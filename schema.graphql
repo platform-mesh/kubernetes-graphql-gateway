@@ -1,0 +1,2919 @@
+#
+type GithubTokenRequestspec {
+  #
+  code: String
+
+  #
+  domain: String
+}
+
+#
+type Site {
+  # APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  # SiteSpec defines the desired state of Site
+  spec: Sitespec
+
+  # SiteStatus defines the observed state of Site
+  status: Sitestatus
+}
+
+#
+type ComponentSpecExtensionsjira {
+  #
+  componentName: String
+
+  #
+  projectKey: String
+}
+
+#
+type WizardConfiguration {
+  # APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  # WizardConfigurationSpec defines the desired state of WizardConfiguration
+  spec: WizardConfigurationspec
+}
+
+#
+type ProjectMetadata {
+  # APIVersion defines the versioned schema of this representation of an object.
+  # Servers should convert recognized schemas to the latest internal value, and
+  # may reject unrecognized values.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents.
+  # Servers may infer this from the endpoint the client submits requests to.
+  # Cannot be updated.
+  # In CamelCase.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  # ProjectMetadataSpec defines the desired state of ProjectMetadata
+  spec: ProjectMetadataspec
+}
+
+#
+type ClusterGithubAppInstallationspec {
+  #
+  account: ClusterGithubAppInstallationSpecaccount
+
+  #
+  html_url: String
+
+  #
+  readonly: Boolean
+
+  #
+  repository_selection: String
+
+  #
+  suspended_at: String
+
+  #
+  target_type: String
+}
+
+#
+type APIResourceDisplayConfig {
+  # APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  # APIResourceDisplayConfigSpec defines the desired state of APIResourceDisplayConfig
+  spec: APIResourceDisplayConfigspec
+}
+
+#
+type TeamMetadataSpecExtensionsdocs {
+  #
+  hasMkDocsConfig: Boolean
+
+  #
+  hasReadme: Boolean
+}
+
+#
+type AccountSpecInstallationdatahsPipelineData {
+  # The pipeline group id for this account
+  groupId: String
+}
+
+#
+type APIDefinitionSpecextensions {
+  #
+  docs: APIDefinitionSpecExtensionsdocs
+
+  #
+  team: APIDefinitionSpecExtensionsteam
+}
+
+#
+type ServiceInstancespec {
+  # The name of the instance in Service Manager
+  externalName: String
+
+  # The name of the service offering
+  serviceOfferingName: String
+
+  # The plan ID in case service offering and plan name are ambiguous
+  servicePlanID: String
+
+  # The name of the service plan
+  servicePlanName: String
+
+  # UserInfo contains information about the user that last modified this instance. This field is set by the API server and not settable by the end-user. User-provided values for this field are not saved.
+  userInfo: ServiceInstanceSpecuserInfo
+}
+
+#
+type APIResourceDisplayConfigSpecapiServerConfig {
+  #
+  host: String
+
+  #
+  namespaceRetrievalStrategy: String
+}
+
+#
+type GithubAppRegistration {
+  # APIVersion defines the versioned schema of this representation of an object.
+  # Servers should convert recognized schemas to the latest internal value, and
+  # may reject unrecognized values.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents.
+  # Servers may infer this from the endpoint the client submits requests to.
+  # Cannot be updated.
+  # In CamelCase.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  # GithubAppRegistrationSpec defines the desired state of GithubAppRegistration
+  spec: GithubAppRegistrationspec
+
+  # GithubAppRegistrationStatus defines the observed state of GithubAppRegistration
+  status: GithubAppRegistrationstatus
+}
+
+#
+type GithubAppRegistrationstatus {
+  #
+  eventingLastUpdateTime: String
+}
+
+#
+type BoundedContextAutomationspec {
+  #
+  commit: String
+
+  # This is the same pattern used by kubernetes to validate names
+  item: String
+
+  #
+  messageId: String
+
+  #
+  metadataURL: String
+}
+
+#
+type ServiceBindingSpecuserInfo {
+  # A unique value that identifies this user across time. If this user is deleted and another user by the same name is added, they will have different UIDs.
+  uid: String
+
+  # The name that uniquely identifies this user among all active users.
+  username: String
+}
+
+#
+type ComponentSpecExtensionsRepositorytags {
+  #
+  latestTag: ComponentSpecExtensionsRepositoryTagslatestTag
+}
+
+#
+type TechDocsRebuildAutomationstatus {
+  # TechDocsRebuildAutomationSpec defines the desired state of TechDocsRebuildAutomation
+  values: TechDocsRebuildAutomationStatusvalues
+}
+
+#
+type DefaultExtensionConfigurationspec {
+  #
+  condition: String
+}
+
+#
+type ExtensionClassSpecicon {
+  #
+  dark: ExtensionClassSpecIcondark
+
+  #
+  light: ExtensionClassSpecIconlight
+}
+
+#
+type PageConfig {
+  # APIVersion defines the versioned schema of this representation of an object.
+  # Servers should convert recognized schemas to the latest internal value, and
+  # may reject unrecognized values.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents.
+  # Servers may infer this from the endpoint the client submits requests to.
+  # Cannot be updated.
+  # In CamelCase.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  # PageConfigSpec defines the desired state of PageConfig
+  spec: PageConfigspec
+}
+
+#
+type ComponentSpecExtensionspiper {
+  #
+  enabled: Boolean
+}
+
+#
+type ExtensionSetupspec {
+  # DefaultExtensionConfigurationRef refers to a DefaultExtensionConfiguration at any place within the cluster. If it isn't provided, the reconciliation cycle should look for the one existing on the parent namespace.
+  defaultExtensionConfigurationRef: ExtensionSetupSpecdefaultExtensionConfigurationRef
+}
+
+#
+type GlobalAccountReferencespec {
+  #
+  displayName: String
+
+  #
+  subDomain: String
+}
+
+#
+type VaultAccessPolicy {
+  # APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  # VaultAccessPolicySpec defines the desired state of VaultAccessPolicy
+  spec: VaultAccessPolicyspec
+}
+
+#
+type VaultAccessPolicyspec {
+  #
+  serviceAccount: VaultAccessPolicySpecserviceAccount
+
+  #
+  vaultPolicy: String
+}
+
+#
+type VaultAccessPolicySpecserviceAccount {
+  # Name of resource being referenced
+  name: String
+
+  # Namespace of resource being referenced
+  namespace: String
+}
+
+#
+type ServiceInstanceSpecuserInfo {
+  # A unique value that identifies this user across time. If this user is deleted and another user by the same name is added, they will have different UIDs.
+  uid: String
+
+  # The name that uniquely identifies this user among all active users.
+  username: String
+}
+
+#
+type ServiceInstancestatus {
+  # The generated ID of the instance, will be automatically filled once the instance is created
+  instanceID: String
+
+  # The operation type (CREATE/UPDATE/DELETE) for ongoing operation
+  operationType: String
+
+  # URL of ongoing operation for the service instance
+  operationURL: String
+
+  # Indicates whether instance is ready for usage
+  ready: String
+}
+
+#
+type AccountConnectionSpecaccountType {
+  # Name of resource being referenced
+  name: String
+
+  # Namespace of resource being referenced
+  namespace: String
+}
+
+#
+type GithubTeam {
+  # APIVersion defines the versioned schema of this representation of an object.
+  # Servers should convert recognized schemas to the latest internal value, and
+  # may reject unrecognized values.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents.
+  # Servers may infer this from the endpoint the client submits requests to.
+  # Cannot be updated.
+  # In CamelCase.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  # GithubTeamSpec defines the desired state of GithubTeam
+  spec: GithubTeamspec
+
+  # GithubTeamStatus defines the observed state of GithubTeam
+  status: GithubTeamstatus
+}
+
+#
+type TeamMetadataSpecLogodefaultImage {
+  #
+  data: String
+
+  #
+  url: String
+}
+
+#
+type TechDocsAutomationStatusRegenerationregenerate {
+  #
+  html: Boolean
+
+  #
+  index: Boolean
+}
+
+#
+type ReprocessRequestspec {
+  #
+  errorsOnly: Boolean
+}
+
+#
+type SiteSpecbuilder {
+  # The package manager that will be used in the build process. An install command will be executed. Currently npm and yarn are supported. If no package manager is set, it will default to 'npm'. The used npm version is 6.14.13. The used yarn version is 1.22.5
+  packageManager: String
+
+  # The configures the base image that is going to be used in the website build. Currently node14 is supported.
+  type: String
+}
+
+#
+type TeamMetadataAutomation {
+  # APIVersion defines the versioned schema of this representation of an object.
+  # Servers should convert recognized schemas to the latest internal value, and
+  # may reject unrecognized values.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents.
+  # Servers may infer this from the endpoint the client submits requests to.
+  # Cannot be updated.
+  # In CamelCase.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  # BoundedContextAutomationSpec defines the desired state of BoundedContextAutomation
+  spec: TeamMetadataAutomationspec
+
+  # BoundedContextAutomationStatus defines the observed state of BoundedContextAutomation
+  status: TeamMetadataAutomationstatus
+}
+
+#
+type SecretReferenceSpecbackend {
+  #
+  ref: SecretReferenceSpecBackendref
+
+  #
+  type: String
+}
+
+#
+type ExtensionClassspec {
+  #
+  category: String
+
+  #
+  cdmUrl: String
+
+  #
+  configurationMetadata: String
+
+  #
+  description: String
+
+  #
+  displayName: String
+
+  #
+  documentation: ExtensionClassSpecdocumentation
+
+  #
+  helpCenterData: ExtensionClassSpechelpCenterData
+
+  #
+  icon: ExtensionClassSpecicon
+
+  #
+  image: String
+
+  #
+  mainLink: ExtensionClassSpecmainLink
+
+  #
+  multipleInstallations: Boolean
+
+  #
+  network: String
+
+  #
+  provider: String
+
+  #
+  security: ExtensionClassSpecsecurity
+
+  #
+  serviceLevel: String
+
+  #
+  supportsDynamicCdmUrls: Boolean
+
+  #
+  template: ExtensionClassSpectemplate
+
+  #
+  type: String
+
+  #
+  verification: ExtensionClassSpecverification
+
+  #
+  wizardConfigRef: ExtensionClassSpecwizardConfigRef
+}
+
+#
+type TechDocsAutomationspec {
+  #
+  component: TechDocsAutomationSpeccomponent
+
+  #
+  lastProcessedCommit: String
+}
+
+#
+type AccountSpecinstallationData {
+  # Data that should be used creating account with referenced Hyperspace Pipeline data
+  hsPipelineData: AccountSpecInstallationdatahsPipelineData
+
+  # Id of a project used as a template to create a new project
+  templateProjectId: String
+}
+
+#
+type ComponentSpecExtensionsRepositorybranches {
+  #
+  defaultBranch: ComponentSpecExtensionsRepositoryBranchesdefaultBranch
+}
+
+#
+type ComponentSpecExtensionstemplate {
+  #
+  name: String
+
+  #
+  version: String
+}
+
+#
+type APIResourceDisplayConfigspec {
+  #
+  apiServerConfig: APIResourceDisplayConfigSpecapiServerConfig
+
+  #
+  resourceConfig: APIResourceDisplayConfigSpecresourceConfig
+}
+
+#
+type ExtensionClassSpecIconlight {
+  #
+  data: String
+
+  #
+  url: String
+}
+
+#
+type AccountExtensionSpecextension {
+  # APIVersion defines the versioned schema of this representation of an object.
+  # Servers should convert recognized schemas to the latest internal value, and
+  # may reject unrecognized values.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents.
+  # Servers may infer this from the endpoint the client submits requests to.
+  # Cannot be updated.
+  # In CamelCase.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+}
+
+#
+type Accountspec {
+  # AccountRole specifies the intended role for this Account object.
+  accountRole: String
+
+  # An optional description for this account
+  description: String
+
+  # The display name for this account
+  displayName: String
+
+  # If set to true, no extension changes can be made to this Account
+  frozen: Boolean
+
+  # Installation data for creating account with predefined setup
+  installationData: AccountSpecinstallationData
+
+  # Namespace is the name of the namespace container for objects owned by this Account
+  namespace: String
+
+  # The account owner email.
+  owner: String
+
+  # Account type
+  type: String
+}
+
+#
+type BoundedContextSpecautomation {
+  #
+  baseDomain: String
+
+  #
+  isGithubEnterprise: Boolean
+
+  #
+  login: String
+
+  #
+  metadataFile: String
+
+  #
+  path: String
+
+  #
+  refName: String
+
+  #
+  repo: String
+
+  #
+  repoUrl: String
+}
+
+#
+type ExtensionInstanceSpecextensionRef {
+  # Name is the name of the resource being referenced
+  name: String
+
+  # Namespace is the namespace of the resource being referenced
+  namespace: String
+}
+
+#
+type TechDocsAutomationStatusindex {
+  #
+  jobName: String
+
+  #
+  status: String
+
+  #
+  workflowName: String
+}
+
+#
+type AccountConnection {
+  # APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  # AccountConnectionSpec defines the desired state of AccountConnection
+  spec: AccountConnectionspec
+}
+
+#
+type ExtensionInstancespec {
+  #
+  configurationMetadata: String
+
+  #
+  displayName: String
+
+  #
+  extensionRef: ExtensionInstanceSpecextensionRef
+
+  #
+  isMandatoryExtension: Boolean
+}
+
+#
+type ProxyConfigSpecaccountConnectionTypeRef {
+  #
+  name: String
+}
+
+#
+type APIDefinitionAutomationspec {
+  #
+  commit: String
+
+  # This is the same pattern used by kubernetes to validate names
+  item: String
+
+  #
+  messageId: String
+
+  #
+  metadataURL: String
+}
+
+#
+type SecretReference {
+  # APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  # SecretReferenceSpec defines the desired state of SecretReference
+  spec: SecretReferencespec
+}
+
+#
+type Componentspec {
+  #
+  automation: ComponentSpecautomation
+
+  #
+  boundedContext: String
+
+  #
+  componentType: String
+
+  #
+  description: String
+
+  #
+  displayName: String
+
+  #
+  extensions: ComponentSpecextensions
+
+  #
+  logo: ComponentSpeclogo
+
+  #
+  longDescription: String
+
+  #
+  type: ComponentSpectype
+}
+
+#
+type ExtensionClassSearch {
+  # APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  # ExtensionClassSearchSpec defines the desired state of ExtensionClassSearch
+  spec: ExtensionClassSearchspec
+}
+
+#
+type APIDefinitionSpecautomation {
+  #
+  baseDomain: String
+
+  #
+  isGithubEnterprise: Boolean
+
+  #
+  login: String
+
+  #
+  metadataFile: String
+
+  #
+  path: String
+
+  #
+  refName: String
+
+  #
+  repo: String
+
+  #
+  repoUrl: String
+}
+
+#
+type ReprocessRequest {
+  # APIVersion defines the versioned schema of this representation of an object.
+  # Servers should convert recognized schemas to the latest internal value, and
+  # may reject unrecognized values.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents.
+  # Servers may infer this from the endpoint the client submits requests to.
+  # Cannot be updated.
+  # In CamelCase.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  # ReprocessRequestSpec defines the desired state of ReprocessRequest
+  spec: ReprocessRequestspec
+}
+
+#
+type GithubInstallationAccessTokenRequestspec {
+  #
+  accountName: String
+
+  #
+  entity: String
+
+  #
+  githubDomain: String
+
+  #
+  repositoryUrl: String
+
+  #
+  scope: String
+
+  #
+  tenantId: String
+}
+
+#
+type SubaccountReference {
+  # APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  # SubaccountReferenceSpec defines the desired state of SubaccountReference
+  spec: SubaccountReferencespec
+}
+
+#
+type ComponentSpecExtensionsteam {
+  #
+  name: String
+
+  #
+  productManager: String
+
+  #
+  productOwner: String
+
+  #
+  qualityLead: String
+
+  #
+  securityLead: String
+
+  #
+  technicalOwner: String
+
+  #
+  uxLead: String
+}
+
+#
+type Componentstatus {
+  #
+  eventingLastUpdateTime: String
+}
+
+#
+type APIDefinitionAutomationstatus {
+  #
+  commit: String
+
+  #
+  item: String
+
+  #
+  workflow: String
+}
+
+#
+type ExtensionSetupSpecdefaultExtensionConfigurationRef {
+  # Name is the name of the resource being referenced
+  name: String
+
+  # Namespace is the namespace of the resource being referenced
+  namespace: String
+}
+
+#
+type ExtensionInstanceSearch {
+  # APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  # ExtensionInstanceSearchSpec defines the desired state of ExtensionInstanceSearch
+  spec: ExtensionInstanceSearchspec
+}
+
+#
+type ComponentSpectype {
+  #
+  lifecycle: String
+
+  #
+  name: String
+}
+
+#
+type TechDocsRebuildAutomationStatusvalues {
+  #
+  regenerate: TechDocsRebuildAutomationStatusValuesregenerate
+}
+
+#
+type WizardConfigurationSpecmetadata {
+  # The display name is shown as title in the wizard
+  displayName: String
+}
+
+#
+type AccountConnectionTypeSpecextensionRef {
+  # Name is the name of resource being referenced
+  name: String
+
+  # Name is the name of resource being referenced
+  namespace: String
+}
+
+#
+type GithubInstallationTokenRequeststatus {
+  #
+  accessToken: String
+}
+
+#
+type SiteSpecrelease {
+  # The name of the asset in a github release. It will default to 'dist.tar.gz'
+  assetName: String
+
+  #
+  organization: String
+
+  #
+  repository: String
+
+  #
+  version: String
+}
+
+#
+type AccountConnectionTypespec {
+  #
+  description: String
+
+  #
+  displayName: String
+
+  #
+  extensionRef: AccountConnectionTypeSpecextensionRef
+
+  #
+  image: AccountConnectionTypeSpecimage
+
+  #
+  type: AccountConnectionTypeSpectype
+}
+
+#
+type GithubInstallationTokenRequest {
+  # APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  # GithubInstallationTokenRequestSpec defines the desired state of GithubInstallationTokenRequest
+  spec: GithubInstallationTokenRequestspec
+
+  # GithubInstallationTokenRequestStatus defines the observed state of GithubInstallationTokenRequest
+  status: GithubInstallationTokenRequeststatus
+}
+
+#
+type BoundedContextSpecExtensionsdocs {
+  #
+  hasMkDocsConfig: Boolean
+
+  #
+  hasReadme: Boolean
+}
+
+#
+type Commitspec {
+  #
+  sha: String
+}
+
+#
+type BTPProviderConfigspec {
+  #
+  cmsAccountName: String
+
+  #
+  controlPlaneConfig: String
+}
+
+#
+type ExtensionClassSpechelpCenterData {
+  #
+  feedbackTracker: ExtensionClassSpecHelpcenterdatafeedbackTracker
+
+  #
+  issueTracker: ExtensionClassSpecHelpcenterdataissueTracker
+}
+
+#
+type ComponentAutomationstatus {
+  #
+  componentName: String
+
+  #
+  nextSubmissionTime: String
+
+  #
+  ref: String
+
+  #
+  workflow: String
+}
+
+#
+type ComponentSpecautomation {
+  #
+  baseDomain: String
+
+  #
+  isGithubEnterprise: Boolean
+
+  #
+  login: String
+
+  #
+  metadataFile: String
+
+  #
+  path: String
+
+  #
+  refName: String
+
+  #
+  repo: String
+
+  #
+  repoUrl: String
+}
+
+#
+type ControlPlaneConfigspec {
+  #
+  controlPlaneAccountName: String
+}
+
+#
+type TechDocsRebuildAutomationspec {
+  #
+  regenerate: TechDocsRebuildAutomationSpecregenerate
+}
+
+#
+type TechDocsRebuildAutomationStatusValuesregenerate {
+  #
+  html: Boolean
+
+  #
+  index: Boolean
+}
+
+#
+type SubaccountReferencespec {
+  #
+  displayName: String
+
+  #
+  globalAccountReference: String
+
+  #
+  region: String
+
+  #
+  subDomain: String
+}
+
+#
+type ProjectMetadataSpecExtensionstechDocsExtension {
+  #
+  projectDocumentationComponentID: String
+}
+
+#
+type ProjectMetadataSpecExtensionsserviceToolchain {
+  #
+  euAccess: String
+
+  #
+  name: String
+
+  #
+  releaseStage: String
+
+  #
+  serviceCategory: String
+
+  #
+  serviceID: String
+
+  #
+  serviceOwnerID: String
+
+  #
+  serviceOwnerName: String
+}
+
+#
+type BoundedContextAutomationstatus {
+  #
+  commit: String
+
+  #
+  item: String
+
+  #
+  workflow: String
+}
+
+#
+type ComponentAutomation {
+  # APIVersion defines the versioned schema of this representation of an object.
+  # Servers should convert recognized schemas to the latest internal value, and
+  # may reject unrecognized values.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents.
+  # Servers may infer this from the endpoint the client submits requests to.
+  # Cannot be updated.
+  # In CamelCase.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  # ComponentAutomationSpec defines the desired state of ComponentAutomation
+  spec: ComponentAutomationspec
+
+  # ComponentAutomationStatus defines the observed state of ComponentAutomation
+  status: ComponentAutomationstatus
+}
+
+#
+type AccountExtensionspec {
+  # Should an object of the specified type be autocreated for each affected account
+  # when the account extension is created and also when new accounts are created?
+  # Defaults to true
+  autoCreate: Boolean
+
+  # Should the AccountExtension be automatically applied to **all** Accounts in the current
+  # hierarchy. Defaults to true
+  autoExtend: Boolean
+
+  # The extension custom resource that contains any additional information required
+  # by this account extension
+  extension: AccountExtensionSpecextension
+
+  # Inherited extensions search for their data object at the current level of the
+  # account and all the way to the top of the hierarchy.
+  # Defaults to false.
+  inherited: Boolean
+
+  # The type of a condition that must be set to True on the Extension object
+  # for the extension to be considered Reconciled and ready. If this is empty,
+  # the extension is considered ready. The conditions array is expected to be
+  # placed in the Extension object's Status section, and called "conditions"
+  readyConditionType: String
+}
+
+#
+type WizardConfigurationspec {
+  # Used to specify meta data to be displayed
+  metadata: WizardConfigurationSpecmetadata
+}
+
+#
+type ClusterGithubAppInstallation {
+  # APIVersion defines the versioned schema of this representation of an object.
+  # Servers should convert recognized schemas to the latest internal value, and
+  # may reject unrecognized values.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents.
+  # Servers may infer this from the endpoint the client submits requests to.
+  # Cannot be updated.
+  # In CamelCase.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  # ClusterGithubAppInstallationSpec defines the desired state of ClusterGithubAppInstallation
+  spec: ClusterGithubAppInstallationspec
+}
+
+#
+type GithubEventSubscription {
+  # APIVersion defines the versioned schema of this representation of an object.
+  # Servers should convert recognized schemas to the latest internal value, and
+  # may reject unrecognized values.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents.
+  # Servers may infer this from the endpoint the client submits requests to.
+  # Cannot be updated.
+  # In CamelCase.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  # GithubEventSubscriptionSpec defines the desired state of GithubEventSubscription
+  spec: GithubEventSubscriptionspec
+}
+
+#
+type BoundedContextspec {
+  #
+  automation: BoundedContextSpecautomation
+
+  #
+  description: String
+
+  #
+  displayName: String
+
+  #
+  extensions: BoundedContextSpecextensions
+}
+
+#
+type ControlPlaneConfig {
+  # APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  # ControlPlaneConfigSpec defines the desired state of ControlPlaneConfig
+  spec: ControlPlaneConfigspec
+}
+
+#
+type ServiceBindingSpeccredentialsRotationPolicy {
+  #
+  enabled: Boolean
+
+  # For how long to keep the rotated binding.
+  rotatedBindingTTL: String
+
+  # What frequency to perform binding rotation.
+  rotationFrequency: String
+}
+
+#
+type ComponentSpecExtensionsRepositoryreleases {
+  #
+  latestRelease: ComponentSpecExtensionsRepositoryReleaseslatestRelease
+}
+
+#
+type ExtensionClassSpecHelpcenterdataissueTracker {
+  #
+  url: String
+}
+
+#
+type GithubTokenRequest {
+  # APIVersion defines the versioned schema of this representation of an object.
+  # Servers should convert recognized schemas to the latest internal value, and
+  # may reject unrecognized values.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents.
+  # Servers may infer this from the endpoint the client submits requests to.
+  # Cannot be updated.
+  # In CamelCase.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  # GithubTokenRequestSpec defines the desired state of GithubTokenRequest
+  spec: GithubTokenRequestspec
+
+  # GithubTokenRequestStatus defines the observed state of GithubTokenRequest
+  status: GithubTokenRequeststatus
+}
+
+#
+type ComponentAutomationspec {
+  # Desired Commit to be processed
+  commit: String
+
+  # This is the same pattern used by kubernetes to validate names
+  componentName: String
+
+  # MessageId will be updated if a new events triggers a reprocessing
+  messageId: String
+
+  #
+  metadataURL: String
+}
+
+#
+type SecretReferencespec {
+  #
+  accountConnectionType: SecretReferenceSpecaccountConnectionType
+
+  #
+  backend: SecretReferenceSpecbackend
+
+  #
+  name: String
+
+  #
+  ref: String
+}
+
+#
+type GithubInstallationTokenRequestspec {
+  #
+  accountName: String
+
+  #
+  entity: String
+
+  #
+  githubDomain: String
+
+  #
+  repositoryUrl: String
+
+  #
+  scope: String
+
+  #
+  tenantId: String
+}
+
+#
+type ComponentSpecExtensionsrepository {
+  #
+  branches: ComponentSpecExtensionsRepositorybranches
+
+  #
+  createdAt: String
+
+  #
+  defaultBranch: String
+
+  #
+  lastUpdatedAt: String
+
+  #
+  license: ComponentSpecExtensionsRepositorylicense
+
+  #
+  path: String
+
+  #
+  releases: ComponentSpecExtensionsRepositoryreleases
+
+  #
+  tags: ComponentSpecExtensionsRepositorytags
+
+  #
+  url: String
+
+  #
+  visibility: String
+}
+
+#
+type SecretReferenceSpecBackendref {
+  # Name of resource being referenced
+  name: String
+
+  # Namespace of resource being referenced
+  namespace: String
+}
+
+#
+type ExtensionInstancestatus {
+  #
+  isMissingMandatoryData: Boolean
+}
+
+#
+type ComponentSpecExtensionsdocs {
+  #
+  hasMkDocsConfig: Boolean
+
+  #
+  hasReadme: Boolean
+}
+
+#
+type ComponentSpecLogodefaultImage {
+  #
+  data: String
+
+  #
+  url: String
+}
+
+#
+type ExtensionInstanceSearchSpecextensionClassRef {
+  # Name is the name of the resource being referenced
+  name: String
+
+  # Namespace is the namespace of the resource being referenced
+  namespace: String
+}
+
+#
+type ComponentSpecExtensionsRepositoryTagslatestTag {
+  #
+  name: String
+
+  #
+  url: String
+}
+
+#
+type ExtensionClassSearchSpecwizardConfigRef {
+  # Name is the name of the resource being referenced
+  name: String
+
+  # Namespace is the namespace of the resource being referenced
+  namespace: String
+}
+
+#
+type TeamMetadataSpecExtensionsteam {
+  #
+  name: String
+
+  #
+  productManager: String
+
+  #
+  productOwner: String
+
+  #
+  qualityLead: String
+
+  #
+  securityLead: String
+
+  #
+  technicalOwner: String
+
+  #
+  uxLead: String
+}
+
+#
+type DefaultExtensionConfiguration {
+  # APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  #
+  spec: DefaultExtensionConfigurationspec
+}
+
+#
+type InstrumentedResource {
+  # APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+}
+
+#
+type ExtensionClassSpecverification {
+  #
+  type: String
+}
+
+#
+type APIDefinitionAutomation {
+  # APIVersion defines the versioned schema of this representation of an object.
+  # Servers should convert recognized schemas to the latest internal value, and
+  # may reject unrecognized values.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents.
+  # Servers may infer this from the endpoint the client submits requests to.
+  # Cannot be updated.
+  # In CamelCase.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  # BoundedContextAutomationSpec defines the desired state of BoundedContextAutomation
+  spec: APIDefinitionAutomationspec
+
+  # BoundedContextAutomationStatus defines the observed state of BoundedContextAutomation
+  status: APIDefinitionAutomationstatus
+}
+
+#
+type TechDocsAutomationSpeccomponent {
+  #
+  latestDocumentationCommit: String
+
+  #
+  name: String
+}
+
+#
+type ComponentSpecExtensionsvulnerabilityExtension {
+  #
+  motivation: ComponentSpecExtensionsVulnerabilityextensionmotivation
+}
+
+#
+type ExtensionSetup {
+  # APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  #
+  spec: ExtensionSetupspec
+}
+
+#
+type ExtensionClass {
+  # APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  #
+  spec: ExtensionClassspec
+}
+
+#
+type ExtensionClassSpecwizardConfigRef {
+  # Name is the name of the resource being referenced
+  name: String
+
+  # Namespace is the namespace of the resource being referenced
+  namespace: String
+}
+
+#
+type GithubAppRegistrationspec {
+  #
+  accountName: String
+
+  #
+  installationRef: String
+}
+
+#
+type ExtensionClassSpecdocumentation {
+  #
+  url: String
+}
+
+#
+type GlobalAccountReference {
+  # APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  # GlobalAccountReferenceSpec defines the desired state of GlobalAccountReference
+  spec: GlobalAccountReferencespec
+}
+
+#
+type TechDocsRebuildAutomation {
+  # APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  # TechDocsRebuildAutomationSpec defines the desired state of TechDocsRebuildAutomation
+  spec: TechDocsRebuildAutomationspec
+
+  # TechDocsRebuildAutomationStatus defines the observed state of TechDocsRebuildAutomation
+  status: TechDocsRebuildAutomationstatus
+}
+
+#
+type DxpExtensionstatus {
+  #
+  automaticdNamespace: String
+
+  #
+  eventingLastUpdateTime: String
+
+  #
+  nextReconcileTime: String
+
+  #
+  observedResourceVersion: String
+}
+
+#
+type ProxyConfigSpectype {
+  #
+  context: String
+
+  #
+  name: String
+}
+
+#
+type APIDefinitionSpecschema {
+  #
+  location: String
+}
+
+#
+type ProjectMetadataSpecLogodefaultImage {
+  #
+  data: String
+
+  #
+  url: String
+}
+
+#
+type ExtensionClassSpecmainLink {
+  #
+  URL: String
+
+  #
+  displayName: String
+}
+
+#
+type TechDocsAutomationstatus {
+  #
+  currentProcessingCommit: String
+
+  #
+  index: TechDocsAutomationStatusindex
+
+  #
+  regeneration: TechDocsAutomationStatusregeneration
+
+  #
+  workflow: TechDocsAutomationStatusworkflow
+}
+
+#
+type Commit {
+  # APIVersion defines the versioned schema of this representation of an object.
+  # Servers should convert recognized schemas to the latest internal value, and
+  # may reject unrecognized values.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents.
+  # Servers may infer this from the endpoint the client submits requests to.
+  # Cannot be updated.
+  # In CamelCase.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  # CommitSpec defines the desired state of Commit
+  spec: Commitspec
+}
+
+#
+type AccountConnectionTypeSpecimage {
+  #
+  fromConfigMap: AccountConnectionTypeSpecImagefromConfigMap
+
+  #
+  url: String
+}
+
+#
+type ExtensionClassSpecHelpcenterdatafeedbackTracker {
+  #
+  url: String
+}
+
+#
+type ComponentSpeclogo {
+  #
+  defaultImage: ComponentSpecLogodefaultImage
+}
+
+#
+type BoundedContext {
+  # APIVersion defines the versioned schema of this representation of an object.
+  # Servers should convert recognized schemas to the latest internal value, and
+  # may reject unrecognized values.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents.
+  # Servers may infer this from the endpoint the client submits requests to.
+  # Cannot be updated.
+  # In CamelCase.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  # BoundedContextSpec defines the desired state of BoundedContext
+  spec: BoundedContextspec
+}
+
+#
+type SecretReferenceSpecaccountConnectionType {
+  # Name of resource being referenced
+  name: String
+
+  # Namespace of resource being referenced
+  namespace: String
+}
+
+#
+type ExtensionInstanceSearchspec {
+  #
+  extensionClassRef: ExtensionInstanceSearchSpecextensionClassRef
+}
+
+#
+type Sitestatus {
+  #
+  commit: String
+
+  #
+  deployedAt: String
+
+  #
+  deployedRelease: String
+
+  #
+  domain: String
+
+  #
+  gcpLoadBalancer: String
+
+  #
+  gcpUrlMap: String
+
+  #
+  status: String
+
+  #
+  url: String
+}
+
+#
+type ComponentSpecExtensionsdora {
+  #
+  identifier: String
+}
+
+#
+type ProjectMetadataSearch {
+  # APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+}
+
+#
+type ProjectMetadataAutomationstatus {
+  #
+  commit: String
+
+  #
+  item: String
+
+  #
+  workflow: String
+}
+
+#
+type TeamMetadataSearch {
+  # APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+}
+
+#
+type ComponentSpecExtensionsinnerSource {
+  #
+  motivation: String
+}
+
+#
+type ProjectMetadataSpecExtensionsdocs {
+  #
+  hasMkDocsConfig: Boolean
+
+  #
+  hasReadme: Boolean
+}
+
+#
+type ComponentSpecExtensionsRepositorylicense {
+  #
+  key: String
+
+  #
+  name: String
+
+  #
+  spdxId: String
+
+  #
+  url: String
+}
+
+#
+type APIDefinitionSpecExtensionsdocs {
+  #
+  hasMkDocsConfig: Boolean
+
+  #
+  hasReadme: Boolean
+}
+
+#
+type TeamMetadataSpeclogo {
+  #
+  defaultImage: TeamMetadataSpecLogodefaultImage
+}
+
+#
+type BoundedContextAutomation {
+  # APIVersion defines the versioned schema of this representation of an object.
+  # Servers should convert recognized schemas to the latest internal value, and
+  # may reject unrecognized values.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents.
+  # Servers may infer this from the endpoint the client submits requests to.
+  # Cannot be updated.
+  # In CamelCase.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  # BoundedContextAutomationSpec defines the desired state of BoundedContextAutomation
+  spec: BoundedContextAutomationspec
+
+  # BoundedContextAutomationStatus defines the observed state of BoundedContextAutomation
+  status: BoundedContextAutomationstatus
+}
+
+#
+type TechDocsAutomationStatusworkflow {
+  #
+  name: String
+}
+
+#
+type ExtensionClassSearchspec {
+  #
+  wizardConfigRef: ExtensionClassSearchSpecwizardConfigRef
+}
+
+#
+type APIDefinitionspec {
+  #
+  automation: APIDefinitionSpecautomation
+
+  #
+  description: String
+
+  #
+  displayName: String
+
+  #
+  extensions: APIDefinitionSpecextensions
+
+  #
+  schema: APIDefinitionSpecschema
+
+  #
+  type: APIDefinitionSpectype
+}
+
+#
+type TechDocsAutomationStatusregeneration {
+  #
+  regenerate: TechDocsAutomationStatusRegenerationregenerate
+}
+
+#
+type ProxyConfigspec {
+  #
+  accountConnectionTypeRef: ProxyConfigSpecaccountConnectionTypeRef
+
+  #
+  target: String
+
+  #
+  type: ProxyConfigSpectype
+}
+
+#
+type VaultRegistration {
+  # APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  # VaultRegistrationStatus defines the observed state of VaultRegistration
+  status: VaultRegistrationstatus
+}
+
+#
+type ExtensionClassSpectemplate {
+  #
+  name: String
+
+  #
+  version: String
+}
+
+#
+type GithubEventSubscriptionspec {
+  #
+  branch: String
+
+  #
+  domain: String
+
+  #
+  owner: String
+
+  #
+  repository: String
+}
+
+#
+type TechDocsRebuildAutomationSpecregenerate {
+  #
+  html: Boolean
+
+  #
+  index: Boolean
+}
+
+#
+type GithubTeamspec {
+  #
+  description: String
+
+  #
+  domain: String
+
+  #
+  maintainerPolicy: String
+
+  #
+  memberPolicy: String
+
+  #
+  messageID: String
+
+  #
+  organization: String
+
+  #
+  postFix: String
+
+  #
+  privacy: String
+}
+
+#
+type ComponentSpecExtensionsRepositoryBranchesdefaultBranch {
+  #
+  name: String
+}
+
+#
+type APIResourceDisplayConfigSpecresourceConfig {
+  #
+  groupVersion: String
+
+  #
+  kind: String
+}
+
+#
+type Query {
+  #
+  accountconnections: [AccountConnection]
+
+  #
+  accountconnectiontypes: [AccountConnectionType]
+
+  #
+  accountextensions: [AccountExtension]
+
+  #
+  accounts: [Account]
+
+  #
+  apidefinitionautomations: [APIDefinitionAutomation]
+
+  #
+  apidefinitions: [APIDefinition]
+
+  #
+  apiresourcedisplayconfigs: [APIResourceDisplayConfig]
+
+  #
+  boundedcontextautomations: [BoundedContextAutomation]
+
+  #
+  boundedcontexts: [BoundedContext]
+
+  #
+  btpproviderconfigs: [BTPProviderConfig]
+
+  #
+  clustergithubappinstallations: [ClusterGithubAppInstallation]
+
+  #
+  commits: [Commit]
+
+  #
+  componentautomations: [ComponentAutomation]
+
+  #
+  componentrunmappings: [ComponentRunMapping]
+
+  #
+  components: [Component]
+
+  #
+  controlplaneconfigs: [ControlPlaneConfig]
+
+  #
+  defaultextensionconfigurations: [DefaultExtensionConfiguration]
+
+  #
+  dxpextensions: [DxpExtension]
+
+  #
+  extensionclasses: [ExtensionClass]
+
+  #
+  extensionclasssearches: [ExtensionClassSearch]
+
+  #
+  extensioninstances: [ExtensionInstance]
+
+  #
+  extensioninstancesearches: [ExtensionInstanceSearch]
+
+  #
+  extensionsetups: [ExtensionSetup]
+
+  #
+  githubappregistrations: [GithubAppRegistration]
+
+  #
+  githubeventsubscriptions: [GithubEventSubscription]
+
+  #
+  githubinstallationaccesstokenrequests: [GithubInstallationAccessTokenRequest]
+
+  #
+  githubinstallationtokenrequests: [GithubInstallationTokenRequest]
+
+  #
+  githubteams: [GithubTeam]
+
+  #
+  githubtokenrequests: [GithubTokenRequest]
+
+  #
+  globalaccountreferences: [GlobalAccountReference]
+
+  #
+  instrumentedresources: [InstrumentedResource]
+
+  #
+  pageconfigs: [PageConfig]
+
+  #
+  projectmetadataautomations: [ProjectMetadataAutomation]
+
+  #
+  projectmetadatas: [ProjectMetadata]
+
+  #
+  projectmetadatasearches: [ProjectMetadataSearch]
+
+  #
+  proxyconfigs: [ProxyConfig]
+
+  #
+  reprocessrequests: [ReprocessRequest]
+
+  #
+  secretreferences: [SecretReference]
+
+  #
+  servicebindings: [ServiceBinding]
+
+  #
+  serviceinstances: [ServiceInstance]
+
+  #
+  sites: [Site]
+
+  #
+  subaccountreferences: [SubaccountReference]
+
+  #
+  teammetadataautomations: [TeamMetadataAutomation]
+
+  #
+  teammetadatas: [TeamMetadata]
+
+  #
+  teammetadatasearches: [TeamMetadataSearch]
+
+  #
+  techdocsautomations: [TechDocsAutomation]
+
+  #
+  techdocsrebuildautomations: [TechDocsRebuildAutomation]
+
+  #
+  universes: [Universe]
+
+  #
+  vaultaccesspolicies: [VaultAccessPolicy]
+
+  #
+  vaultregistrations: [VaultRegistration]
+
+  #
+  version: String
+
+  #
+  wizardconfigurations: [WizardConfiguration]
+
+  #
+  wizardconfigurationsearches: [WizardConfigurationSearch]
+}
+
+#
+type ComponentSpecExtensionsVulnerabilityextensionmotivation {
+  #
+  criticalHTMLUrl: String
+
+  #
+  highHTMLUrl: String
+
+  #
+  moderateHTMLUrl: String
+}
+
+#
+type ComponentRunMappingspec {
+  #
+  componentName: String
+
+  #
+  projectId: String
+
+  #
+  runId: String
+
+  #
+  runToken: String
+
+  #
+  templateId: String
+
+  #
+  templateName: String
+
+  #
+  templatePath: String
+
+  #
+  templateVersion: String
+}
+
+#
+type AccountConnectionspec {
+  #
+  accountType: AccountConnectionSpecaccountType
+
+  #
+  displayName: String
+
+  #
+  name: String
+}
+
+#
+type Universe {
+  # APIVersion defines the versioned schema of this representation of an object.
+  # Servers should convert recognized schemas to the latest internal value, and
+  # may reject unrecognized values.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents.
+  # Servers may infer this from the endpoint the client submits requests to.
+  # Cannot be updated.
+  # In CamelCase.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  # UniverseSpec defines the desired state of Universe
+  spec: Universespec
+}
+
+#
+type AccountConnectionTypeSpectype {
+  #
+  context: String
+
+  #
+  name: String
+}
+
+#
+type ProjectMetadataSpeclogo {
+  #
+  defaultImage: ProjectMetadataSpecLogodefaultImage
+}
+
+#
+type WizardConfigurationSearch {
+  # APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+}
+
+#
+type ServiceBinding {
+  # APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  # ServiceBindingSpec defines the desired state of ServiceBinding
+  spec: ServiceBindingspec
+
+  # ServiceBindingStatus defines the observed state of ServiceBinding
+  status: ServiceBindingstatus
+}
+
+#
+type Sitespec {
+  # Builder represents the command to build the site
+  builder: SiteSpecbuilder
+
+  # DisplayName represents the display name of the site
+  displayName: String
+
+  # Release represents the version of the Source already built to deploy the site
+  release: SiteSpecrelease
+
+  # Source represents the source code url of the site
+  source: SiteSpecsource
+
+  # SubDomain represents the sprefix subdomain of the website
+  subDomain: String
+
+  # Type represents the type of the builder
+  type: String
+}
+
+#
+type ProjectMetadataspec {
+  #
+  extensions: ProjectMetadataSpecextensions
+
+  #
+  logo: ProjectMetadataSpeclogo
+}
+
+#
+type ServiceBindingstatus {
+  # The generated ID of the binding, will be automatically filled once the binding is created
+  bindingID: String
+
+  # The ID of the instance in SM associated with binding
+  instanceID: String
+
+  # Indicates when binding secret was rotated
+  lastCredentialsRotationTime: String
+
+  # The operation type (CREATE/UPDATE/DELETE) for ongoing operation
+  operationType: String
+
+  # URL of ongoing operation for the service binding
+  operationURL: String
+
+  # Indicates whether binding is ready for usage
+  ready: String
+}
+
+#
+type GithubInstallationAccessTokenRequest {
+  # APIVersion defines the versioned schema of this representation of an object.
+  # Servers should convert recognized schemas to the latest internal value, and
+  # may reject unrecognized values.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents.
+  # Servers may infer this from the endpoint the client submits requests to.
+  # Cannot be updated.
+  # In CamelCase.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  # GithubInstallationTokenRequestSpec defines the desired state of GithubInstallationAccessTokenRequest
+  spec: GithubInstallationAccessTokenRequestspec
+
+  # GithubInstallationAccessTokenRequestStatus defines the observed state of GithubInstallationAccessTokenRequest
+  status: GithubInstallationAccessTokenRequeststatus
+}
+
+#
+type GithubInstallationAccessTokenRequeststatus {
+  #
+  accessToken: String
+}
+
+#
+type ComponentSpecExtensionsRepositoryReleaseslatestRelease {
+  #
+  name: String
+
+  #
+  url: String
+}
+
+#
+type TeamMetadataAutomationspec {
+  #
+  commit: String
+
+  # This is the same pattern used by kubernetes to validate names
+  item: String
+
+  #
+  messageId: String
+
+  #
+  metadataURL: String
+}
+
+#
+type SiteSpecsource {
+  #
+  branch: String
+
+  #
+  commit: String
+
+  #
+  path: String
+
+  #
+  url: String
+}
+
+#
+type Universespec {
+  # Namespace is the name of the namespace container for objects owned by this Universe
+  namespace: String
+}
+
+#
+type ProjectMetadataSpecextensions {
+  #
+  docs: ProjectMetadataSpecExtensionsdocs
+
+  #
+  serviceToolchain: ProjectMetadataSpecExtensionsserviceToolchain
+
+  #
+  team: ProjectMetadataSpecExtensionsteam
+
+  #
+  techDocsExtension: ProjectMetadataSpecExtensionstechDocsExtension
+}
+
+#
+type ProjectMetadataSpecExtensionsteam {
+  #
+  name: String
+
+  #
+  productManager: String
+
+  #
+  productOwner: String
+
+  #
+  qualityLead: String
+
+  #
+  securityLead: String
+
+  #
+  technicalOwner: String
+
+  #
+  uxLead: String
+}
+
+#
+type ExtensionClassSpecsecurity {
+  #
+  clientId: String
+}
+
+#
+type ExtensionClassSpecIcondark {
+  #
+  data: String
+
+  #
+  url: String
+}
+
+#
+type TeamMetadata {
+  # APIVersion defines the versioned schema of this representation of an object.
+  # Servers should convert recognized schemas to the latest internal value, and
+  # may reject unrecognized values.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents.
+  # Servers may infer this from the endpoint the client submits requests to.
+  # Cannot be updated.
+  # In CamelCase.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  # TeamMetadataSpec defines the desired state of TeamMetadata
+  spec: TeamMetadataspec
+}
+
+#
+type ProjectMetadataAutomation {
+  # APIVersion defines the versioned schema of this representation of an object.
+  # Servers should convert recognized schemas to the latest internal value, and
+  # may reject unrecognized values.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents.
+  # Servers may infer this from the endpoint the client submits requests to.
+  # Cannot be updated.
+  # In CamelCase.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  # BoundedContextAutomationSpec defines the desired state of BoundedContextAutomation
+  spec: ProjectMetadataAutomationspec
+
+  # BoundedContextAutomationStatus defines the observed state of BoundedContextAutomation
+  status: ProjectMetadataAutomationstatus
+}
+
+#
+type ComponentSpecextensions {
+  #
+  docs: ComponentSpecExtensionsdocs
+
+  #
+  dora: ComponentSpecExtensionsdora
+
+  #
+  innerSource: ComponentSpecExtensionsinnerSource
+
+  #
+  jira: ComponentSpecExtensionsjira
+
+  #
+  piper: ComponentSpecExtensionspiper
+
+  #
+  repository: ComponentSpecExtensionsrepository
+
+  #
+  team: ComponentSpecExtensionsteam
+
+  #
+  template: ComponentSpecExtensionstemplate
+
+  #
+  vulnerabilityExtension: ComponentSpecExtensionsvulnerabilityExtension
+}
+
+#
+type APIDefinitionSpecExtensionsteam {
+  #
+  name: String
+
+  #
+  productManager: String
+
+  #
+  productOwner: String
+
+  #
+  qualityLead: String
+
+  #
+  securityLead: String
+
+  #
+  technicalOwner: String
+
+  #
+  uxLead: String
+}
+
+#
+type AccountConnectionType {
+  # APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  # AccountConnectionTypeSpec defines the desired state of AccountConnectionType
+  spec: AccountConnectionTypespec
+}
+
+#
+type AccountExtension {
+  # APIVersion defines the versioned schema of this representation of an object.
+  # Servers should convert recognized schemas to the latest internal value, and
+  # may reject unrecognized values.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents.
+  # Servers may infer this from the endpoint the client submits requests to.
+  # Cannot be updated.
+  # In CamelCase.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  # AccountExtensionSpec defines the desired state of AccountExtension
+  spec: AccountExtensionspec
+}
+
+#
+type APIDefinitionSpectype {
+  #
+  name: String
+}
+
+#
+type DxpExtension {
+  # APIVersion defines the versioned schema of this representation of an object.
+  # Servers should convert recognized schemas to the latest internal value, and
+  # may reject unrecognized values.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents.
+  # Servers may infer this from the endpoint the client submits requests to.
+  # Cannot be updated.
+  # In CamelCase.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  # DxpExtensionStatus defines the observed state of DxpExtension
+  status: DxpExtensionstatus
+}
+
+#
+type AccountConnectionTypeSpecImagefromConfigMap {
+  #
+  key: String
+
+  #
+  name: String
+}
+
+#
+type TechDocsAutomation {
+  # APIVersion defines the versioned schema of this representation of an object.
+  # Servers should convert recognized schemas to the latest internal value, and
+  # may reject unrecognized values.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents.
+  # Servers may infer this from the endpoint the client submits requests to.
+  # Cannot be updated.
+  # In CamelCase.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  # IndexingSpec defines the desired state of TechDocsAutomation
+  spec: TechDocsAutomationspec
+
+  # IndexingStatus defines the observed state of TechDocsAutomation
+  status: TechDocsAutomationstatus
+}
+
+#
+type GithubTeamstatus {
+  #
+  nextSubmissionTime: String
+}
+
+#
+type TeamMetadataspec {
+  #
+  extensions: TeamMetadataSpecextensions
+
+  #
+  logo: TeamMetadataSpeclogo
+}
+
+#
+type PageConfigspec {
+  #
+  baseDomain: String
+
+  #
+  branch: String
+
+  #
+  githubAcronym: String
+
+  #
+  login: String
+
+  #
+  repo: String
+}
+
+#
+type Account {
+  # APIVersion defines the versioned schema of this representation of an object.
+  # Servers should convert recognized schemas to the latest internal value, and
+  # may reject unrecognized values.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents.
+  # Servers may infer this from the endpoint the client submits requests to.
+  # Cannot be updated.
+  # In CamelCase.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  # AccountSpec defines the desired state of Account
+  spec: Accountspec
+}
+
+#
+type ComponentRunMapping {
+  # APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  # ComponentRunMappingSpec defines the desired state of ComponentRunMapping
+  spec: ComponentRunMappingspec
+}
+
+#
+type ExtensionInstance {
+  # APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  #
+  spec: ExtensionInstancespec
+
+  #
+  status: ExtensionInstancestatus
+}
+
+#
+type ServiceBindingspec {
+  # CredentialsRotationPolicy holds automatic credentials rotation configuration.
+  credentialsRotationPolicy: ServiceBindingSpeccredentialsRotationPolicy
+
+  # The name of the binding in Service Manager
+  externalName: String
+
+  # SecretKey is used as the key inside the secret to store the credentials returned by the broker encoded as json to support complex data structures. If not specified, the credentials returned by the broker will be used directly as the secrets data.
+  secretKey: String
+
+  # SecretName is the name of the secret where credentials will be stored
+  secretName: String
+
+  # SecretRootKey is used as the key inside the secret to store all binding data including credentials returned by the broker and additional info under single key. Convenient way to store whole binding data in single file when using `volumeMounts`.
+  secretRootKey: String
+
+  # The k8s name of the service instance to bind, should be in the namespace of the binding
+  serviceInstanceName: String
+
+  # UserInfo contains information about the user that last modified this instance. This field is set by the API server and not settable by the end-user. User-provided values for this field are not saved.
+  userInfo: ServiceBindingSpecuserInfo
+}
+
+#
+type BoundedContextSpecextensions {
+  #
+  docs: BoundedContextSpecExtensionsdocs
+
+  #
+  team: BoundedContextSpecExtensionsteam
+}
+
+#
+type BTPProviderConfig {
+  # APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  # BTPProviderConfigSpec defines the desired state of BTPProviderConfig
+  spec: BTPProviderConfigspec
+}
+
+#
+type ClusterGithubAppInstallationSpecaccount {
+  #
+  avatar_url: String
+
+  #
+  githubDomain: String
+
+  #
+  gravatar_id: String
+
+  #
+  html_url: String
+
+  #
+  login: String
+
+  #
+  node_id: String
+
+  #
+  type: String
+
+  #
+  url: String
+}
+
+#
+type TeamMetadataSpecextensions {
+  #
+  docs: TeamMetadataSpecExtensionsdocs
+
+  #
+  team: TeamMetadataSpecExtensionsteam
+}
+
+#
+type TeamMetadataAutomationstatus {
+  #
+  commit: String
+
+  #
+  item: String
+
+  #
+  workflow: String
+}
+
+#
+type ProxyConfig {
+  # APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  # ProxyConfigSpec defines the desired state of ProxyConfig
+  spec: ProxyConfigspec
+}
+
+#
+type VaultRegistrationstatus {
+  # The operator enables an app auth method in this namespace
+  appauthmethodpath: String
+
+  # The operator enables an k8s method in this namespace
+  k8sauthmethodpath: String
+
+  # The auth role name that you need for the k8s login
+  k8sauthrolename: String
+
+  # The operator creates a KV version 2 secret engine in the namespace. And gives it this name.
+  keyvalueenginename: String
+
+  # The path in the kv engine, where users of this project have access to
+  keyvalueenginepath: String
+
+  #
+  onboardednamespace: String
+
+  #
+  vaultaddress: String
+}
+
+#
+type GithubTokenRequeststatus {
+  #
+  accessToken: String
+}
+
+#
+type ServiceInstance {
+  # APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  # ServiceInstanceSpec defines the desired state of ServiceInstance
+  spec: ServiceInstancespec
+
+  # ServiceInstanceStatus defines the observed state of ServiceInstance
+  status: ServiceInstancestatus
+}
+
+#
+type Component {
+  # APIVersion defines the versioned schema of this representation of an object.
+  # Servers should convert recognized schemas to the latest internal value, and
+  # may reject unrecognized values.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents.
+  # Servers may infer this from the endpoint the client submits requests to.
+  # Cannot be updated.
+  # In CamelCase.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  # ComponentSpec defines the desired state of Component
+  spec: Componentspec
+
+  # ComponentStatus defines the observed state of Component
+  status: Componentstatus
+}
+
+#
+type BoundedContextSpecExtensionsteam {
+  #
+  name: String
+
+  #
+  productManager: String
+
+  #
+  productOwner: String
+
+  #
+  qualityLead: String
+
+  #
+  securityLead: String
+
+  #
+  technicalOwner: String
+
+  #
+  uxLead: String
+}
+
+#
+type APIDefinition {
+  # APIVersion defines the versioned schema of this representation of an object.
+  # Servers should convert recognized schemas to the latest internal value, and
+  # may reject unrecognized values.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+  apiVersion: String
+
+  # Kind is a string value representing the REST resource this object represents.
+  # Servers may infer this from the endpoint the client submits requests to.
+  # Cannot be updated.
+  # In CamelCase.
+  # More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  kind: String
+
+  # APIDefinitionSpec defines the desired state of APIDefinition
+  spec: APIDefinitionspec
+}
+
+#
+type ProjectMetadataAutomationspec {
+  #
+  commit: String
+
+  # This is the same pattern used by kubernetes to validate names
+  item: String
+
+  #
+  messageId: String
+
+  #
+  metadataURL: String
+}
