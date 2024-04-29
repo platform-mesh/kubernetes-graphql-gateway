@@ -1,7 +1,9 @@
 package gateway
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"log/slog"
 	"slices"
 	"strings"
@@ -53,7 +55,12 @@ func gqlTypeForOpenAPIProperties(in map[string]apiextensionsv1.JSONSchemaProps, 
 	return fields
 }
 
-func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, cl client.Client) (graphql.Schema, error) {
+type Config struct {
+	Client          client.Client
+	QueryToTypeFunc func(graphql.ResolveParams) (client.ObjectList, error)
+}
+
+func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, conf Config) (graphql.Schema, error) {
 	query := graphql.NewObject(graphql.ObjectConfig{
 		Name: "Query",
 		Fields: graphql.Fields{
@@ -96,19 +103,27 @@ func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, cl client.Client)
 					Version: crds[idx].Spec.Versions[0].Name,
 					Kind:    crds[idx].Spec.Names.Kind,
 				})
-				err := cl.List(context.Background(), &us)
+
+				list, err := conf.QueryToTypeFunc(p)
+				if err != nil {
+					return nil, err
+				}
+
+				err = conf.Client.List(context.Background(), list)
 				if err != nil {
 					return nil, err
 				}
 
 				// TODO: subject access review
 
-				var returnObj []map[string]any
-				for _, info := range us.Items {
-					returnObj = append(returnObj, info.Object)
-				}
+				// FIXME: this is currently a workaround to see if the typedClients are working
+				// this method loses the order of the elements which is unintended
+				result := map[string]any{}
+				var intermediate bytes.Buffer
+				json.NewEncoder(&intermediate).Encode(list)
+				json.NewDecoder(&intermediate).Decode(&result)
 
-				return returnObj, nil
+				return result["items"], nil
 			},
 		})
 	}
