@@ -72,56 +72,95 @@ func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, conf Config) (gra
 		},
 	})
 
+	byGroup := map[string][]apiextensionsv1.CustomResourceDefinition{}
+
 	for _, crd := range crds {
-
-		versionIdx := slices.IndexFunc(crd.Spec.Versions, func(version apiextensionsv1.CustomResourceDefinitionVersion) bool { return version.Storage })
-		typeInformation := crd.Spec.Versions[versionIdx]
-
-		fields := gqlTypeForOpenAPIProperties(typeInformation.Schema.OpenAPIV3Schema.Properties, graphql.Fields{}, crd.Spec.Names.Kind)
-
-		if len(fields) == 0 {
-			slog.Info("skip processing of kind due to empty field map", "kind", crd.Spec.Names.Kind)
-			continue
+		var groupNameBuilder strings.Builder
+		for i, part := range strings.Split(crd.Spec.Group, ".") {
+			if i == 0 {
+				groupNameBuilder.WriteString(part)
+				continue
+			}
+			piece := cases.Title(language.English).String(part)
+			groupNameBuilder.WriteString(piece)
 		}
+		byGroup[groupNameBuilder.String()] = append(byGroup[groupNameBuilder.String()], crd)
+	}
 
-		crdType := graphql.NewObject(graphql.ObjectConfig{
-			Name:   crd.Spec.Names.Kind,
-			Fields: fields,
+	for group, crds := range byGroup {
+
+		groupType := graphql.NewObject(graphql.ObjectConfig{
+			Name: group + "Type",
+			Fields: graphql.Fields{
+				"debug": &graphql.Field{
+					Type: graphql.String,
+				},
+			},
 		})
 
-		query.AddFieldConfig(crd.Spec.Names.Plural, &graphql.Field{
-			Type: graphql.NewList(crdType),
+		for _, crd := range crds {
+
+			versionIdx := slices.IndexFunc(crd.Spec.Versions, func(version apiextensionsv1.CustomResourceDefinitionVersion) bool { return version.Storage })
+			typeInformation := crd.Spec.Versions[versionIdx]
+
+			fields := gqlTypeForOpenAPIProperties(typeInformation.Schema.OpenAPIV3Schema.Properties, graphql.Fields{}, crd.Spec.Names.Kind)
+
+			if len(fields) == 0 {
+				slog.Info("skip processing of kind due to empty field map", "kind", crd.Spec.Names.Kind)
+				continue
+			}
+
+			crdType := graphql.NewObject(graphql.ObjectConfig{
+				Name:   crd.Spec.Names.Kind,
+				Fields: fields,
+			})
+
+			groupType.AddFieldConfig(crd.Spec.Names.Plural, &graphql.Field{
+				Type: graphql.NewList(crdType),
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					var us unstructured.UnstructuredList
+					idx := slices.IndexFunc(crds, func(crd apiextensionsv1.CustomResourceDefinition) bool {
+						return crd.Spec.Names.Plural == p.Info.FieldName
+					})
+
+					us.SetGroupVersionKind(runtimeschema.GroupVersionKind{
+						Group:   crds[idx].Spec.Group,
+						Version: crds[idx].Spec.Versions[0].Name,
+						Kind:    crds[idx].Spec.Names.Kind,
+					})
+
+					list, err := conf.QueryToTypeFunc(p)
+					if err != nil {
+						return nil, err
+					}
+
+					err = conf.Client.List(context.Background(), list)
+					if err != nil {
+						return nil, err
+					}
+
+					// TODO: subject access review
+
+					// FIXME: this looses ordering of the results
+					result, err := runtime.DefaultUnstructuredConverter.ToUnstructured(list)
+					if err != nil {
+						return nil, err
+					}
+
+					return result["items"], nil
+				},
+			})
+		}
+
+		query.AddFieldConfig(group, &graphql.Field{
+			Type: groupType,
 			Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				var us unstructured.UnstructuredList
-				idx := slices.IndexFunc(crds, func(crd apiextensionsv1.CustomResourceDefinition) bool {
-					return crd.Spec.Names.Plural == p.Info.FieldName
-				})
-
-				us.SetGroupVersionKind(runtimeschema.GroupVersionKind{
-					Group:   crds[idx].Spec.Group,
-					Version: crds[idx].Spec.Versions[0].Name,
-					Kind:    crds[idx].Spec.Names.Kind,
-				})
-
-				list, err := conf.QueryToTypeFunc(p)
-				if err != nil {
-					return nil, err
+				// we need to return the general structure here in order for subsequent resolvers to kick in
+				r := map[string]any{}
+				for _, crd := range crds {
+					r[crd.Spec.Names.Plural] = nil
 				}
-
-				err = conf.Client.List(context.Background(), list)
-				if err != nil {
-					return nil, err
-				}
-
-				// TODO: subject access review
-
-				// FIXME: this looses ordering of the results
-				result, err := runtime.DefaultUnstructuredConverter.ToUnstructured(list)
-				if err != nil {
-					return nil, err
-				}
-
-				return result["items"], nil
+				return r, nil
 			},
 		})
 	}
