@@ -1,9 +1,7 @@
 package gateway
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"log/slog"
 	"slices"
 	"strings"
@@ -13,6 +11,7 @@ import (
 	"golang.org/x/text/language"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	runtimeschema "k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -116,12 +115,11 @@ func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, conf Config) (gra
 
 				// TODO: subject access review
 
-				// FIXME: this is currently a workaround to see if the typedClients are working
-				// this method loses the order of the elements which is unintended
-				result := map[string]any{}
-				var intermediate bytes.Buffer
-				json.NewEncoder(&intermediate).Encode(list)
-				json.NewDecoder(&intermediate).Decode(&result)
+				// FIXME: this looses ordering of the results
+				result, err := runtime.DefaultUnstructuredConverter.ToUnstructured(list)
+				if err != nil {
+					return nil, err
+				}
 
 				return result["items"], nil
 			},
