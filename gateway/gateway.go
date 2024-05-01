@@ -9,12 +9,12 @@ import (
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/watch"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func gqlTypeForOpenAPIProperties(in map[string]apiextensionsv1.JSONSchemaProps, fields graphql.Fields, parentFieldName string) graphql.Fields {
+func gqlTypeForOpenAPIProperties(in map[string]apiextensionsv1.JSONSchemaProps, fields graphql.Fields, parentFieldName string, requiredKeys []string) graphql.Fields {
 	for key, info := range in {
 		typeKey := strings.ReplaceAll(key, "-", "")
 		currentField := &graphql.Field{
@@ -27,12 +27,37 @@ func gqlTypeForOpenAPIProperties(in map[string]apiextensionsv1.JSONSchemaProps, 
 			currentField.Type = graphql.String
 		case "boolean":
 			currentField.Type = graphql.Boolean
+		case "array":
+			typeName := parentFieldName + cases.Title(language.English).String(key) + "Item"
+
+			if info.Items.Schema.Properties != nil { // nested array object
+				newFields := gqlTypeForOpenAPIProperties(info.Items.Schema.Properties, graphql.Fields{}, typeName, info.Items.Schema.Required)
+				newType := graphql.NewObject(graphql.ObjectConfig{
+					Name:   typeName,
+					Fields: newFields,
+				})
+				if len(newFields) == 0 {
+					slog.Info("skipping creation of subtype due to emtpy field configuration", "type", typeName)
+					continue
+				}
+
+				currentField.Type = graphql.NewList(newType)
+			} else { // primitive array
+				switch info.Items.Schema.Type {
+				case "string":
+					currentField.Type = graphql.String
+				case "boolean":
+					currentField.Type = graphql.Boolean
+				}
+
+				currentField.Type = graphql.NewList(currentField.Type)
+			}
 		case "object":
-			if in[key].Properties == nil {
+			if info.Properties == nil {
 				continue
 			}
 			typeName := parentFieldName + cases.Title(language.English).String(key)
-			newFields := gqlTypeForOpenAPIProperties(in[key].Properties, graphql.Fields{}, typeName)
+			newFields := gqlTypeForOpenAPIProperties(info.Properties, graphql.Fields{}, typeName, info.Required)
 			if len(newFields) == 0 {
 				slog.Info("skipping creation of subtype due to emtpy field configuration", "type", typeName)
 				continue
@@ -44,6 +69,10 @@ func gqlTypeForOpenAPIProperties(in map[string]apiextensionsv1.JSONSchemaProps, 
 			currentField.Type = newType
 		default:
 			continue
+		}
+
+		if slices.Contains(requiredKeys, key) {
+			currentField.Type = graphql.NewNonNull(currentField.Type)
 		}
 
 		fields[typeKey] = currentField
@@ -103,7 +132,7 @@ func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, conf Config) (gra
 			versionIdx := slices.IndexFunc(crd.Spec.Versions, func(version apiextensionsv1.CustomResourceDefinitionVersion) bool { return version.Storage })
 			typeInformation := crd.Spec.Versions[versionIdx]
 
-			fields := gqlTypeForOpenAPIProperties(typeInformation.Schema.OpenAPIV3Schema.Properties, graphql.Fields{}, crd.Spec.Names.Kind)
+			fields := gqlTypeForOpenAPIProperties(typeInformation.Schema.OpenAPIV3Schema.Properties, graphql.Fields{}, crd.Spec.Names.Kind, nil)
 
 			if len(fields) == 0 {
 				slog.Info("skip processing of kind due to empty field map", "kind", crd.Spec.Names.Kind)
@@ -130,18 +159,27 @@ func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, conf Config) (gra
 
 					// TODO: subject access review
 
-					// FIXME: this looses ordering of the results
-					result, err := runtime.DefaultUnstructuredConverter.ToUnstructured(list)
+					items, err := meta.ExtractList(list)
 					if err != nil {
 						return nil, err
 					}
 
-					return result["items"], nil
+					return items, nil
 				},
 			})
 
 			subscriptions[group+crd.Spec.Names.Kind] = &graphql.Field{
 				Type: crdType,
+				Args: graphql.FieldConfigArgument{
+					"name": &graphql.ArgumentConfig{
+						Type:        graphql.NewNonNull(graphql.String),
+						Description: "the metadata.name of the object you want to watch",
+					},
+					"namespace": &graphql.ArgumentConfig{
+						Type:        graphql.NewNonNull(graphql.String),
+						Description: "the metadata.namesapce of the object you want to watch",
+					},
+				},
 				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 					return p.Source, nil
 				},
@@ -151,7 +189,11 @@ func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, conf Config) (gra
 						return nil, err
 					}
 
-					listWatch, err := conf.Client.Watch(p.Context, list)
+					// TODO: SAR before staring the watch
+
+					listWatch, err := conf.Client.Watch(p.Context, list, client.InNamespace(p.Args["namespace"].(string)), client.MatchingFields{
+						"metadata.name": p.Args["name"].(string),
+					})
 					if err != nil {
 						return nil, err
 					}
@@ -169,14 +211,7 @@ func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, conf Config) (gra
 									continue
 								}
 
-								r, err := runtime.DefaultUnstructuredConverter.ToUnstructured(ev.Object)
-								if err != nil {
-									listWatch.Stop()
-									slog.Error("error converting", "err", err.Error())
-									close(resultChannel)
-									return
-								}
-								resultChannel <- r
+								resultChannel <- ev.Object
 							}
 						}
 					}()

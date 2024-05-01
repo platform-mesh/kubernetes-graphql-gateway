@@ -32,10 +32,6 @@ func main() {
 
 	k8sCache, err := cache.New(cfg, cache.Options{
 		Scheme: schema,
-		ByObject: map[client.Object]cache.ByObject{
-			&echelonv1alpha.Account{}:            {},
-			&extensionsv1alpha1.ExtensionClass{}: {},
-		},
 	})
 	if err != nil {
 		panic(err)
