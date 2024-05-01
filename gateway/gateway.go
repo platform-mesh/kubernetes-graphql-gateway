@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"context"
 	"log/slog"
 	"slices"
 	"strings"
@@ -10,9 +9,8 @@ import (
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	runtimeschema "k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/watch"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -55,12 +53,12 @@ func gqlTypeForOpenAPIProperties(in map[string]apiextensionsv1.JSONSchemaProps, 
 }
 
 type Config struct {
-	Client          client.Client
+	Client          client.WithWatch
 	QueryToTypeFunc func(graphql.ResolveParams) (client.ObjectList, error)
 }
 
 func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, conf Config) (graphql.Schema, error) {
-	query := graphql.NewObject(graphql.ObjectConfig{
+	rootQuery := graphql.NewObject(graphql.ObjectConfig{
 		Name: "Query",
 		Fields: graphql.Fields{
 			"version": &graphql.Field{
@@ -71,6 +69,8 @@ func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, conf Config) (gra
 			},
 		},
 	})
+
+	subscriptions := graphql.Fields{}
 
 	byGroup := map[string][]apiextensionsv1.CustomResourceDefinition{}
 
@@ -118,23 +118,12 @@ func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, conf Config) (gra
 			groupType.AddFieldConfig(crd.Spec.Names.Plural, &graphql.Field{
 				Type: graphql.NewList(crdType),
 				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-					var us unstructured.UnstructuredList
-					idx := slices.IndexFunc(crds, func(crd apiextensionsv1.CustomResourceDefinition) bool {
-						return crd.Spec.Names.Plural == p.Info.FieldName
-					})
-
-					us.SetGroupVersionKind(runtimeschema.GroupVersionKind{
-						Group:   crds[idx].Spec.Group,
-						Version: crds[idx].Spec.Versions[0].Name,
-						Kind:    crds[idx].Spec.Names.Kind,
-					})
-
 					list, err := conf.QueryToTypeFunc(p)
 					if err != nil {
 						return nil, err
 					}
 
-					err = conf.Client.List(context.Background(), list)
+					err = conf.Client.List(p.Context, list)
 					if err != nil {
 						return nil, err
 					}
@@ -150,22 +139,64 @@ func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, conf Config) (gra
 					return result["items"], nil
 				},
 			})
+
+			subscriptions[group+crd.Spec.Names.Kind] = &graphql.Field{
+				Type: crdType,
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					return p.Source, nil
+				},
+				Subscribe: func(p graphql.ResolveParams) (interface{}, error) {
+					list, err := conf.QueryToTypeFunc(p)
+					if err != nil {
+						return nil, err
+					}
+
+					listWatch, err := conf.Client.Watch(p.Context, list)
+					if err != nil {
+						return nil, err
+					}
+
+					resultChannel := make(chan interface{})
+					go func() {
+						for ev := range listWatch.ResultChan() {
+							select {
+							case <-p.Context.Done():
+								slog.Info("stopping watch due to client cancel")
+								listWatch.Stop()
+								close(resultChannel)
+							default:
+								if ev.Type == watch.Bookmark {
+									continue
+								}
+
+								r, err := runtime.DefaultUnstructuredConverter.ToUnstructured(ev.Object)
+								if err != nil {
+									listWatch.Stop()
+									slog.Error("error converting", "err", err.Error())
+									close(resultChannel)
+									return
+								}
+								resultChannel <- r
+							}
+						}
+					}()
+
+					return resultChannel, nil
+				},
+			}
 		}
 
-		query.AddFieldConfig(group, &graphql.Field{
-			Type: groupType,
-			Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				// we need to return the general structure here in order for subsequent resolvers to kick in
-				r := map[string]any{}
-				for _, crd := range crds {
-					r[crd.Spec.Names.Plural] = nil
-				}
-				return r, nil
-			},
+		rootQuery.AddFieldConfig(group, &graphql.Field{
+			Type:    groupType,
+			Resolve: func(p graphql.ResolveParams) (interface{}, error) { return p.Source, nil },
 		})
 	}
 
 	return graphql.NewSchema(graphql.SchemaConfig{
-		Query: query,
+		Query: rootQuery,
+		Subscription: graphql.NewObject(graphql.ObjectConfig{
+			Name:   "Subscription",
+			Fields: subscriptions,
+		}),
 	})
 }

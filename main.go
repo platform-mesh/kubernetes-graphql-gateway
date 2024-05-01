@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -47,7 +49,7 @@ func main() {
 		panic("no cache sync")
 	}
 
-	cl, err := client.New(cfg, client.Options{
+	cl, err := client.NewWithWatch(cfg, client.Options{
 		Scheme: schema,
 		Cache: &client.CacheOptions{
 			Reader: k8sCache,
@@ -71,8 +73,9 @@ func main() {
 	}
 
 	mapping := map[string]func() client.ObjectList{
-		"accounts":         func() client.ObjectList { return &echelonv1alpha.AccountList{} },
-		"extensionclasses": func() client.ObjectList { return &extensionsv1alpha1.ExtensionClassList{} },
+		"accounts":                      func() client.ObjectList { return &echelonv1alpha.AccountList{} },
+		"extensionclasses":              func() client.ObjectList { return &extensionsv1alpha1.ExtensionClassList{} },
+		"fabricFoundationSapComAccount": func() client.ObjectList { return &echelonv1alpha.AccountList{} }, // REFACTOR: this is a hack for the subscriptions which I do not like
 	}
 
 	gqlSchema, err := gateway.FromCRDs(crds, gateway.Config{
@@ -94,6 +97,37 @@ func main() {
 		Pretty:     true,
 		Playground: true,
 	}))
+	http.HandleFunc("/subscription", func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
+		opts := handler.NewRequestOptions(r)
+
+		rc := http.NewResponseController(w)
+		defer rc.Flush()
+
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("Connection", "keep-alive")
+		w.Header().Set("Content-Type", "application/json")
+
+		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprint(w, ":\n\n")
+		rc.Flush()
+
+		subscriptionChannel := graphql.Subscribe(graphql.Params{
+			Schema:         gqlSchema,
+			Context:        ctx,
+			RequestString:  opts.Query,
+			VariableValues: opts.Variables,
+		})
+
+		for result := range subscriptionChannel {
+			b, _ := json.Marshal(result)
+			fmt.Fprintf(w, "event: next\ndata: %s\n\n", b)
+			rc.Flush()
+		}
+
+		fmt.Fprint(w, "event: complete\n\n")
+	})
 
 	http.ListenAndServe(":3000", nil)
 }
