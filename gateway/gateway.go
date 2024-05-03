@@ -10,6 +10,7 @@ import (
 	"golang.org/x/text/language"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/watch"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -87,18 +88,8 @@ type Config struct {
 }
 
 func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, conf Config) (graphql.Schema, error) {
-	rootQuery := graphql.NewObject(graphql.ObjectConfig{
-		Name: "Query",
-		Fields: graphql.Fields{
-			"version": &graphql.Field{
-				Type: graphql.String,
-				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-					return "dev", nil
-				},
-			},
-		},
-	})
 
+	rootQueryFields := graphql.Fields{}
 	subscriptions := graphql.Fields{}
 
 	byGroup := map[string][]apiextensionsv1.CustomResourceDefinition{}
@@ -118,7 +109,7 @@ func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, conf Config) (gra
 
 	for group, crds := range byGroup {
 
-		groupType := graphql.NewObject(graphql.ObjectConfig{
+		queryGroupType := graphql.NewObject(graphql.ObjectConfig{
 			Name: group + "Type",
 			Fields: graphql.Fields{
 				"debug": &graphql.Field{
@@ -144,15 +135,30 @@ func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, conf Config) (gra
 				Fields: fields,
 			})
 
-			groupType.AddFieldConfig(crd.Spec.Names.Plural, &graphql.Field{
+			queryGroupType.AddFieldConfig(crd.Spec.Names.Plural, &graphql.Field{
 				Type: graphql.NewList(crdType),
+				Args: graphql.FieldConfigArgument{
+					"labelselector": &graphql.ArgumentConfig{
+						Type: graphql.String,
+					},
+				},
 				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 					list, err := conf.QueryToTypeFunc(p)
 					if err != nil {
 						return nil, err
 					}
 
-					err = conf.Client.List(p.Context, list)
+					var opts []client.ListOption
+					if labelSelector, ok := p.Args["labelselector"].(string); ok && labelSelector != "" {
+						selector, err := labels.Parse(labelSelector)
+						if err != nil {
+							slog.Error("unable to parse given label selector", "error", err)
+							return nil, err
+						}
+						opts = append(opts, client.MatchingLabelsSelector{Selector: selector})
+					}
+
+					err = conf.Client.List(p.Context, list, opts...)
 					if err != nil {
 						return nil, err
 					}
@@ -221,14 +227,17 @@ func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, conf Config) (gra
 			}
 		}
 
-		rootQuery.AddFieldConfig(group, &graphql.Field{
-			Type:    groupType,
+		rootQueryFields[group] = &graphql.Field{
+			Type:    queryGroupType,
 			Resolve: func(p graphql.ResolveParams) (interface{}, error) { return p.Source, nil },
-		})
+		}
 	}
 
 	return graphql.NewSchema(graphql.SchemaConfig{
-		Query: rootQuery,
+		Query: graphql.NewObject(graphql.ObjectConfig{
+			Name:   "Query",
+			Fields: rootQueryFields,
+		}),
 		Subscription: graphql.NewObject(graphql.ObjectConfig{
 			Name:   "Subscription",
 			Fields: subscriptions,
