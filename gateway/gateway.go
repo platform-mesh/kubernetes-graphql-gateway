@@ -11,9 +11,22 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+var objectMeta = graphql.NewObject(graphql.ObjectConfig{
+	Name: "Metadata",
+	Fields: graphql.Fields{
+		"name": &graphql.Field{
+			Type: graphql.NewNonNull(graphql.String),
+		},
+		"namespace": &graphql.Field{
+			Type: graphql.NewNonNull(graphql.String),
+		},
+	},
+})
 
 func gqlTypeForOpenAPIProperties(in map[string]apiextensionsv1.JSONSchemaProps, fields graphql.Fields, parentFieldName string, requiredKeys []string) graphql.Fields {
 	for key, info := range in {
@@ -135,6 +148,10 @@ func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, conf Config) (gra
 				Fields: fields,
 			})
 
+			crdType.AddFieldConfig("metadata", &graphql.Field{
+				Type: objectMeta,
+			})
+
 			queryGroupType.AddFieldConfig(crd.Spec.Names.Plural, &graphql.Field{
 				Type: graphql.NewList(crdType),
 				Args: graphql.FieldConfigArgument{
@@ -169,6 +186,11 @@ func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, conf Config) (gra
 					if err != nil {
 						return nil, err
 					}
+
+					// the controller-runtime cache returns unordered results so we sort it here
+					slices.SortFunc(items, func(a runtime.Object, b runtime.Object) int {
+						return strings.Compare(a.(client.Object).GetName(), b.(client.Object).GetName())
+					})
 
 					return items, nil
 				},
