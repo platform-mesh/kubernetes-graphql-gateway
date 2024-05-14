@@ -1,13 +1,16 @@
 package gateway
 
 import (
+	"errors"
 	"log/slog"
 	"slices"
 	"strings"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/graphql-go/graphql"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
+	authzv1 "k8s.io/api/authorization/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/labels"
@@ -41,6 +44,8 @@ func gqlTypeForOpenAPIProperties(in map[string]apiextensionsv1.JSONSchemaProps, 
 			currentField.Type = graphql.String
 		case "boolean":
 			currentField.Type = graphql.Boolean
+		case "integer":
+			currentField.Type = graphql.Int
 		case "array":
 			typeName := parentFieldName + cases.Title(language.English).String(key) + "Item"
 
@@ -62,6 +67,8 @@ func gqlTypeForOpenAPIProperties(in map[string]apiextensionsv1.JSONSchemaProps, 
 					currentField.Type = graphql.String
 				case "boolean":
 					currentField.Type = graphql.Boolean
+				case "integer":
+					currentField.Type = graphql.Int
 				}
 
 				currentField.Type = graphql.NewList(currentField.Type)
@@ -158,6 +165,10 @@ func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, conf Config) (gra
 					"labelselector": &graphql.ArgumentConfig{
 						Type: graphql.String,
 					},
+					"namespace": &graphql.ArgumentConfig{
+						Type:        graphql.String,
+						Description: "the namespace in which to search for the objects",
+					},
 				},
 				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 					list, err := conf.QueryToTypeFunc(p)
@@ -175,12 +186,43 @@ func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, conf Config) (gra
 						opts = append(opts, client.MatchingLabelsSelector{Selector: selector})
 					}
 
-					err = conf.Client.List(p.Context, list, opts...)
+					claims := jwt.MapClaims{}
+					_, _, err = jwt.NewParser().ParseUnverified(p.Info.RootValue.(map[string]interface{})["token"].(string), &claims)
 					if err != nil {
 						return nil, err
 					}
 
-					// TODO: subject access review
+					sar := authzv1.SubjectAccessReview{
+						Spec: authzv1.SubjectAccessReviewSpec{
+							User: claims["mail"].(string),
+							ResourceAttributes: &authzv1.ResourceAttributes{
+								Verb:     "list",
+								Group:    crd.Spec.Group,
+								Version:  crd.Spec.Versions[versionIdx].Name,
+								Resource: crd.Spec.Names.Plural,
+							},
+						},
+					}
+
+					if namespace, ok := p.Args["namespace"].(string); ok && namespace != "" {
+						opts = append(opts, client.InNamespace(namespace))
+						sar.Spec.ResourceAttributes.Namespace = namespace
+					}
+
+					err = conf.Client.Create(p.Context, &sar)
+					if err != nil {
+						return nil, err
+					}
+					slog.Info("SAR result", "allowed", sar.Status.Allowed)
+
+					if !sar.Status.Allowed {
+						return nil, errors.New("access denied")
+					}
+
+					err = conf.Client.List(p.Context, list, opts...)
+					if err != nil {
+						return nil, err
+					}
 
 					items, err := meta.ExtractList(list)
 					if err != nil {
@@ -217,7 +259,35 @@ func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, conf Config) (gra
 						return nil, err
 					}
 
-					// TODO: SAR before staring the watch
+					claims := jwt.MapClaims{}
+					_, _, err = jwt.NewParser().ParseUnverified(p.Info.RootValue.(map[string]interface{})["token"].(string), &claims)
+					if err != nil {
+						return nil, err
+					}
+
+					sar := authzv1.SubjectAccessReview{
+						Spec: authzv1.SubjectAccessReviewSpec{
+							User: claims["mail"].(string),
+							ResourceAttributes: &authzv1.ResourceAttributes{
+								Verb:      "watch",
+								Group:     crd.Spec.Group,
+								Version:   crd.Spec.Versions[versionIdx].Name,
+								Resource:  crd.Spec.Names.Plural,
+								Namespace: p.Args["namespace"].(string),
+								Name:      p.Args["name"].(string),
+							},
+						},
+					}
+
+					err = conf.Client.Create(p.Context, &sar)
+					if err != nil {
+						return nil, err
+					}
+					slog.Info("SAR result", "allowed", sar.Status.Allowed)
+
+					if !sar.Status.Allowed {
+						return nil, errors.New("access denied")
+					}
 
 					listWatch, err := conf.Client.Watch(p.Context, list, client.InNamespace(p.Args["namespace"].(string)), client.MatchingFields{
 						"metadata.name": p.Args["name"].(string),
