@@ -108,9 +108,14 @@ func gqlTypeForOpenAPIProperties(in map[string]apiextensionsv1.JSONSchemaProps, 
 type Config struct {
 	Client      client.WithWatch
 	QueryToType map[string]func() client.ObjectList
+	UserClaim   string
 }
 
 func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, conf Config) (graphql.Schema, error) {
+
+	if conf.UserClaim == "" {
+		conf.UserClaim = "mail"
+	}
 
 	rootQueryFields := graphql.Fields{}
 	subscriptions := graphql.Fields{}
@@ -202,7 +207,8 @@ func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, conf Config) (gra
 
 					sar := authzv1.SubjectAccessReview{
 						Spec: authzv1.SubjectAccessReviewSpec{
-							User: claims["mail"].(string),
+							// TODO: make this conversion more robust
+							User: claims[conf.UserClaim].(string),
 							ResourceAttributes: &authzv1.ResourceAttributes{
 								Verb:     "list",
 								Group:    crd.Spec.Group,
@@ -221,7 +227,7 @@ func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, conf Config) (gra
 					if err != nil {
 						return nil, err
 					}
-					slog.Info("SAR result", "allowed", sar.Status.Allowed)
+					slog.Info("SAR result", "allowed", sar.Status.Allowed, "user", sar.Spec.User, "namespace", sar.Spec.ResourceAttributes.Namespace, "resource", sar.Spec.ResourceAttributes.Resource)
 
 					if !sar.Status.Allowed {
 						return nil, errors.New("access denied")
@@ -280,7 +286,8 @@ func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, conf Config) (gra
 
 					sar := authzv1.SubjectAccessReview{
 						Spec: authzv1.SubjectAccessReviewSpec{
-							User: claims["mail"].(string),
+							// TODO: make this conversion more robust
+							User: claims[conf.UserClaim].(string),
 							ResourceAttributes: &authzv1.ResourceAttributes{
 								Verb:      "watch",
 								Group:     crd.Spec.Group,
@@ -296,7 +303,7 @@ func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, conf Config) (gra
 					if err != nil {
 						return nil, err
 					}
-					slog.Info("SAR result", "allowed", sar.Status.Allowed)
+					slog.Info("SAR result", "allowed", sar.Status.Allowed, "user", sar.Spec.User, "namespace", sar.Spec.ResourceAttributes.Namespace, "resource", sar.Spec.ResourceAttributes.Resource)
 
 					if !sar.Status.Allowed {
 						return nil, errors.New("access denied")
