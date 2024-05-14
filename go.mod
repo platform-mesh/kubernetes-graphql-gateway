@@ -6,6 +6,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/graphql-go/graphql v0.8.1
 	github.com/graphql-go/handler v0.2.3
+	github.com/spf13/cobra v1.8.0
 	github.tools.sap/automaticd/automaticd/operators/jira v0.0.0-20240513130407-09009e9c881c
 	github.tools.sap/dxp/echelon-operator v0.0.0-20240425093132-c47fcb937bcf
 	github.tools.sap/dxp/extension-manager-operator v0.91.0
@@ -38,6 +39,7 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.19.1 // indirect
 	github.com/imdario/mergo v0.3.16 // indirect
+	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
