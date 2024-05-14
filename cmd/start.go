@@ -4,12 +4,10 @@ import (
 	"net/http"
 
 	"context"
-	"errors"
 	"strings"
 
 	"github.com/spf13/cobra"
 
-	"github.com/graphql-go/graphql"
 	"github.com/graphql-go/handler"
 	"github.com/openmfp/crd-gql-gateway/gateway"
 	"github.com/openmfp/crd-gql-gateway/transport"
@@ -76,22 +74,12 @@ var startCmd = &cobra.Command{
 			}
 		}
 
-		mapping := map[string]func() client.ObjectList{
-			"jiraprojects":                  func() client.ObjectList { return &jirav1alpha1.JiraProjectList{} },
-			"accounts":                      func() client.ObjectList { return &echelonv1alpha.AccountList{} },
-			"extensionclasses":              func() client.ObjectList { return &extensionsv1alpha1.ExtensionClassList{} },
-			"fabricFoundationSapComAccount": func() client.ObjectList { return &echelonv1alpha.AccountList{} }, // REFACTOR: this is a hack for the subscriptions which I do not like
-			"automaticdSapJiraProject":      func() client.ObjectList { return &jirav1alpha1.JiraProjectList{} },
-		}
-
 		gqlSchema, err := gateway.FromCRDs(crds, gateway.Config{
 			Client: cl,
-			QueryToTypeFunc: func(rp graphql.ResolveParams) (client.ObjectList, error) {
-				f := mapping[rp.Info.FieldName]
-				if f == nil {
-					return nil, errors.New("no typed client available for the reuqested type")
-				}
-				return f(), nil
+			QueryToType: map[string]func() client.ObjectList{
+				"jiraprojects":     func() client.ObjectList { return &jirav1alpha1.JiraProjectList{} },
+				"accounts":         func() client.ObjectList { return &echelonv1alpha.AccountList{} },
+				"extensionclasses": func() client.ObjectList { return &extensionsv1alpha1.ExtensionClassList{} },
 			},
 		})
 		if err != nil {

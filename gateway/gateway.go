@@ -8,6 +8,9 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/graphql-go/graphql"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 	authzv1 "k8s.io/api/authorization/v1"
@@ -103,8 +106,8 @@ func gqlTypeForOpenAPIProperties(in map[string]apiextensionsv1.JSONSchemaProps, 
 }
 
 type Config struct {
-	Client          client.WithWatch
-	QueryToTypeFunc func(graphql.ResolveParams) (client.ObjectList, error)
+	Client      client.WithWatch
+	QueryToType map[string]func() client.ObjectList
 }
 
 func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, conf Config) (graphql.Schema, error) {
@@ -171,10 +174,15 @@ func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, conf Config) (gra
 					},
 				},
 				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-					list, err := conf.QueryToTypeFunc(p)
-					if err != nil {
-						return nil, err
+					ctx, span := otel.Tracer("").Start(p.Context, "Resolve", trace.WithAttributes(attribute.String("kind", crd.Spec.Names.Kind)))
+					defer span.End()
+
+					listFunc, ok := conf.QueryToType[crd.Spec.Names.Plural]
+					if !ok {
+						return nil, errors.New("no typed client available for the reuqested type")
 					}
+
+					list := listFunc()
 
 					var opts []client.ListOption
 					if labelSelector, ok := p.Args["labelselector"].(string); ok && labelSelector != "" {
@@ -187,7 +195,7 @@ func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, conf Config) (gra
 					}
 
 					claims := jwt.MapClaims{}
-					_, _, err = jwt.NewParser().ParseUnverified(p.Info.RootValue.(map[string]interface{})["token"].(string), &claims)
+					_, _, err := jwt.NewParser().ParseUnverified(p.Info.RootValue.(map[string]interface{})["token"].(string), &claims)
 					if err != nil {
 						return nil, err
 					}
@@ -209,7 +217,7 @@ func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, conf Config) (gra
 						sar.Spec.ResourceAttributes.Namespace = namespace
 					}
 
-					err = conf.Client.Create(p.Context, &sar)
+					err = conf.Client.Create(ctx, &sar)
 					if err != nil {
 						return nil, err
 					}
@@ -219,7 +227,7 @@ func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, conf Config) (gra
 						return nil, errors.New("access denied")
 					}
 
-					err = conf.Client.List(p.Context, list, opts...)
+					err = conf.Client.List(ctx, list, opts...)
 					if err != nil {
 						return nil, err
 					}
@@ -254,13 +262,18 @@ func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, conf Config) (gra
 					return p.Source, nil
 				},
 				Subscribe: func(p graphql.ResolveParams) (interface{}, error) {
-					list, err := conf.QueryToTypeFunc(p)
-					if err != nil {
-						return nil, err
+					ctx, span := otel.Tracer("").Start(p.Context, "Subscribe", trace.WithAttributes(attribute.String("kind", crd.Spec.Names.Kind)))
+					defer span.End()
+
+					listType, ok := conf.QueryToType[crd.Spec.Names.Plural]
+					if !ok {
+						return nil, errors.New("no typed client available for the reuqested type")
 					}
 
+					list := listType()
+
 					claims := jwt.MapClaims{}
-					_, _, err = jwt.NewParser().ParseUnverified(p.Info.RootValue.(map[string]interface{})["token"].(string), &claims)
+					_, _, err := jwt.NewParser().ParseUnverified(p.Info.RootValue.(map[string]interface{})["token"].(string), &claims)
 					if err != nil {
 						return nil, err
 					}
@@ -279,7 +292,7 @@ func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, conf Config) (gra
 						},
 					}
 
-					err = conf.Client.Create(p.Context, &sar)
+					err = conf.Client.Create(ctx, &sar)
 					if err != nil {
 						return nil, err
 					}
@@ -289,7 +302,7 @@ func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, conf Config) (gra
 						return nil, errors.New("access denied")
 					}
 
-					listWatch, err := conf.Client.Watch(p.Context, list, client.InNamespace(p.Args["namespace"].(string)), client.MatchingFields{
+					listWatch, err := conf.Client.Watch(ctx, list, client.InNamespace(p.Args["namespace"].(string)), client.MatchingFields{
 						"metadata.name": p.Args["name"].(string),
 					})
 					if err != nil {
@@ -300,7 +313,7 @@ func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, conf Config) (gra
 					go func() {
 						for ev := range listWatch.ResultChan() {
 							select {
-							case <-p.Context.Done():
+							case <-ctx.Done():
 								slog.Info("stopping watch due to client cancel")
 								listWatch.Stop()
 								close(resultChannel)
