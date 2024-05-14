@@ -16,8 +16,10 @@ import (
 	authzv1 "k8s.io/api/authorization/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -34,29 +36,54 @@ var objectMeta = graphql.NewObject(graphql.ObjectConfig{
 	},
 })
 
-func gqlTypeForOpenAPIProperties(in map[string]apiextensionsv1.JSONSchemaProps, fields graphql.Fields, parentFieldName string, requiredKeys []string) graphql.Fields {
+var metadataInput = graphql.NewInputObject(graphql.InputObjectConfig{
+	Name: "MetadataInput",
+	Fields: graphql.InputObjectConfigFieldMap{
+		"name": &graphql.InputObjectFieldConfig{
+			Type: graphql.String,
+		},
+		"generateName": &graphql.InputObjectFieldConfig{
+			Type: graphql.String,
+		},
+		"namespace": &graphql.InputObjectFieldConfig{
+			Type: graphql.NewNonNull(graphql.String),
+		},
+	},
+})
+
+func gqlTypeForOpenAPIProperties(in map[string]apiextensionsv1.JSONSchemaProps, fields graphql.Fields, inputFields graphql.InputObjectConfigFieldMap, parentFieldName string, requiredKeys []string) (graphql.Fields, graphql.InputObjectConfigFieldMap) {
 	for key, info := range in {
 		typeKey := strings.ReplaceAll(key, "-", "")
 		currentField := &graphql.Field{
 			Name:        typeKey,
 			Description: info.Description,
 		}
+		currentInputField := &graphql.InputObjectFieldConfig{
+			Description: info.Description,
+		}
 
 		switch info.Type {
 		case "string":
 			currentField.Type = graphql.String
+			currentInputField.Type = graphql.String
 		case "boolean":
 			currentField.Type = graphql.Boolean
+			currentInputField.Type = graphql.Boolean
 		case "integer":
 			currentField.Type = graphql.Int
+			currentInputField.Type = graphql.Int
 		case "array":
 			typeName := parentFieldName + cases.Title(language.English).String(key) + "Item"
 
 			if info.Items.Schema.Properties != nil { // nested array object
-				newFields := gqlTypeForOpenAPIProperties(info.Items.Schema.Properties, graphql.Fields{}, typeName, info.Items.Schema.Required)
+				newFields, newInputFields := gqlTypeForOpenAPIProperties(info.Items.Schema.Properties, graphql.Fields{}, graphql.InputObjectConfigFieldMap{}, typeName, info.Items.Schema.Required)
 				newType := graphql.NewObject(graphql.ObjectConfig{
 					Name:   typeName,
 					Fields: newFields,
+				})
+				newInputType := graphql.NewInputObject(graphql.InputObjectConfig{
+					Name:   typeName + "Input",
+					Fields: newInputFields,
 				})
 				if len(newFields) == 0 {
 					slog.Info("skipping creation of subtype due to emtpy field configuration", "type", typeName)
@@ -64,45 +91,59 @@ func gqlTypeForOpenAPIProperties(in map[string]apiextensionsv1.JSONSchemaProps, 
 				}
 
 				currentField.Type = graphql.NewList(newType)
+				currentInputField.Type = graphql.NewList(newInputType)
 			} else { // primitive array
 				switch info.Items.Schema.Type {
 				case "string":
 					currentField.Type = graphql.String
+					currentInputField.Type = graphql.String
 				case "boolean":
 					currentField.Type = graphql.Boolean
+					currentInputField.Type = graphql.Boolean
 				case "integer":
 					currentField.Type = graphql.Int
+					currentInputField.Type = graphql.Int
 				}
 
 				currentField.Type = graphql.NewList(currentField.Type)
+				currentInputField.Type = graphql.NewList(currentInputField.Type)
 			}
 		case "object":
 			if info.Properties == nil {
 				continue
 			}
 			typeName := parentFieldName + cases.Title(language.English).String(key)
-			newFields := gqlTypeForOpenAPIProperties(info.Properties, graphql.Fields{}, typeName, info.Required)
+			newFields, newInputFields := gqlTypeForOpenAPIProperties(info.Properties, graphql.Fields{}, graphql.InputObjectConfigFieldMap{}, typeName, info.Required)
 			if len(newFields) == 0 {
 				slog.Info("skipping creation of subtype due to emtpy field configuration", "type", typeName)
 				continue
 			}
+
 			newType := graphql.NewObject(graphql.ObjectConfig{
 				Name:   parentFieldName + key,
 				Fields: newFields,
 			})
+			newInputType := graphql.NewInputObject(graphql.InputObjectConfig{
+				Name:   parentFieldName + key + "Input",
+				Fields: newInputFields,
+			})
+
 			currentField.Type = newType
+			currentInputField.Type = newInputType
 		default:
 			continue
 		}
 
 		if slices.Contains(requiredKeys, key) {
 			currentField.Type = graphql.NewNonNull(currentField.Type)
+			currentInputField.Type = graphql.NewNonNull(currentInputField.Type)
 		}
 
 		fields[typeKey] = currentField
+		inputFields[typeKey] = currentInputField
 	}
 
-	return fields
+	return fields, inputFields
 }
 
 type Config struct {
@@ -118,6 +159,7 @@ func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, conf Config) (gra
 	}
 
 	rootQueryFields := graphql.Fields{}
+	rootMutationFields := graphql.Fields{}
 	subscriptions := graphql.Fields{}
 
 	byGroup := map[string][]apiextensionsv1.CustomResourceDefinition{}
@@ -146,12 +188,21 @@ func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, conf Config) (gra
 			},
 		})
 
+		mutationGroupType := graphql.NewObject(graphql.ObjectConfig{
+			Name: group + "Mutation",
+			Fields: graphql.Fields{
+				"debug": &graphql.Field{
+					Type: graphql.String,
+				},
+			},
+		})
+
 		for _, crd := range crds {
 
 			versionIdx := slices.IndexFunc(crd.Spec.Versions, func(version apiextensionsv1.CustomResourceDefinitionVersion) bool { return version.Storage })
 			typeInformation := crd.Spec.Versions[versionIdx]
 
-			fields := gqlTypeForOpenAPIProperties(typeInformation.Schema.OpenAPIV3Schema.Properties, graphql.Fields{}, crd.Spec.Names.Kind, nil)
+			fields, inputFields := gqlTypeForOpenAPIProperties(typeInformation.Schema.OpenAPIV3Schema.Properties, graphql.Fields{}, graphql.InputObjectConfigFieldMap{}, crd.Spec.Names.Kind, nil)
 
 			if len(fields) == 0 {
 				slog.Info("skip processing of kind due to empty field map", "kind", crd.Spec.Names.Kind)
@@ -337,10 +388,86 @@ func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, conf Config) (gra
 					return resultChannel, nil
 				},
 			}
+
+			mutationGroupType.AddFieldConfig("create"+crd.Spec.Names.Kind, &graphql.Field{
+				Type: crdType,
+				Args: graphql.FieldConfigArgument{
+					"spec": &graphql.ArgumentConfig{
+						Type: inputFields["spec"].Type,
+					},
+					"metadata": &graphql.ArgumentConfig{
+						Type: graphql.NewNonNull(metadataInput),
+					},
+				},
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					ctx, span := otel.Tracer("").Start(p.Context, "Create", trace.WithAttributes(attribute.String("kind", crd.Spec.Names.Kind)))
+					defer span.End()
+
+					claims := jwt.MapClaims{}
+					_, _, err := jwt.NewParser().ParseUnverified(p.Info.RootValue.(map[string]interface{})["token"].(string), &claims)
+					if err != nil {
+						return nil, err
+					}
+
+					sar := authzv1.SubjectAccessReview{
+						Spec: authzv1.SubjectAccessReviewSpec{
+							// TODO: make this conversion more robust
+							User: claims[conf.UserClaim].(string),
+							ResourceAttributes: &authzv1.ResourceAttributes{
+								Verb:      "create",
+								Group:     crd.Spec.Group,
+								Version:   crd.Spec.Versions[versionIdx].Name,
+								Resource:  crd.Spec.Names.Plural,
+								Namespace: p.Args["metadata"].(map[string]interface{})["namespace"].(string),
+							},
+						},
+					}
+
+					err = conf.Client.Create(ctx, &sar)
+					if err != nil {
+						return nil, err
+					}
+					slog.Info("SAR result", "allowed", sar.Status.Allowed, "user", sar.Spec.User, "namespace", sar.Spec.ResourceAttributes.Namespace, "resource", sar.Spec.ResourceAttributes.Resource)
+
+					if !sar.Status.Allowed {
+						return nil, errors.New("access denied")
+					}
+
+					us := &unstructured.Unstructured{}
+					us.SetGroupVersionKind(schema.GroupVersionKind{
+						Group:   crd.Spec.Group,
+						Version: crd.Spec.Versions[versionIdx].Name,
+						Kind:    crd.Spec.Names.Kind,
+					})
+
+					us.SetNamespace(p.Args["metadata"].(map[string]interface{})["namespace"].(string))
+					if name := p.Args["metadata"].(map[string]interface{})["name"]; name != nil {
+						us.SetName(name.(string))
+					}
+
+					if generateName := p.Args["metadata"].(map[string]interface{})["generateName"]; generateName != nil {
+						us.SetGenerateName(generateName.(string))
+					}
+
+					if us.GetName() == "" && us.GetGenerateName() == "" {
+						return nil, errors.New("either name or generateName must be set")
+					}
+
+					unstructured.SetNestedField(us.Object, p.Args["spec"], "spec")
+
+					err = conf.Client.Create(ctx, us)
+
+					return us.Object, err
+				},
+			})
 		}
 
 		rootQueryFields[group] = &graphql.Field{
 			Type:    queryGroupType,
+			Resolve: func(p graphql.ResolveParams) (interface{}, error) { return p.Source, nil },
+		}
+		rootMutationFields[group] = &graphql.Field{
+			Type:    mutationGroupType,
 			Resolve: func(p graphql.ResolveParams) (interface{}, error) { return p.Source, nil },
 		}
 	}
@@ -349,6 +476,10 @@ func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, conf Config) (gra
 		Query: graphql.NewObject(graphql.ObjectConfig{
 			Name:   "Query",
 			Fields: rootQueryFields,
+		}),
+		Mutation: graphql.NewObject(graphql.ObjectConfig{
+			Name:   "Mutation",
+			Fields: rootMutationFields,
 		}),
 		Subscription: graphql.NewObject(graphql.ObjectConfig{
 			Name:   "Subscription",
