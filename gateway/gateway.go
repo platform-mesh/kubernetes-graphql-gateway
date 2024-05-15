@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"reflect"
 	"slices"
 	"strings"
 
@@ -189,8 +190,34 @@ func gqlTypeForOpenAPIProperties(in map[string]apiextensionsv1.JSONSchemaProps, 
 
 type Config struct {
 	Client      client.WithWatch
-	QueryToType map[string]func() client.ObjectList
+	queryToType map[string]func() client.ObjectList
 	UserClaim   string
+}
+
+func getListTypesFromScheme(schema runtime.Scheme, crds []apiextensionsv1.CustomResourceDefinition) map[string]func() client.ObjectList {
+	pluralToList := map[string]func() client.ObjectList{}
+
+	listInterface := reflect.TypeOf((*client.ObjectList)(nil)).Elem()
+
+	for gvk, knownType := range schema.AllKnownTypes() {
+
+		idx := slices.IndexFunc(crds, func(crd apiextensionsv1.CustomResourceDefinition) bool {
+			return strings.Contains(gvk.Kind, crd.Spec.Names.Kind) && crd.Spec.Group == gvk.Group
+		})
+		if idx == -1 {
+			continue
+		}
+
+		if !reflect.PointerTo(knownType).Implements(listInterface) {
+			continue
+		}
+
+		pluralToList[crds[idx].Spec.Names.Plural] = func() client.ObjectList {
+			return reflect.New(knownType).Interface().(client.ObjectList)
+		}
+	}
+
+	return pluralToList
 }
 
 func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, conf Config) (graphql.Schema, error) {
@@ -198,6 +225,8 @@ func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, conf Config) (gra
 	if conf.UserClaim == "" {
 		conf.UserClaim = "mail"
 	}
+
+	conf.queryToType = getListTypesFromScheme(*conf.Client.Scheme(), crds)
 
 	rootQueryFields := graphql.Fields{}
 	rootMutationFields := graphql.Fields{}
@@ -274,7 +303,7 @@ func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, conf Config) (gra
 					ctx, span := otel.Tracer("").Start(p.Context, "Resolve", trace.WithAttributes(attribute.String("kind", crd.Spec.Names.Kind)))
 					defer span.End()
 
-					listFunc, ok := conf.QueryToType[crd.Spec.Names.Plural]
+					listFunc, ok := conf.queryToType[crd.Spec.Names.Plural]
 					if !ok {
 						return nil, errors.New("no typed client available for the reuqested type")
 					}
@@ -363,7 +392,7 @@ func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, conf Config) (gra
 					ctx, span := otel.Tracer("").Start(p.Context, "Subscribe", trace.WithAttributes(attribute.String("kind", crd.Spec.Names.Kind)))
 					defer span.End()
 
-					listType, ok := conf.QueryToType[crd.Spec.Names.Plural]
+					listType, ok := conf.queryToType[crd.Spec.Names.Plural]
 					if !ok {
 						return nil, errors.New("no typed client available for the reuqested type")
 					}

@@ -76,11 +76,6 @@ var startCmd = &cobra.Command{
 
 		gqlSchema, err := gateway.FromCRDs(crds, gateway.Config{
 			Client: cl,
-			QueryToType: map[string]func() client.ObjectList{
-				"jiraprojects":     func() client.ObjectList { return &jirav1alpha1.JiraProjectList{} },
-				"accounts":         func() client.ObjectList { return &echelonv1alpha.AccountList{} },
-				"extensionclasses": func() client.ObjectList { return &extensionsv1alpha1.ExtensionClassList{} },
-			},
 		})
 		if err != nil {
 			return err
