@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -194,8 +195,9 @@ type Config struct {
 	UserClaim   string
 }
 
-func getListTypesFromScheme(schema runtime.Scheme, crds []apiextensionsv1.CustomResourceDefinition) map[string]func() client.ObjectList {
+func getListTypesAndCRDsFromScheme(schema runtime.Scheme, crds []apiextensionsv1.CustomResourceDefinition) (map[string]func() client.ObjectList, []apiextensionsv1.CustomResourceDefinition) {
 	pluralToList := map[string]func() client.ObjectList{}
+	activeCRDs := []apiextensionsv1.CustomResourceDefinition{}
 
 	listInterface := reflect.TypeOf((*client.ObjectList)(nil)).Elem()
 
@@ -215,18 +217,27 @@ func getListTypesFromScheme(schema runtime.Scheme, crds []apiextensionsv1.Custom
 		pluralToList[crds[idx].Spec.Names.Plural] = func() client.ObjectList {
 			return reflect.New(knownType).Interface().(client.ObjectList)
 		}
+
+		activeCRDs = append(activeCRDs, crds[idx])
 	}
 
-	return pluralToList
+	return pluralToList, activeCRDs
 }
 
-func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, conf Config) (graphql.Schema, error) {
+func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 
 	if conf.UserClaim == "" {
 		conf.UserClaim = "mail"
 	}
 
-	conf.queryToType = getListTypesFromScheme(*conf.Client.Scheme(), crds)
+	var crdsList apiextensionsv1.CustomResourceDefinitionList
+	err := conf.Client.List(ctx, &crdsList)
+	if err != nil {
+		return graphql.Schema{}, err
+	}
+
+	var crds []apiextensionsv1.CustomResourceDefinition
+	conf.queryToType, crds = getListTypesAndCRDsFromScheme(*conf.Client.Scheme(), crdsList.Items)
 
 	rootQueryFields := graphql.Fields{}
 	rootMutationFields := graphql.Fields{}

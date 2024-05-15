@@ -61,20 +61,7 @@ var startCmd = &cobra.Command{
 			return err
 		}
 
-		var crdList apiextensionsv1.CustomResourceDefinitionList
-		err = cl.List(context.Background(), &crdList)
-		if err != nil {
-			return err
-		}
-
-		var crds []apiextensionsv1.CustomResourceDefinition
-		for _, crd := range crdList.Items {
-			if strings.Contains(crd.Spec.Group, "automaticd.sap") {
-				crds = append(crds, crd)
-			}
-		}
-
-		gqlSchema, err := gateway.FromCRDs(crds, gateway.Config{
+		gqlSchema, err := gateway.New(cmd.Context(), gateway.Config{
 			Client: cl,
 		})
 		if err != nil {
