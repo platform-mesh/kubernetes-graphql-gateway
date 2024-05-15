@@ -8,8 +8,6 @@ require (
 	github.com/graphql-go/handler v0.2.3
 	github.com/spf13/cobra v1.8.0
 	github.tools.sap/automaticd/automaticd/operators/jira v0.0.0-20240513130407-09009e9c881c
-	github.tools.sap/dxp/echelon-operator v0.0.0-20240425093132-c47fcb937bcf
-	github.tools.sap/dxp/extension-manager-operator v0.91.0
 	go.opentelemetry.io/otel v1.26.0
 	go.opentelemetry.io/otel/trace v1.26.0
 	golang.org/x/text v0.15.0

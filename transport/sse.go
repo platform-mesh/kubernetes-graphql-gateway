@@ -6,14 +6,38 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/graphql-go/graphql"
 	"github.com/graphql-go/handler"
+	"github.com/openmfp/crd-gql-gateway/gateway"
 )
 
 // New returns a new http.Handler that can serve a GraphQL subscription over SSE.
-func New(schema graphql.Schema) http.Handler {
+func New(schema graphql.Schema, userClaimName string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
+
+		authHeader := r.Header.Get("Authorization")
+		token := strings.TrimPrefix(authHeader, "Bearer ")
+		if token == "" {
+			http.Error(w, "missing token", http.StatusUnauthorized)
+			return
+		}
+
+		claims := jwt.MapClaims{}
+		_, _, err := jwt.NewParser().ParseUnverified(token, claims)
+		if err != nil {
+			http.Error(w, "invalid token", http.StatusUnauthorized)
+			return
+		}
+
+		userIdentifier, ok := claims[userClaimName].(string)
+		if !ok || userIdentifier == "" {
+			http.Error(w, "invalid user claim", http.StatusUnauthorized)
+			return
+		}
+
+		ctx = gateway.AddUserToContext(ctx, userIdentifier)
 
 		opts := handler.NewRequestOptions(r)
 
@@ -33,9 +57,6 @@ func New(schema graphql.Schema) http.Handler {
 			Schema:         schema,
 			RequestString:  opts.Query,
 			VariableValues: opts.Variables,
-			RootObject: map[string]interface{}{
-				"token": strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "),
-			},
 		})
 
 		for result := range subscriptionChannel {

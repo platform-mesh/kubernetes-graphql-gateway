@@ -2,9 +2,9 @@ package gateway
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"log/slog"
+	"net/http"
 	"reflect"
 	"slices"
 	"strings"
@@ -12,6 +12,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/graphql-go/graphql"
 	"github.com/graphql-go/graphql/language/ast"
+	"github.com/graphql-go/handler"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -34,18 +35,7 @@ var stringMapScalar = graphql.NewScalar(graphql.ScalarConfig{
 	Serialize: func(value interface{}) interface{} {
 		return value
 	},
-	ParseValue: func(value interface{}) interface{} {
-		var out map[string]string
-		switch value := value.(type) {
-		case string:
-			json.Unmarshal([]byte(value), &out)
-		case *string:
-			json.Unmarshal([]byte(*value), &out)
-		default:
-			return nil
-		}
-		return out
-	},
+	ParseValue: func(value interface{}) interface{} { return value },
 	ParseLiteral: func(valueAST ast.Value) interface{} {
 		out := map[string]string{}
 		switch value := valueAST.(type) {
@@ -80,16 +70,20 @@ var metadataInput = graphql.NewInputObject(graphql.InputObjectConfig{
 	Name: "MetadataInput",
 	Fields: graphql.InputObjectConfigFieldMap{
 		"name": &graphql.InputObjectFieldConfig{
-			Type: graphql.String,
+			Type:        graphql.String,
+			Description: "the metadata.name of the object you want to create",
 		},
 		"generateName": &graphql.InputObjectFieldConfig{
-			Type: graphql.String,
+			Type:        graphql.String,
+			Description: "the metadata.generateName of the object you want to create",
 		},
 		"namespace": &graphql.InputObjectFieldConfig{
-			Type: graphql.NewNonNull(graphql.String),
+			Type:        graphql.NewNonNull(graphql.String),
+			Description: "the metadata.namespace of the object you want to create",
 		},
 		"labels": &graphql.InputObjectFieldConfig{
-			Type: stringMapScalar,
+			Type:        stringMapScalar,
+			Description: "the metadata.labels of the object you want to create",
 		},
 	},
 })
@@ -193,8 +187,7 @@ type Config struct {
 	Client client.WithWatch
 
 	// optional client.Reader to use for initial crd retrieval
-	Reader    client.Reader
-	UserClaim string
+	Reader client.Reader
 
 	queryToType map[string]func() client.ObjectList
 }
@@ -228,11 +221,26 @@ func getListTypesAndCRDsFromScheme(schema *runtime.Scheme, crds []apiextensionsv
 	return pluralToList, activeCRDs
 }
 
-func New(ctx context.Context, conf Config) (graphql.Schema, error) {
+func crdsByGroup(crds []apiextensionsv1.CustomResourceDefinition) map[string][]apiextensionsv1.CustomResourceDefinition {
+	byGroup := map[string][]apiextensionsv1.CustomResourceDefinition{}
 
-	if conf.UserClaim == "" {
-		conf.UserClaim = "mail"
+	for _, crd := range crds {
+		var groupNameBuilder strings.Builder
+		for i, part := range strings.Split(crd.Spec.Group, ".") {
+			if i == 0 {
+				groupNameBuilder.WriteString(part)
+				continue
+			}
+			piece := cases.Title(language.English).String(part)
+			groupNameBuilder.WriteString(piece)
+		}
+		byGroup[groupNameBuilder.String()] = append(byGroup[groupNameBuilder.String()], crd)
 	}
+
+	return byGroup
+}
+
+func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 
 	if conf.Client == nil {
 		return graphql.Schema{}, errors.New("client is required")
@@ -255,39 +263,16 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 	rootMutationFields := graphql.Fields{}
 	subscriptions := graphql.Fields{}
 
-	byGroup := map[string][]apiextensionsv1.CustomResourceDefinition{}
-
-	for _, crd := range crds {
-		var groupNameBuilder strings.Builder
-		for i, part := range strings.Split(crd.Spec.Group, ".") {
-			if i == 0 {
-				groupNameBuilder.WriteString(part)
-				continue
-			}
-			piece := cases.Title(language.English).String(part)
-			groupNameBuilder.WriteString(piece)
-		}
-		byGroup[groupNameBuilder.String()] = append(byGroup[groupNameBuilder.String()], crd)
-	}
-
-	for group, crds := range byGroup {
+	for group, crds := range crdsByGroup(crds) {
 
 		queryGroupType := graphql.NewObject(graphql.ObjectConfig{
-			Name: group + "Type",
-			Fields: graphql.Fields{
-				"debug": &graphql.Field{
-					Type: graphql.String,
-				},
-			},
+			Name:   group + "Type",
+			Fields: graphql.Fields{},
 		})
 
 		mutationGroupType := graphql.NewObject(graphql.ObjectConfig{
-			Name: group + "Mutation",
-			Fields: graphql.Fields{
-				"debug": &graphql.Field{
-					Type: graphql.String,
-				},
-			},
+			Name:   group + "Mutation",
+			Fields: graphql.Fields{},
 		})
 
 		for _, crd := range crds {
@@ -308,14 +293,16 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 			})
 
 			crdType.AddFieldConfig("metadata", &graphql.Field{
-				Type: objectMeta,
+				Type:        objectMeta,
+				Description: "Standard object's metadata.",
 			})
 
 			queryGroupType.AddFieldConfig(crd.Spec.Names.Plural, &graphql.Field{
-				Type: graphql.NewList(crdType),
+				Type: graphql.NewNonNull(graphql.NewList(graphql.NewNonNull(crdType))),
 				Args: graphql.FieldConfigArgument{
 					"labelselector": &graphql.ArgumentConfig{
-						Type: graphql.String,
+						Type:        graphql.String,
+						Description: "a label selector to filter the objects by",
 					},
 					"namespace": &graphql.ArgumentConfig{
 						Type:        graphql.String,
@@ -343,16 +330,14 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 						opts = append(opts, client.MatchingLabelsSelector{Selector: selector})
 					}
 
-					claims := jwt.MapClaims{}
-					_, _, err := jwt.NewParser().ParseUnverified(p.Info.RootValue.(map[string]interface{})["token"].(string), &claims)
-					if err != nil {
-						return nil, err
+					user, ok := p.Context.Value(userContextKey{}).(string)
+					if !ok || user == "" {
+						return nil, errors.New("no user found in context")
 					}
 
 					sar := authzv1.SubjectAccessReview{
 						Spec: authzv1.SubjectAccessReviewSpec{
-							// TODO: make this conversion more robust
-							User: claims[conf.UserClaim].(string),
+							User: user,
 							ResourceAttributes: &authzv1.ResourceAttributes{
 								Verb:     "list",
 								Group:    crd.Spec.Group,
@@ -422,16 +407,14 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 
 					list := listType()
 
-					claims := jwt.MapClaims{}
-					_, _, err := jwt.NewParser().ParseUnverified(p.Info.RootValue.(map[string]interface{})["token"].(string), &claims)
-					if err != nil {
-						return nil, err
+					user, ok := p.Context.Value(userContextKey{}).(string)
+					if !ok || user == "" {
+						return nil, errors.New("no user found in context")
 					}
 
 					sar := authzv1.SubjectAccessReview{
 						Spec: authzv1.SubjectAccessReviewSpec{
-							// TODO: make this conversion more robust
-							User: claims[conf.UserClaim].(string),
+							User: user,
 							ResourceAttributes: &authzv1.ResourceAttributes{
 								Verb:      "watch",
 								Group:     crd.Spec.Group,
@@ -498,16 +481,14 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 					ctx, span := otel.Tracer("").Start(p.Context, "Delete", trace.WithAttributes(attribute.String("kind", crd.Spec.Names.Kind)))
 					defer span.End()
 
-					claims := jwt.MapClaims{}
-					_, _, err := jwt.NewParser().ParseUnverified(p.Info.RootValue.(map[string]interface{})["token"].(string), &claims)
-					if err != nil {
-						return nil, err
+					user, ok := p.Context.Value(userContextKey{}).(string)
+					if !ok || user == "" {
+						return nil, errors.New("no user found in context")
 					}
 
 					sar := authzv1.SubjectAccessReview{
 						Spec: authzv1.SubjectAccessReviewSpec{
-							// TODO: make this conversion more robust
-							User: claims[conf.UserClaim].(string),
+							User: user,
 							ResourceAttributes: &authzv1.ResourceAttributes{
 								Verb:      "delete",
 								Group:     crd.Spec.Group,
@@ -559,16 +540,14 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 					ctx, span := otel.Tracer("").Start(p.Context, "Create", trace.WithAttributes(attribute.String("kind", crd.Spec.Names.Kind)))
 					defer span.End()
 
-					claims := jwt.MapClaims{}
-					_, _, err := jwt.NewParser().ParseUnverified(p.Info.RootValue.(map[string]interface{})["token"].(string), &claims)
-					if err != nil {
-						return nil, err
+					user, ok := p.Context.Value(userContextKey{}).(string)
+					if !ok || user == "" {
+						return nil, errors.New("no user found in context")
 					}
 
 					sar := authzv1.SubjectAccessReview{
 						Spec: authzv1.SubjectAccessReviewSpec{
-							// TODO: make this conversion more robust
-							User: claims[conf.UserClaim].(string),
+							User: user,
 							ResourceAttributes: &authzv1.ResourceAttributes{
 								Verb:      "create",
 								Group:     crd.Spec.Group,
@@ -646,4 +625,44 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 			Fields: subscriptions,
 		}),
 	})
+}
+
+type userContextKey struct{}
+
+type HandlerConfig struct {
+	*handler.Config
+	UserClaim string
+}
+
+func Handler(conf HandlerConfig) http.Handler {
+	h := handler.New(conf.Config)
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		authHeader := r.Header.Get("Authorization")
+		token := strings.TrimPrefix(authHeader, "Bearer ")
+		if token == "" && (conf.Playground || conf.GraphiQL) {
+			h.ServeHTTP(w, r)
+			return
+		}
+
+		claims := jwt.MapClaims{}
+		_, _, err := jwt.NewParser().ParseUnverified(token, claims)
+		if err != nil {
+			http.Error(w, "invalid token", http.StatusUnauthorized)
+			return
+		}
+
+		userIdentifier, ok := claims[conf.UserClaim].(string)
+		if !ok || userIdentifier == "" {
+			http.Error(w, "invalid user claim", http.StatusUnauthorized)
+			return
+		}
+
+		h.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), userContextKey{}, userIdentifier)))
+	})
+}
+
+func AddUserToContext(ctx context.Context, user string) context.Context {
+	return context.WithValue(ctx, userContextKey{}, user)
 }

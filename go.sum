@@ -129,10 +129,6 @@ github.tools.sap/automaticd/automaticd/operators/jira v0.0.0-20240513130407-0900
 github.tools.sap/automaticd/automaticd/operators/jira v0.0.0-20240513130407-09009e9c881c/go.mod h1:QeBIjruI/DXst/ZooNavxL1bVqY2FVOYlCK8iMUk4V4=
 github.tools.sap/automaticd/automaticd/shared v0.37.11 h1:2xihN+gBu8iRaU/g9OWHUjHyCMCVWYvNXgxyfIsWYO8=
 github.tools.sap/automaticd/automaticd/shared v0.37.11/go.mod h1:z1LWsm1bcY9HB6AwSc2bCuLKTFdJN4nXfsfVlxZix4M=
-github.tools.sap/dxp/echelon-operator v0.0.0-20240425093132-c47fcb937bcf h1:/kLrxPgHAZ5l5yOv9EZ0pX/D7q05m15vw82hqL6ucM8=
-github.tools.sap/dxp/echelon-operator v0.0.0-20240425093132-c47fcb937bcf/go.mod h1:b7X6/YbwZq7DHyxjRhgXEpFsvjhcHCoxNTpa9TnUcR8=
-github.tools.sap/dxp/extension-manager-operator v0.91.0 h1:UQ/qr3S/tusIRHwUHuA40KN0Zh6+nwP1SnBzvHBd7G4=
-github.tools.sap/dxp/extension-manager-operator v0.91.0/go.mod h1:gqETx2zXmiKD0tns4a28CeL7Q1AmJmGa+g/3TLd7r3U=
 go.opentelemetry.io/otel v1.26.0 h1:LQwgL5s/1W7YiiRwxf03QGnWLb2HW4pLiAhaA5cZXBs=
 go.opentelemetry.io/otel v1.26.0/go.mod h1:UmLkJHUAidDval2EICqBMbnAd0/m2vmpf/dAM+fvFs4=
 go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.26.0 h1:1u/AyyOqAWzy+SkPxDpahCNZParHV8Vid1RnI2clyDE=
