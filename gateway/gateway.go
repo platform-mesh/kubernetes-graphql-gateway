@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"slices"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/graphql-go/graphql"
+	"github.com/graphql-go/graphql/language/ast"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -24,6 +26,36 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+var stringMapScalar = graphql.NewScalar(graphql.ScalarConfig{
+	Name:        "StringMap",
+	Description: "A map of strings",
+	Serialize: func(value interface{}) interface{} {
+		return value
+	},
+	ParseValue: func(value interface{}) interface{} {
+		var out map[string]string
+		switch value := value.(type) {
+		case string:
+			json.Unmarshal([]byte(value), &out)
+		case *string:
+			json.Unmarshal([]byte(*value), &out)
+		default:
+			return nil
+		}
+		return out
+	},
+	ParseLiteral: func(valueAST ast.Value) interface{} {
+		out := map[string]string{}
+		switch value := valueAST.(type) {
+		case *ast.ObjectValue:
+			for _, field := range value.Fields {
+				out[field.Name.Value] = field.Value.GetValue().(string)
+			}
+		}
+		return out
+	},
+})
+
 var objectMeta = graphql.NewObject(graphql.ObjectConfig{
 	Name: "Metadata",
 	Fields: graphql.Fields{
@@ -32,6 +64,12 @@ var objectMeta = graphql.NewObject(graphql.ObjectConfig{
 		},
 		"namespace": &graphql.Field{
 			Type: graphql.NewNonNull(graphql.String),
+		},
+		"labels": &graphql.Field{
+			Type: stringMapScalar,
+		},
+		"annotations": &graphql.Field{
+			Type: stringMapScalar,
 		},
 	},
 })
@@ -47,6 +85,9 @@ var metadataInput = graphql.NewInputObject(graphql.InputObjectConfig{
 		},
 		"namespace": &graphql.InputObjectFieldConfig{
 			Type: graphql.NewNonNull(graphql.String),
+		},
+		"labels": &graphql.InputObjectFieldConfig{
+			Type: stringMapScalar,
 		},
 	},
 })
@@ -389,6 +430,69 @@ func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, conf Config) (gra
 				},
 			}
 
+			mutationGroupType.AddFieldConfig("delete"+crd.Spec.Names.Kind, &graphql.Field{
+				Type: graphql.Boolean,
+				Args: graphql.FieldConfigArgument{
+					"name": &graphql.ArgumentConfig{
+						Type:        graphql.NewNonNull(graphql.String),
+						Description: "the metadata.name of the object you want to delete",
+					},
+					"namespace": &graphql.ArgumentConfig{
+						Type:        graphql.NewNonNull(graphql.String),
+						Description: "the metadata.namesapce of the object you want to delete",
+					},
+				},
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					ctx, span := otel.Tracer("").Start(p.Context, "Delete", trace.WithAttributes(attribute.String("kind", crd.Spec.Names.Kind)))
+					defer span.End()
+
+					claims := jwt.MapClaims{}
+					_, _, err := jwt.NewParser().ParseUnverified(p.Info.RootValue.(map[string]interface{})["token"].(string), &claims)
+					if err != nil {
+						return nil, err
+					}
+
+					sar := authzv1.SubjectAccessReview{
+						Spec: authzv1.SubjectAccessReviewSpec{
+							// TODO: make this conversion more robust
+							User: claims[conf.UserClaim].(string),
+							ResourceAttributes: &authzv1.ResourceAttributes{
+								Verb:      "delete",
+								Group:     crd.Spec.Group,
+								Version:   crd.Spec.Versions[versionIdx].Name,
+								Resource:  crd.Spec.Names.Plural,
+								Namespace: p.Args["namespace"].(string),
+								Name:      p.Args["name"].(string),
+							},
+						},
+					}
+
+					err = conf.Client.Create(ctx, &sar)
+					if err != nil {
+						return nil, err
+					}
+					slog.Info("SAR result", "allowed", sar.Status.Allowed, "user", sar.Spec.User, "namespace", sar.Spec.ResourceAttributes.Namespace, "resource", sar.Spec.ResourceAttributes.Resource)
+
+					if !sar.Status.Allowed {
+						return nil, errors.New("access denied")
+					}
+
+					us := &unstructured.Unstructured{}
+					us.SetGroupVersionKind(schema.GroupVersionKind{
+						Group:   crd.Spec.Group,
+						Version: crd.Spec.Versions[versionIdx].Name,
+						Kind:    crd.Spec.Names.Kind,
+					})
+
+					us.SetNamespace(p.Args["namespace"].(string))
+					us.SetName(p.Args["name"].(string))
+
+					err = conf.Client.Delete(ctx, us)
+
+					return err == nil, err
+				},
+			})
+
 			mutationGroupType.AddFieldConfig("create"+crd.Spec.Names.Kind, &graphql.Field{
 				Type: crdType,
 				Args: graphql.FieldConfigArgument{
@@ -447,6 +551,10 @@ func FromCRDs(crds []apiextensionsv1.CustomResourceDefinition, conf Config) (gra
 
 					if generateName := p.Args["metadata"].(map[string]interface{})["generateName"]; generateName != nil {
 						us.SetGenerateName(generateName.(string))
+					}
+
+					if labels := p.Args["metadata"].(map[string]interface{})["labels"]; labels != nil {
+						us.SetLabels(labels.(map[string]string))
 					}
 
 					if us.GetName() == "" && us.GetGenerateName() == "" {
