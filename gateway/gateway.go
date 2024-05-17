@@ -599,6 +599,76 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 					return us.Object, err
 				},
 			})
+
+			mutationGroupType.AddFieldConfig("update"+crd.Spec.Names.Kind, &graphql.Field{
+				Type: crdType,
+				Args: graphql.FieldConfigArgument{
+					"spec": &graphql.ArgumentConfig{
+						Type: inputFields["spec"].Type,
+					},
+					"metadata": &graphql.ArgumentConfig{
+						Type: graphql.NewNonNull(metadataInput),
+					},
+				},
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+
+					ctx, span := otel.Tracer("").Start(p.Context, "Update", trace.WithAttributes(attribute.String("kind", crd.Spec.Names.Kind)))
+					defer span.End()
+
+					user, ok := p.Context.Value(userContextKey{}).(string)
+					if !ok || user == "" {
+						return nil, errors.New("no user found in context")
+					}
+
+					sar := authzv1.SubjectAccessReview{
+						Spec: authzv1.SubjectAccessReviewSpec{
+							User: user,
+							ResourceAttributes: &authzv1.ResourceAttributes{
+								Verb:      "update",
+								Group:     crd.Spec.Group,
+								Version:   crd.Spec.Versions[versionIdx].Name,
+								Resource:  crd.Spec.Names.Plural,
+								Namespace: p.Args["metadata"].(map[string]interface{})["namespace"].(string),
+								Name:      p.Args["metadata"].(map[string]interface{})["name"].(string),
+							},
+						},
+					}
+
+					err = conf.Client.Create(ctx, &sar)
+					if err != nil {
+						return nil, err
+					}
+					slog.Info("SAR result", "allowed", sar.Status.Allowed, "user", sar.Spec.User, "namespace", sar.Spec.ResourceAttributes.Namespace, "resource", sar.Spec.ResourceAttributes.Resource)
+
+					if !sar.Status.Allowed {
+						return nil, errors.New("access denied")
+					}
+
+					us := &unstructured.Unstructured{}
+					us.SetGroupVersionKind(schema.GroupVersionKind{
+						Group:   crd.Spec.Group,
+						Version: crd.Spec.Versions[versionIdx].Name,
+						Kind:    crd.Spec.Names.Kind,
+					})
+
+					us.SetNamespace(p.Args["metadata"].(map[string]interface{})["namespace"].(string))
+					us.SetName(p.Args["metadata"].(map[string]interface{})["name"].(string))
+
+					err = conf.Client.Get(ctx, client.ObjectKey{Namespace: us.GetNamespace(), Name: us.GetName()}, us)
+					if err != nil {
+						return nil, err
+					}
+
+					unstructured.SetNestedField(us.Object, p.Args["spec"], "spec")
+
+					err = conf.Client.Update(ctx, us)
+					if err != nil {
+						return nil, err
+					}
+
+					return us.Object, nil
+				},
+			})
 		}
 
 		rootQueryFields[group] = &graphql.Field{
