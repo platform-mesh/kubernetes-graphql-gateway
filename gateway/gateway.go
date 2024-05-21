@@ -2,7 +2,9 @@ package gateway
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"reflect"
@@ -729,7 +731,39 @@ func Handler(conf HandlerConfig) http.Handler {
 			return
 		}
 
-		h.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), userContextKey{}, userIdentifier)))
+		ctx := AddUserToContext(r.Context(), userIdentifier)
+
+		if r.Header.Get("Accept") == "text/event-stream" {
+			opts := handler.NewRequestOptions(r)
+
+			rc := http.NewResponseController(w)
+			defer rc.Flush()
+
+			w.Header().Set("Cache-Control", "no-cache")
+			w.Header().Set("Connection", "keep-alive")
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("Content-Type", "text/event-stream")
+			fmt.Fprintf(w, ":\n\n")
+			rc.Flush()
+
+			subscriptionChannel := graphql.Subscribe(graphql.Params{
+				Context:        ctx,
+				Schema:         *conf.Schema,
+				RequestString:  opts.Query,
+				VariableValues: opts.Variables,
+			})
+
+			for result := range subscriptionChannel {
+				b, _ := json.Marshal(result)
+				fmt.Fprintf(w, "event: next\ndata: %s\n\n", b)
+				rc.Flush()
+			}
+
+			fmt.Fprint(w, "event: complete\n\n")
+			return
+		}
+
+		h.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
