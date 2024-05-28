@@ -191,11 +191,13 @@ type Config struct {
 	// optional client.Reader to use for initial crd retrieval
 	Reader client.Reader
 
-	queryToType map[string]func() client.ObjectList
+	pluralToListType   map[string]func() client.ObjectList
+	pluralToObjectType map[string]func() client.Object
 }
 
-func getListTypesAndCRDsFromScheme(schema *runtime.Scheme, crds []apiextensionsv1.CustomResourceDefinition) (map[string]func() client.ObjectList, []apiextensionsv1.CustomResourceDefinition) {
+func getListTypesAndCRDsFromScheme(schema *runtime.Scheme, crds []apiextensionsv1.CustomResourceDefinition) (map[string]func() client.ObjectList, map[string]func() client.Object, []apiextensionsv1.CustomResourceDefinition) {
 	pluralToList := map[string]func() client.ObjectList{}
+	pluralToObject := map[string]func() client.Object{}
 	activeCRDs := []apiextensionsv1.CustomResourceDefinition{}
 
 	listInterface := reflect.TypeOf((*client.ObjectList)(nil)).Elem()
@@ -209,6 +211,10 @@ func getListTypesAndCRDsFromScheme(schema *runtime.Scheme, crds []apiextensionsv
 			continue
 		}
 
+		pluralToObject[crds[idx].Spec.Names.Plural] = func() client.Object {
+			return reflect.New(knownType).Interface().(client.Object)
+		}
+
 		if !reflect.PointerTo(knownType).Implements(listInterface) {
 			continue
 		}
@@ -220,7 +226,7 @@ func getListTypesAndCRDsFromScheme(schema *runtime.Scheme, crds []apiextensionsv
 		activeCRDs = append(activeCRDs, crds[idx])
 	}
 
-	return pluralToList, activeCRDs
+	return pluralToList, pluralToObject, activeCRDs
 }
 
 func crdsByGroup(crds []apiextensionsv1.CustomResourceDefinition) map[string][]apiextensionsv1.CustomResourceDefinition {
@@ -259,7 +265,7 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 	}
 
 	var crds []apiextensionsv1.CustomResourceDefinition
-	conf.queryToType, crds = getListTypesAndCRDsFromScheme(conf.Client.Scheme(), crdsList.Items)
+	conf.pluralToListType, conf.pluralToObjectType, crds = getListTypesAndCRDsFromScheme(conf.Client.Scheme(), crdsList.Items)
 
 	rootQueryFields := graphql.Fields{}
 	rootMutationFields := graphql.Fields{}
@@ -299,7 +305,7 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 				Description: "Standard object's metadata.",
 			})
 
-			queryGroupType.AddFieldConfig(crd.Spec.Names.Plural, &graphql.Field{
+			queryGroupType.AddFieldConfig("list"+cases.Title(language.English).String(crd.Spec.Names.Singular), &graphql.Field{
 				Type: graphql.NewNonNull(graphql.NewList(graphql.NewNonNull(crdType))),
 				Args: graphql.FieldConfigArgument{
 					"labelselector": &graphql.ArgumentConfig{
@@ -315,7 +321,7 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 					ctx, span := otel.Tracer("").Start(p.Context, "Resolve", trace.WithAttributes(attribute.String("kind", crd.Spec.Names.Kind)))
 					defer span.End()
 
-					listFunc, ok := conf.queryToType[crd.Spec.Names.Plural]
+					listFunc, ok := conf.pluralToListType[crd.Spec.Names.Plural]
 					if !ok {
 						return nil, errors.New("no typed client available for the reuqested type")
 					}
@@ -383,7 +389,72 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 				},
 			})
 
-			subscriptions[group+crd.Spec.Names.Kind] = &graphql.Field{
+			queryGroupType.AddFieldConfig(crd.Spec.Names.Singular, &graphql.Field{
+				Type: graphql.NewNonNull(crdType),
+				Args: graphql.FieldConfigArgument{
+					"name": &graphql.ArgumentConfig{
+						Type:        graphql.NewNonNull(graphql.String),
+						Description: "the metadata.name of the object you want to retrieve",
+					},
+					"namespace": &graphql.ArgumentConfig{
+						Type:        graphql.NewNonNull(graphql.String),
+						Description: "the metadata.namesapce of the object you want to retrieve",
+					},
+				},
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					ctx, span := otel.Tracer("").Start(p.Context, "Resolve", trace.WithAttributes(attribute.String("kind", crd.Spec.Names.Kind)))
+					defer span.End()
+
+					user, ok := p.Context.Value(userContextKey{}).(string)
+					if !ok || user == "" {
+						return nil, errors.New("no user found in context")
+					}
+
+					name := p.Args["name"].(string)
+					namespace := p.Args["namespace"].(string)
+
+					sar := authzv1.SubjectAccessReview{
+						Spec: authzv1.SubjectAccessReviewSpec{
+							User: user,
+							ResourceAttributes: &authzv1.ResourceAttributes{
+								Verb:      "get",
+								Group:     crd.Spec.Group,
+								Version:   crd.Spec.Versions[versionIdx].Name,
+								Resource:  crd.Spec.Names.Plural,
+								Namespace: namespace,
+								Name:      name,
+							},
+						},
+					}
+
+					err = conf.Client.Create(ctx, &sar)
+					if err != nil {
+						return nil, err
+					}
+					slog.Info("SAR result", "allowed", sar.Status.Allowed, "user", sar.Spec.User, "namespace", sar.Spec.ResourceAttributes.Namespace, "resource", sar.Spec.ResourceAttributes.Resource)
+
+					if !sar.Status.Allowed {
+						return nil, errors.New("access denied")
+					}
+
+					objectFunc, ok := conf.pluralToObjectType[crd.Spec.Names.Plural]
+					if !ok {
+						return nil, errors.New("no typed client available for the reuqested type")
+					}
+
+					obj := objectFunc()
+					err = conf.Client.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, obj)
+					if err != nil {
+						return nil, err
+					}
+
+					return obj, nil
+				},
+			})
+
+			capitalizedSingular := cases.Title(language.English).String(crd.Spec.Names.Singular)
+
+			subscriptions[group+capitalizedSingular] = &graphql.Field{
 				Type: crdType,
 				Args: graphql.FieldConfigArgument{
 					"name": &graphql.ArgumentConfig{
@@ -402,7 +473,7 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 					ctx, span := otel.Tracer("").Start(p.Context, "Subscribe", trace.WithAttributes(attribute.String("kind", crd.Spec.Names.Kind)))
 					defer span.End()
 
-					listType, ok := conf.queryToType[crd.Spec.Names.Plural]
+					listType, ok := conf.pluralToListType[crd.Spec.Names.Plural]
 					if !ok {
 						return nil, errors.New("no typed client available for the reuqested type")
 					}
@@ -467,7 +538,7 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 				},
 			}
 
-			mutationGroupType.AddFieldConfig("delete"+crd.Spec.Names.Kind, &graphql.Field{
+			mutationGroupType.AddFieldConfig("delete"+capitalizedSingular, &graphql.Field{
 				Type: graphql.Boolean,
 				Args: graphql.FieldConfigArgument{
 					"name": &graphql.ArgumentConfig{
@@ -528,7 +599,7 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 				},
 			})
 
-			mutationGroupType.AddFieldConfig("create"+crd.Spec.Names.Kind, &graphql.Field{
+			mutationGroupType.AddFieldConfig("create"+capitalizedSingular, &graphql.Field{
 				Type: crdType,
 				Args: graphql.FieldConfigArgument{
 					"spec": &graphql.ArgumentConfig{
@@ -602,7 +673,7 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 				},
 			})
 
-			mutationGroupType.AddFieldConfig("update"+crd.Spec.Names.Kind, &graphql.Field{
+			mutationGroupType.AddFieldConfig("update"+capitalizedSingular, &graphql.Field{
 				Type: crdType,
 				Args: graphql.FieldConfigArgument{
 					"spec": &graphql.ArgumentConfig{
