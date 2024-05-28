@@ -305,7 +305,7 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 				Description: "Standard object's metadata.",
 			})
 
-			queryGroupType.AddFieldConfig("list"+cases.Title(language.English).String(crd.Spec.Names.Singular), &graphql.Field{
+			queryGroupType.AddFieldConfig(crd.Spec.Names.Plural, &graphql.Field{
 				Type: graphql.NewNonNull(graphql.NewList(graphql.NewNonNull(crdType))),
 				Args: graphql.FieldConfigArgument{
 					"labelselector": &graphql.ArgumentConfig{
