@@ -151,7 +151,7 @@ func gqlTypeForOpenAPIProperties(in map[string]apiextensionsv1.JSONSchemaProps, 
 			if info.Properties == nil {
 				continue
 			}
-			typeName := parentFieldName + cases.Title(language.English).String(key)
+			typeName := cases.Title(language.English).String(parentFieldName) + cases.Title(language.English).String(key)
 			newFields, newInputFields := gqlTypeForOpenAPIProperties(info.Properties, graphql.Fields{}, graphql.InputObjectConfigFieldMap{}, typeName, info.Required)
 			if len(newFields) == 0 {
 				slog.Info("skipping creation of subtype due to emtpy field configuration", "type", typeName)
@@ -163,7 +163,7 @@ func gqlTypeForOpenAPIProperties(in map[string]apiextensionsv1.JSONSchemaProps, 
 				Fields: newFields,
 			})
 			newInputType := graphql.NewInputObject(graphql.InputObjectConfig{
-				Name:   parentFieldName + key + "Input",
+				Name:   typeName + "Input",
 				Fields: newInputFields,
 			})
 
@@ -201,6 +201,7 @@ func getListTypesAndCRDsFromScheme(schema *runtime.Scheme, crds []apiextensionsv
 	activeCRDs := []apiextensionsv1.CustomResourceDefinition{}
 
 	listInterface := reflect.TypeOf((*client.ObjectList)(nil)).Elem()
+	objectInterface := reflect.TypeOf((*client.Object)(nil)).Elem()
 
 	for gvk, knownType := range schema.AllKnownTypes() {
 
@@ -211,8 +212,10 @@ func getListTypesAndCRDsFromScheme(schema *runtime.Scheme, crds []apiextensionsv
 			continue
 		}
 
-		pluralToObject[crds[idx].Spec.Names.Plural] = func() client.Object {
-			return reflect.New(knownType).Interface().(client.Object)
+		if reflect.PointerTo(knownType).Implements(objectInterface) && !reflect.PointerTo(knownType).Implements(listInterface) {
+			pluralToObject[crds[idx].Spec.Names.Plural] = func() client.Object {
+				return reflect.New(knownType).Interface().(client.Object)
+			}
 		}
 
 		if !reflect.PointerTo(knownType).Implements(listInterface) {
@@ -288,7 +291,7 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 			versionIdx := slices.IndexFunc(crd.Spec.Versions, func(version apiextensionsv1.CustomResourceDefinitionVersion) bool { return version.Storage })
 			typeInformation := crd.Spec.Versions[versionIdx]
 
-			fields, inputFields := gqlTypeForOpenAPIProperties(typeInformation.Schema.OpenAPIV3Schema.Properties, graphql.Fields{}, graphql.InputObjectConfigFieldMap{}, crd.Spec.Names.Kind, nil)
+			fields, inputFields := gqlTypeForOpenAPIProperties(typeInformation.Schema.OpenAPIV3Schema.Properties, graphql.Fields{}, graphql.InputObjectConfigFieldMap{}, cases.Title(language.English).String(crd.Spec.Names.Singular), nil)
 
 			if len(fields) == 0 {
 				slog.Info("skip processing of kind due to empty field map", "kind", crd.Spec.Names.Kind)
@@ -455,15 +458,11 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 			capitalizedSingular := cases.Title(language.English).String(crd.Spec.Names.Singular)
 
 			subscriptions[group+capitalizedSingular] = &graphql.Field{
-				Type: crdType,
+				Type: graphql.NewList(crdType),
 				Args: graphql.FieldConfigArgument{
-					"name": &graphql.ArgumentConfig{
-						Type:        graphql.NewNonNull(graphql.String),
-						Description: "the metadata.name of the object you want to watch",
-					},
 					"namespace": &graphql.ArgumentConfig{
 						Type:        graphql.NewNonNull(graphql.String),
-						Description: "the metadata.namesapce of the object you want to watch",
+						Description: "the metadata.namesapce of the objects you want to watch",
 					},
 				},
 				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
@@ -494,7 +493,6 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 								Version:   crd.Spec.Versions[versionIdx].Name,
 								Resource:  crd.Spec.Names.Plural,
 								Namespace: p.Args["namespace"].(string),
-								Name:      p.Args["name"].(string),
 							},
 						},
 					}
@@ -509,15 +507,15 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 						return nil, errors.New("access denied")
 					}
 
-					listWatch, err := conf.Client.Watch(ctx, list, client.InNamespace(p.Args["namespace"].(string)), client.MatchingFields{
-						"metadata.name": p.Args["name"].(string),
-					})
+					listWatch, err := conf.Client.Watch(ctx, list, client.InNamespace(p.Args["namespace"].(string)))
 					if err != nil {
 						return nil, err
 					}
 
 					resultChannel := make(chan interface{})
 					go func() {
+						// TODO: i would like to figure out if there is another way than to buffer all the items
+						items := []client.Object{}
 						for ev := range listWatch.ResultChan() {
 							select {
 							case <-ctx.Done():
@@ -525,11 +523,30 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 								listWatch.Stop()
 								close(resultChannel)
 							default:
+								switch ev.Type {
+								case watch.Added:
+									items = append(items, ev.Object.(client.Object))
+								case watch.Modified:
+									for i, item := range items {
+										if item.GetName() == ev.Object.(client.Object).GetName() {
+											items[i] = ev.Object.(client.Object)
+											break
+										}
+									}
+								case watch.Deleted:
+									for i, item := range items {
+										if item.GetName() == ev.Object.(client.Object).GetName() {
+											items = append(items[:i], items[i+1:]...)
+											break
+										}
+									}
+								}
+
 								if ev.Type == watch.Bookmark {
 									continue
 								}
 
-								resultChannel <- ev.Object
+								resultChannel <- items
 							}
 						}
 					}()
