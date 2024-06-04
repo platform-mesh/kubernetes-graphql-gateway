@@ -26,9 +26,10 @@ var startCmd = &cobra.Command{
 		cfg := controllerruntime.GetConfigOrDie()
 
 		schema := runtime.NewScheme()
-		jirav1alpha1.AddToScheme(schema)
 		apiextensionsv1.AddToScheme(schema)
 		authzv1.AddToScheme(schema)
+
+		jirav1alpha1.AddToScheme(schema)
 
 		k8sCache, err := cache.New(cfg, cache.Options{
 			Scheme: schema,

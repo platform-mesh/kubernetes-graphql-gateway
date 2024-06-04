@@ -33,13 +33,12 @@ import (
 
 var stringMapScalar = graphql.NewScalar(graphql.ScalarConfig{
 	Name:        "StringMap",
-	Description: "A map of strings",
-	Serialize: func(value interface{}) interface{} {
-		return value
-	},
-	ParseValue: func(value interface{}) interface{} { return value },
+	Description: "A map of strings, Commonly used for metadata.labels and metadata.annotations.",
+	Serialize:   func(value interface{}) interface{} { return value },
+	ParseValue:  func(value interface{}) interface{} { return value },
 	ParseLiteral: func(valueAST ast.Value) interface{} {
 		out := map[string]string{}
+
 		switch value := valueAST.(type) {
 		case *ast.ObjectValue:
 			for _, field := range value.Fields {
@@ -54,16 +53,20 @@ var objectMeta = graphql.NewObject(graphql.ObjectConfig{
 	Name: "Metadata",
 	Fields: graphql.Fields{
 		"name": &graphql.Field{
-			Type: graphql.NewNonNull(graphql.String),
+			Type:        graphql.NewNonNull(graphql.String),
+			Description: "the metadata.name of the object",
 		},
 		"namespace": &graphql.Field{
-			Type: graphql.NewNonNull(graphql.String),
+			Type:        graphql.NewNonNull(graphql.String),
+			Description: "the metadata.namespace of the object",
 		},
 		"labels": &graphql.Field{
-			Type: stringMapScalar,
+			Type:        stringMapScalar,
+			Description: "the metadata.labels of the object",
 		},
 		"annotations": &graphql.Field{
-			Type: stringMapScalar,
+			Type:        stringMapScalar,
+			Description: "the metadata.annotations of the object",
 		},
 	},
 })
@@ -195,7 +198,7 @@ type Config struct {
 	pluralToObjectType map[string]func() client.Object
 }
 
-func getListTypesAndCRDsFromScheme(schema *runtime.Scheme, crds []apiextensionsv1.CustomResourceDefinition) (map[string]func() client.ObjectList, map[string]func() client.Object, []apiextensionsv1.CustomResourceDefinition) {
+func getTypesAndCRDsFromScheme(schema *runtime.Scheme, crds []apiextensionsv1.CustomResourceDefinition) (map[string]func() client.ObjectList, map[string]func() client.Object, []apiextensionsv1.CustomResourceDefinition) {
 	pluralToList := map[string]func() client.ObjectList{}
 	pluralToObject := map[string]func() client.Object{}
 	activeCRDs := []apiextensionsv1.CustomResourceDefinition{}
@@ -268,7 +271,7 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 	}
 
 	var crds []apiextensionsv1.CustomResourceDefinition
-	conf.pluralToListType, conf.pluralToObjectType, crds = getListTypesAndCRDsFromScheme(conf.Client.Scheme(), crdsList.Items)
+	conf.pluralToListType, conf.pluralToObjectType, crds = getTypesAndCRDsFromScheme(conf.Client.Scheme(), crdsList.Items)
 
 	rootQueryFields := graphql.Fields{}
 	rootMutationFields := graphql.Fields{}
@@ -288,477 +291,398 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 
 		for _, crd := range crds {
 
-			versionIdx := slices.IndexFunc(crd.Spec.Versions, func(version apiextensionsv1.CustomResourceDefinitionVersion) bool { return version.Storage })
-			typeInformation := crd.Spec.Versions[versionIdx]
+			for _, typeInformation := range crd.Spec.Versions {
 
-			fields, inputFields := gqlTypeForOpenAPIProperties(typeInformation.Schema.OpenAPIV3Schema.Properties, graphql.Fields{}, graphql.InputObjectConfigFieldMap{}, cases.Title(language.English).String(crd.Spec.Names.Singular), nil)
+				versionQueryType := graphql.NewObject(graphql.ObjectConfig{
+					Name:   typeInformation.Name + crd.Spec.Names.Kind,
+					Fields: graphql.Fields{},
+				})
 
-			if len(fields) == 0 {
-				slog.Info("skip processing of kind due to empty field map", "kind", crd.Spec.Names.Kind)
-				continue
-			}
+				versionMutationType := graphql.NewObject(graphql.ObjectConfig{
+					Name:   typeInformation.Name + crd.Spec.Names.Kind + "Mutation",
+					Fields: graphql.Fields{},
+				})
 
-			crdType := graphql.NewObject(graphql.ObjectConfig{
-				Name:   crd.Spec.Names.Kind,
-				Fields: fields,
-			})
+				fields, inputFields := gqlTypeForOpenAPIProperties(typeInformation.Schema.OpenAPIV3Schema.Properties, graphql.Fields{}, graphql.InputObjectConfigFieldMap{}, cases.Title(language.English).String(crd.Spec.Names.Singular), nil)
 
-			crdType.AddFieldConfig("metadata", &graphql.Field{
-				Type:        objectMeta,
-				Description: "Standard object's metadata.",
-			})
+				if len(fields) == 0 {
+					slog.Info("skip processing of kind due to empty field map", "kind", crd.Spec.Names.Kind)
+					continue
+				}
 
-			queryGroupType.AddFieldConfig(crd.Spec.Names.Plural, &graphql.Field{
-				Type: graphql.NewNonNull(graphql.NewList(graphql.NewNonNull(crdType))),
-				Args: graphql.FieldConfigArgument{
-					"labelselector": &graphql.ArgumentConfig{
-						Type:        graphql.String,
-						Description: "a label selector to filter the objects by",
+				crdType := graphql.NewObject(graphql.ObjectConfig{
+					Name:   crd.Spec.Names.Kind,
+					Fields: fields,
+				})
+
+				crdType.AddFieldConfig("metadata", &graphql.Field{
+					Type:        objectMeta,
+					Description: "Standard object's metadata.",
+				})
+
+				versionQueryType.AddFieldConfig(crd.Spec.Names.Plural, &graphql.Field{
+					Type: graphql.NewNonNull(graphql.NewList(graphql.NewNonNull(crdType))),
+					Args: graphql.FieldConfigArgument{
+						"labelselector": &graphql.ArgumentConfig{
+							Type:        graphql.String,
+							Description: "a label selector to filter the objects by",
+						},
+						"namespace": &graphql.ArgumentConfig{
+							Type:        graphql.String,
+							Description: "the namespace in which to search for the objects",
+						},
 					},
-					"namespace": &graphql.ArgumentConfig{
-						Type:        graphql.String,
-						Description: "the namespace in which to search for the objects",
-					},
-				},
-				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-					ctx, span := otel.Tracer("").Start(p.Context, "Resolve", trace.WithAttributes(attribute.String("kind", crd.Spec.Names.Kind)))
-					defer span.End()
+					Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+						ctx, span := otel.Tracer("").Start(p.Context, "Resolve", trace.WithAttributes(attribute.String("kind", crd.Spec.Names.Kind)))
+						defer span.End()
 
-					listFunc, ok := conf.pluralToListType[crd.Spec.Names.Plural]
-					if !ok {
-						return nil, errors.New("no typed client available for the reuqested type")
-					}
+						listFunc, ok := conf.pluralToListType[crd.Spec.Names.Plural]
+						if !ok {
+							return nil, errors.New("no typed client available for the reuqested type")
+						}
 
-					list := listFunc()
+						list := listFunc()
 
-					var opts []client.ListOption
-					if labelSelector, ok := p.Args["labelselector"].(string); ok && labelSelector != "" {
-						selector, err := labels.Parse(labelSelector)
-						if err != nil {
-							slog.Error("unable to parse given label selector", "error", err)
+						var opts []client.ListOption
+						if labelSelector, ok := p.Args["labelselector"].(string); ok && labelSelector != "" {
+							selector, err := labels.Parse(labelSelector)
+							if err != nil {
+								slog.Error("unable to parse given label selector", "error", err)
+								return nil, err
+							}
+							opts = append(opts, client.MatchingLabelsSelector{Selector: selector})
+						}
+
+						ras := authzv1.ResourceAttributes{
+							Verb:     "list",
+							Group:    crd.Spec.Group,
+							Version:  typeInformation.Name,
+							Resource: crd.Spec.Names.Plural,
+						}
+						if namespace, ok := p.Args["namespace"].(string); ok && namespace != "" {
+							opts = append(opts, client.InNamespace(namespace))
+							ras.Namespace = namespace
+						}
+
+						if err := isAuthorized(ctx, conf.Client, ras); err != nil {
 							return nil, err
 						}
-						opts = append(opts, client.MatchingLabelsSelector{Selector: selector})
-					}
 
-					user, ok := p.Context.Value(userContextKey{}).(string)
-					if !ok || user == "" {
-						return nil, errors.New("no user found in context")
-					}
-
-					sar := authzv1.SubjectAccessReview{
-						Spec: authzv1.SubjectAccessReviewSpec{
-							User: user,
-							ResourceAttributes: &authzv1.ResourceAttributes{
-								Verb:     "list",
-								Group:    crd.Spec.Group,
-								Version:  crd.Spec.Versions[versionIdx].Name,
-								Resource: crd.Spec.Names.Plural,
-							},
-						},
-					}
-
-					if namespace, ok := p.Args["namespace"].(string); ok && namespace != "" {
-						opts = append(opts, client.InNamespace(namespace))
-						sar.Spec.ResourceAttributes.Namespace = namespace
-					}
-
-					err = conf.Client.Create(ctx, &sar)
-					if err != nil {
-						return nil, err
-					}
-					slog.Info("SAR result", "allowed", sar.Status.Allowed, "user", sar.Spec.User, "namespace", sar.Spec.ResourceAttributes.Namespace, "resource", sar.Spec.ResourceAttributes.Resource)
-
-					if !sar.Status.Allowed {
-						return nil, errors.New("access denied")
-					}
-
-					err = conf.Client.List(ctx, list, opts...)
-					if err != nil {
-						return nil, err
-					}
-
-					items, err := meta.ExtractList(list)
-					if err != nil {
-						return nil, err
-					}
-
-					// the controller-runtime cache returns unordered results so we sort it here
-					slices.SortFunc(items, func(a runtime.Object, b runtime.Object) int {
-						return strings.Compare(a.(client.Object).GetName(), b.(client.Object).GetName())
-					})
-
-					return items, nil
-				},
-			})
-
-			queryGroupType.AddFieldConfig(crd.Spec.Names.Singular, &graphql.Field{
-				Type: graphql.NewNonNull(crdType),
-				Args: graphql.FieldConfigArgument{
-					"name": &graphql.ArgumentConfig{
-						Type:        graphql.NewNonNull(graphql.String),
-						Description: "the metadata.name of the object you want to retrieve",
-					},
-					"namespace": &graphql.ArgumentConfig{
-						Type:        graphql.NewNonNull(graphql.String),
-						Description: "the metadata.namesapce of the object you want to retrieve",
-					},
-				},
-				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-					ctx, span := otel.Tracer("").Start(p.Context, "Resolve", trace.WithAttributes(attribute.String("kind", crd.Spec.Names.Kind)))
-					defer span.End()
-
-					user, ok := p.Context.Value(userContextKey{}).(string)
-					if !ok || user == "" {
-						return nil, errors.New("no user found in context")
-					}
-
-					name := p.Args["name"].(string)
-					namespace := p.Args["namespace"].(string)
-
-					sar := authzv1.SubjectAccessReview{
-						Spec: authzv1.SubjectAccessReviewSpec{
-							User: user,
-							ResourceAttributes: &authzv1.ResourceAttributes{
-								Verb:      "get",
-								Group:     crd.Spec.Group,
-								Version:   crd.Spec.Versions[versionIdx].Name,
-								Resource:  crd.Spec.Names.Plural,
-								Namespace: namespace,
-								Name:      name,
-							},
-						},
-					}
-
-					err = conf.Client.Create(ctx, &sar)
-					if err != nil {
-						return nil, err
-					}
-					slog.Info("SAR result", "allowed", sar.Status.Allowed, "user", sar.Spec.User, "namespace", sar.Spec.ResourceAttributes.Namespace, "resource", sar.Spec.ResourceAttributes.Resource)
-
-					if !sar.Status.Allowed {
-						return nil, errors.New("access denied")
-					}
-
-					objectFunc, ok := conf.pluralToObjectType[crd.Spec.Names.Plural]
-					if !ok {
-						return nil, errors.New("no typed client available for the reuqested type")
-					}
-
-					obj := objectFunc()
-					err = conf.Client.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, obj)
-					if err != nil {
-						return nil, err
-					}
-
-					return obj, nil
-				},
-			})
-
-			capitalizedSingular := cases.Title(language.English).String(crd.Spec.Names.Singular)
-
-			subscriptions[group+capitalizedSingular] = &graphql.Field{
-				Type: graphql.NewList(crdType),
-				Args: graphql.FieldConfigArgument{
-					"namespace": &graphql.ArgumentConfig{
-						Type:        graphql.NewNonNull(graphql.String),
-						Description: "the metadata.namesapce of the objects you want to watch",
-					},
-				},
-				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-					return p.Source, nil
-				},
-				Subscribe: func(p graphql.ResolveParams) (interface{}, error) {
-					ctx, span := otel.Tracer("").Start(p.Context, "Subscribe", trace.WithAttributes(attribute.String("kind", crd.Spec.Names.Kind)))
-					defer span.End()
-
-					listType, ok := conf.pluralToListType[crd.Spec.Names.Plural]
-					if !ok {
-						return nil, errors.New("no typed client available for the reuqested type")
-					}
-
-					list := listType()
-
-					user, ok := p.Context.Value(userContextKey{}).(string)
-					if !ok || user == "" {
-						return nil, errors.New("no user found in context")
-					}
-
-					sar := authzv1.SubjectAccessReview{
-						Spec: authzv1.SubjectAccessReviewSpec{
-							User: user,
-							ResourceAttributes: &authzv1.ResourceAttributes{
-								Verb:      "watch",
-								Group:     crd.Spec.Group,
-								Version:   crd.Spec.Versions[versionIdx].Name,
-								Resource:  crd.Spec.Names.Plural,
-								Namespace: p.Args["namespace"].(string),
-							},
-						},
-					}
-
-					err = conf.Client.Create(ctx, &sar)
-					if err != nil {
-						return nil, err
-					}
-					slog.Info("SAR result", "allowed", sar.Status.Allowed, "user", sar.Spec.User, "namespace", sar.Spec.ResourceAttributes.Namespace, "resource", sar.Spec.ResourceAttributes.Resource)
-
-					if !sar.Status.Allowed {
-						return nil, errors.New("access denied")
-					}
-
-					listWatch, err := conf.Client.Watch(ctx, list, client.InNamespace(p.Args["namespace"].(string)))
-					if err != nil {
-						return nil, err
-					}
-
-					resultChannel := make(chan interface{})
-					go func() {
-						// TODO: i would like to figure out if there is another way than to buffer all the items
-						items := []client.Object{}
-						for ev := range listWatch.ResultChan() {
-							select {
-							case <-ctx.Done():
-								slog.Info("stopping watch due to client cancel")
-								listWatch.Stop()
-								close(resultChannel)
-							default:
-								switch ev.Type {
-								case watch.Added:
-									items = append(items, ev.Object.(client.Object))
-								case watch.Modified:
-									for i, item := range items {
-										if item.GetName() == ev.Object.(client.Object).GetName() {
-											items[i] = ev.Object.(client.Object)
-											break
-										}
-									}
-								case watch.Deleted:
-									for i, item := range items {
-										if item.GetName() == ev.Object.(client.Object).GetName() {
-											items = append(items[:i], items[i+1:]...)
-											break
-										}
-									}
-								}
-
-								if ev.Type == watch.Bookmark {
-									continue
-								}
-
-								resultChannel <- items
-							}
+						err = conf.Client.List(ctx, list, opts...)
+						if err != nil {
+							return nil, err
 						}
-					}()
 
-					return resultChannel, nil
-				},
+						items, err := meta.ExtractList(list)
+						if err != nil {
+							return nil, err
+						}
+
+						// the controller-runtime cache returns unordered results so we sort it here
+						slices.SortFunc(items, func(a runtime.Object, b runtime.Object) int {
+							return strings.Compare(a.(client.Object).GetName(), b.(client.Object).GetName())
+						})
+
+						return items, nil
+					},
+				})
+
+				versionQueryType.AddFieldConfig(crd.Spec.Names.Singular, &graphql.Field{
+					Type: graphql.NewNonNull(crdType),
+					Args: graphql.FieldConfigArgument{
+						"name": &graphql.ArgumentConfig{
+							Type:        graphql.NewNonNull(graphql.String),
+							Description: "the metadata.name of the object you want to retrieve",
+						},
+						"namespace": &graphql.ArgumentConfig{
+							Type:        graphql.NewNonNull(graphql.String),
+							Description: "the metadata.namesapce of the object you want to retrieve",
+						},
+					},
+					Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+						ctx, span := otel.Tracer("").Start(p.Context, "Resolve", trace.WithAttributes(attribute.String("kind", crd.Spec.Names.Kind)))
+						defer span.End()
+
+						name, ok := p.Args["name"].(string)
+						if !ok {
+							return nil, errors.New("name key does not exist or is not a string")
+						}
+
+						namespace, ok := p.Args["namespace"].(string)
+						if !ok {
+							return nil, errors.New("namespace key does not exist or is not a string")
+						}
+
+						if err := isAuthorized(ctx, conf.Client, authzv1.ResourceAttributes{
+							Verb:      "get",
+							Group:     crd.Spec.Group,
+							Version:   typeInformation.Name,
+							Resource:  crd.Spec.Names.Plural,
+							Namespace: namespace,
+							Name:      name,
+						}); err != nil {
+							return nil, err
+						}
+
+						objectFunc, ok := conf.pluralToObjectType[crd.Spec.Names.Plural]
+						if !ok {
+							return nil, errors.New("no typed client available for the reuqested type")
+						}
+
+						obj := objectFunc()
+						err = conf.Client.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, obj)
+						if err != nil {
+							return nil, err
+						}
+
+						return obj, nil
+					},
+				})
+
+				capitalizedSingular := cases.Title(language.English).String(crd.Spec.Names.Singular)
+
+				versionMutationType.AddFieldConfig("delete"+capitalizedSingular, &graphql.Field{
+					Type: graphql.Boolean,
+					Args: graphql.FieldConfigArgument{
+						"name": &graphql.ArgumentConfig{
+							Type:        graphql.NewNonNull(graphql.String),
+							Description: "the metadata.name of the object you want to delete",
+						},
+						"namespace": &graphql.ArgumentConfig{
+							Type:        graphql.NewNonNull(graphql.String),
+							Description: "the metadata.namesapce of the object you want to delete",
+						},
+					},
+					Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+						ctx, span := otel.Tracer("").Start(p.Context, "Delete", trace.WithAttributes(attribute.String("kind", crd.Spec.Names.Kind)))
+						defer span.End()
+
+						if err := isAuthorized(ctx, conf.Client, authzv1.ResourceAttributes{
+							Verb:      "delete",
+							Group:     crd.Spec.Group,
+							Version:   typeInformation.Name,
+							Resource:  crd.Spec.Names.Plural,
+							Namespace: p.Args["namespace"].(string),
+							Name:      p.Args["name"].(string),
+						}); err != nil {
+							return nil, err
+						}
+
+						us := &unstructured.Unstructured{}
+						us.SetGroupVersionKind(schema.GroupVersionKind{
+							Group:   crd.Spec.Group,
+							Version: typeInformation.Name,
+							Kind:    crd.Spec.Names.Kind,
+						})
+
+						us.SetNamespace(p.Args["namespace"].(string))
+						us.SetName(p.Args["name"].(string))
+
+						err = conf.Client.Delete(ctx, us)
+
+						return err == nil, err
+					},
+				})
+
+				versionMutationType.AddFieldConfig("create"+capitalizedSingular, &graphql.Field{
+					Type: crdType,
+					Args: graphql.FieldConfigArgument{
+						"spec": &graphql.ArgumentConfig{
+							Type: inputFields["spec"].Type,
+						},
+						"metadata": &graphql.ArgumentConfig{
+							Type: graphql.NewNonNull(metadataInput),
+						},
+					},
+					Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+						ctx, span := otel.Tracer("").Start(p.Context, "Create", trace.WithAttributes(attribute.String("kind", crd.Spec.Names.Kind)))
+						defer span.End()
+
+						if err := isAuthorized(ctx, conf.Client, authzv1.ResourceAttributes{
+							Verb:      "create",
+							Group:     crd.Spec.Group,
+							Version:   typeInformation.Name,
+							Resource:  crd.Spec.Names.Plural,
+							Namespace: p.Args["metadata"].(map[string]interface{})["namespace"].(string),
+						}); err != nil {
+							return nil, err
+						}
+
+						us := &unstructured.Unstructured{}
+						us.SetGroupVersionKind(schema.GroupVersionKind{
+							Group:   crd.Spec.Group,
+							Version: typeInformation.Name,
+							Kind:    crd.Spec.Names.Kind,
+						})
+
+						us.SetNamespace(p.Args["metadata"].(map[string]interface{})["namespace"].(string))
+						if name := p.Args["metadata"].(map[string]interface{})["name"]; name != nil {
+							us.SetName(name.(string))
+						}
+
+						if generateName := p.Args["metadata"].(map[string]interface{})["generateName"]; generateName != nil {
+							us.SetGenerateName(generateName.(string))
+						}
+
+						if labels := p.Args["metadata"].(map[string]interface{})["labels"]; labels != nil {
+							us.SetLabels(labels.(map[string]string))
+						}
+
+						if us.GetName() == "" && us.GetGenerateName() == "" {
+							return nil, errors.New("either name or generateName must be set")
+						}
+
+						unstructured.SetNestedField(us.Object, p.Args["spec"], "spec")
+
+						err = conf.Client.Create(ctx, us)
+
+						return us.Object, err
+					},
+				})
+
+				versionMutationType.AddFieldConfig("update"+capitalizedSingular, &graphql.Field{
+					Type: crdType,
+					Args: graphql.FieldConfigArgument{
+						"spec": &graphql.ArgumentConfig{
+							Type: inputFields["spec"].Type,
+						},
+						"metadata": &graphql.ArgumentConfig{
+							Type: graphql.NewNonNull(metadataInput),
+						},
+					},
+					Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+
+						ctx, span := otel.Tracer("").Start(p.Context, "Update", trace.WithAttributes(attribute.String("kind", crd.Spec.Names.Kind)))
+						defer span.End()
+
+						if err := isAuthorized(ctx, conf.Client, authzv1.ResourceAttributes{
+							Verb:      "update",
+							Group:     crd.Spec.Group,
+							Version:   typeInformation.Name,
+							Resource:  crd.Spec.Names.Plural,
+							Namespace: p.Args["metadata"].(map[string]interface{})["namespace"].(string),
+							Name:      p.Args["metadata"].(map[string]interface{})["name"].(string),
+						}); err != nil {
+							return nil, err
+						}
+
+						us := &unstructured.Unstructured{}
+						us.SetGroupVersionKind(schema.GroupVersionKind{
+							Group:   crd.Spec.Group,
+							Version: typeInformation.Name,
+							Kind:    crd.Spec.Names.Kind,
+						})
+
+						us.SetNamespace(p.Args["metadata"].(map[string]interface{})["namespace"].(string))
+						us.SetName(p.Args["metadata"].(map[string]interface{})["name"].(string))
+
+						err = conf.Client.Get(ctx, client.ObjectKey{Namespace: us.GetNamespace(), Name: us.GetName()}, us)
+						if err != nil {
+							return nil, err
+						}
+
+						unstructured.SetNestedField(us.Object, p.Args["spec"], "spec")
+
+						err = conf.Client.Update(ctx, us)
+						if err != nil {
+							return nil, err
+						}
+
+						return us.Object, nil
+					},
+				})
+
+				subscriptions[group+typeInformation.Name+capitalizedSingular] = &graphql.Field{
+					Type: graphql.NewList(crdType),
+					Args: graphql.FieldConfigArgument{
+						"namespace": &graphql.ArgumentConfig{
+							Type:        graphql.NewNonNull(graphql.String),
+							Description: "the metadata.namesapce of the objects you want to watch",
+						},
+					},
+					Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+						return p.Source, nil
+					},
+					Subscribe: func(p graphql.ResolveParams) (interface{}, error) {
+						ctx, span := otel.Tracer("").Start(p.Context, "Subscribe", trace.WithAttributes(attribute.String("kind", crd.Spec.Names.Kind)))
+						defer span.End()
+
+						listType, ok := conf.pluralToListType[crd.Spec.Names.Plural]
+						if !ok {
+							return nil, errors.New("no typed client available for the reuqested type")
+						}
+
+						list := listType()
+
+						if err := isAuthorized(ctx, conf.Client, authzv1.ResourceAttributes{
+							Verb:      "watch",
+							Group:     crd.Spec.Group,
+							Version:   typeInformation.Name,
+							Resource:  crd.Spec.Names.Plural,
+							Namespace: p.Args["namespace"].(string),
+						}); err != nil {
+							return nil, err
+						}
+
+						listWatch, err := conf.Client.Watch(ctx, list, client.InNamespace(p.Args["namespace"].(string)))
+						if err != nil {
+							return nil, err
+						}
+
+						resultChannel := make(chan interface{})
+						go func() {
+							// TODO: i would like to figure out if there is another way than to buffer all the items
+							items := []client.Object{}
+							for ev := range listWatch.ResultChan() {
+								select {
+								case <-ctx.Done():
+									slog.Info("stopping watch due to client cancel")
+									listWatch.Stop()
+									close(resultChannel)
+								default:
+									switch ev.Type {
+									case watch.Added:
+										items = append(items, ev.Object.(client.Object))
+									case watch.Modified:
+										for i, item := range items {
+											if item.GetName() == ev.Object.(client.Object).GetName() {
+												items[i] = ev.Object.(client.Object)
+												break
+											}
+										}
+									case watch.Deleted:
+										for i, item := range items {
+											if item.GetName() == ev.Object.(client.Object).GetName() {
+												items = append(items[:i], items[i+1:]...)
+												break
+											}
+										}
+									}
+
+									if ev.Type == watch.Bookmark {
+										continue
+									}
+
+									resultChannel <- items
+								}
+							}
+						}()
+
+						return resultChannel, nil
+					},
+				}
+
+				queryGroupType.AddFieldConfig(typeInformation.Name, &graphql.Field{
+					Type:    graphql.NewNonNull(versionQueryType),
+					Resolve: func(p graphql.ResolveParams) (interface{}, error) { return p.Source, nil },
+				})
+
+				mutationGroupType.AddFieldConfig(typeInformation.Name, &graphql.Field{
+					Type:    graphql.NewNonNull(versionMutationType),
+					Resolve: func(p graphql.ResolveParams) (interface{}, error) { return p.Source, nil },
+				})
 			}
 
-			mutationGroupType.AddFieldConfig("delete"+capitalizedSingular, &graphql.Field{
-				Type: graphql.Boolean,
-				Args: graphql.FieldConfigArgument{
-					"name": &graphql.ArgumentConfig{
-						Type:        graphql.NewNonNull(graphql.String),
-						Description: "the metadata.name of the object you want to delete",
-					},
-					"namespace": &graphql.ArgumentConfig{
-						Type:        graphql.NewNonNull(graphql.String),
-						Description: "the metadata.namesapce of the object you want to delete",
-					},
-				},
-				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-					ctx, span := otel.Tracer("").Start(p.Context, "Delete", trace.WithAttributes(attribute.String("kind", crd.Spec.Names.Kind)))
-					defer span.End()
-
-					user, ok := p.Context.Value(userContextKey{}).(string)
-					if !ok || user == "" {
-						return nil, errors.New("no user found in context")
-					}
-
-					sar := authzv1.SubjectAccessReview{
-						Spec: authzv1.SubjectAccessReviewSpec{
-							User: user,
-							ResourceAttributes: &authzv1.ResourceAttributes{
-								Verb:      "delete",
-								Group:     crd.Spec.Group,
-								Version:   crd.Spec.Versions[versionIdx].Name,
-								Resource:  crd.Spec.Names.Plural,
-								Namespace: p.Args["namespace"].(string),
-								Name:      p.Args["name"].(string),
-							},
-						},
-					}
-
-					err = conf.Client.Create(ctx, &sar)
-					if err != nil {
-						return nil, err
-					}
-					slog.Info("SAR result", "allowed", sar.Status.Allowed, "user", sar.Spec.User, "namespace", sar.Spec.ResourceAttributes.Namespace, "resource", sar.Spec.ResourceAttributes.Resource)
-
-					if !sar.Status.Allowed {
-						return nil, errors.New("access denied")
-					}
-
-					us := &unstructured.Unstructured{}
-					us.SetGroupVersionKind(schema.GroupVersionKind{
-						Group:   crd.Spec.Group,
-						Version: crd.Spec.Versions[versionIdx].Name,
-						Kind:    crd.Spec.Names.Kind,
-					})
-
-					us.SetNamespace(p.Args["namespace"].(string))
-					us.SetName(p.Args["name"].(string))
-
-					err = conf.Client.Delete(ctx, us)
-
-					return err == nil, err
-				},
-			})
-
-			mutationGroupType.AddFieldConfig("create"+capitalizedSingular, &graphql.Field{
-				Type: crdType,
-				Args: graphql.FieldConfigArgument{
-					"spec": &graphql.ArgumentConfig{
-						Type: inputFields["spec"].Type,
-					},
-					"metadata": &graphql.ArgumentConfig{
-						Type: graphql.NewNonNull(metadataInput),
-					},
-				},
-				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-					ctx, span := otel.Tracer("").Start(p.Context, "Create", trace.WithAttributes(attribute.String("kind", crd.Spec.Names.Kind)))
-					defer span.End()
-
-					user, ok := p.Context.Value(userContextKey{}).(string)
-					if !ok || user == "" {
-						return nil, errors.New("no user found in context")
-					}
-
-					sar := authzv1.SubjectAccessReview{
-						Spec: authzv1.SubjectAccessReviewSpec{
-							User: user,
-							ResourceAttributes: &authzv1.ResourceAttributes{
-								Verb:      "create",
-								Group:     crd.Spec.Group,
-								Version:   crd.Spec.Versions[versionIdx].Name,
-								Resource:  crd.Spec.Names.Plural,
-								Namespace: p.Args["metadata"].(map[string]interface{})["namespace"].(string),
-							},
-						},
-					}
-
-					err = conf.Client.Create(ctx, &sar)
-					if err != nil {
-						return nil, err
-					}
-					slog.Info("SAR result", "allowed", sar.Status.Allowed, "user", sar.Spec.User, "namespace", sar.Spec.ResourceAttributes.Namespace, "resource", sar.Spec.ResourceAttributes.Resource)
-
-					if !sar.Status.Allowed {
-						return nil, errors.New("access denied")
-					}
-
-					us := &unstructured.Unstructured{}
-					us.SetGroupVersionKind(schema.GroupVersionKind{
-						Group:   crd.Spec.Group,
-						Version: crd.Spec.Versions[versionIdx].Name,
-						Kind:    crd.Spec.Names.Kind,
-					})
-
-					us.SetNamespace(p.Args["metadata"].(map[string]interface{})["namespace"].(string))
-					if name := p.Args["metadata"].(map[string]interface{})["name"]; name != nil {
-						us.SetName(name.(string))
-					}
-
-					if generateName := p.Args["metadata"].(map[string]interface{})["generateName"]; generateName != nil {
-						us.SetGenerateName(generateName.(string))
-					}
-
-					if labels := p.Args["metadata"].(map[string]interface{})["labels"]; labels != nil {
-						us.SetLabels(labels.(map[string]string))
-					}
-
-					if us.GetName() == "" && us.GetGenerateName() == "" {
-						return nil, errors.New("either name or generateName must be set")
-					}
-
-					unstructured.SetNestedField(us.Object, p.Args["spec"], "spec")
-
-					err = conf.Client.Create(ctx, us)
-
-					return us.Object, err
-				},
-			})
-
-			mutationGroupType.AddFieldConfig("update"+capitalizedSingular, &graphql.Field{
-				Type: crdType,
-				Args: graphql.FieldConfigArgument{
-					"spec": &graphql.ArgumentConfig{
-						Type: inputFields["spec"].Type,
-					},
-					"metadata": &graphql.ArgumentConfig{
-						Type: graphql.NewNonNull(metadataInput),
-					},
-				},
-				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-
-					ctx, span := otel.Tracer("").Start(p.Context, "Update", trace.WithAttributes(attribute.String("kind", crd.Spec.Names.Kind)))
-					defer span.End()
-
-					user, ok := p.Context.Value(userContextKey{}).(string)
-					if !ok || user == "" {
-						return nil, errors.New("no user found in context")
-					}
-
-					sar := authzv1.SubjectAccessReview{
-						Spec: authzv1.SubjectAccessReviewSpec{
-							User: user,
-							ResourceAttributes: &authzv1.ResourceAttributes{
-								Verb:      "update",
-								Group:     crd.Spec.Group,
-								Version:   crd.Spec.Versions[versionIdx].Name,
-								Resource:  crd.Spec.Names.Plural,
-								Namespace: p.Args["metadata"].(map[string]interface{})["namespace"].(string),
-								Name:      p.Args["metadata"].(map[string]interface{})["name"].(string),
-							},
-						},
-					}
-
-					err = conf.Client.Create(ctx, &sar)
-					if err != nil {
-						return nil, err
-					}
-					slog.Info("SAR result", "allowed", sar.Status.Allowed, "user", sar.Spec.User, "namespace", sar.Spec.ResourceAttributes.Namespace, "resource", sar.Spec.ResourceAttributes.Resource)
-
-					if !sar.Status.Allowed {
-						return nil, errors.New("access denied")
-					}
-
-					us := &unstructured.Unstructured{}
-					us.SetGroupVersionKind(schema.GroupVersionKind{
-						Group:   crd.Spec.Group,
-						Version: crd.Spec.Versions[versionIdx].Name,
-						Kind:    crd.Spec.Names.Kind,
-					})
-
-					us.SetNamespace(p.Args["metadata"].(map[string]interface{})["namespace"].(string))
-					us.SetName(p.Args["metadata"].(map[string]interface{})["name"].(string))
-
-					err = conf.Client.Get(ctx, client.ObjectKey{Namespace: us.GetNamespace(), Name: us.GetName()}, us)
-					if err != nil {
-						return nil, err
-					}
-
-					unstructured.SetNestedField(us.Object, p.Args["spec"], "spec")
-
-					err = conf.Client.Update(ctx, us)
-					if err != nil {
-						return nil, err
-					}
-
-					return us.Object, nil
-				},
-			})
 		}
 
 		rootQueryFields[group] = &graphql.Field{
@@ -857,4 +781,30 @@ func Handler(conf HandlerConfig) http.Handler {
 
 func AddUserToContext(ctx context.Context, user string) context.Context {
 	return context.WithValue(ctx, userContextKey{}, user)
+}
+
+func isAuthorized(ctx context.Context, c client.Client, resourceAttributes authzv1.ResourceAttributes) error {
+	user, ok := ctx.Value(userContextKey{}).(string)
+	if !ok || user == "" {
+		return errors.New("no user found in context")
+	}
+
+	sar := authzv1.SubjectAccessReview{
+		Spec: authzv1.SubjectAccessReviewSpec{
+			User:               user,
+			ResourceAttributes: &resourceAttributes,
+		},
+	}
+
+	err := c.Create(ctx, &sar)
+	if err != nil {
+		return err
+	}
+	slog.Info("SAR result", "allowed", sar.Status.Allowed, "user", sar.Spec.User, "namespace", sar.Spec.ResourceAttributes.Namespace, "resource", sar.Spec.ResourceAttributes.Resource)
+
+	if !sar.Status.Allowed {
+		return errors.New("access denied")
+	}
+
+	return nil
 }
