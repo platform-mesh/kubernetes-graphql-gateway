@@ -15,6 +15,7 @@ import (
 	"github.com/graphql-go/graphql"
 	"github.com/graphql-go/graphql/language/ast"
 	"github.com/graphql-go/handler"
+	"github.com/mitchellh/mapstructure"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -92,6 +93,13 @@ var metadataInput = graphql.NewInputObject(graphql.InputObjectConfig{
 		},
 	},
 })
+
+type MetadatInput struct {
+	Name         string            `mapstructure:"name,omitempty"`
+	GenerateName string            `mapstructure:"generateName,omitempty"`
+	Namespace    string            `mapstructure:"namespace,omitempty"`
+	Labels       map[string]string `mapstructure:"labels,omitempty"`
+}
 
 func gqlTypeForOpenAPIProperties(in map[string]apiextensionsv1.JSONSchemaProps, fields graphql.Fields, inputFields graphql.InputObjectConfigFieldMap, parentFieldName string, requiredKeys []string) (graphql.Fields, graphql.InputObjectConfigFieldMap) {
 	for key, info := range in {
@@ -293,12 +301,12 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 
 			for _, typeInformation := range crd.Spec.Versions {
 
-				versionQueryType := graphql.NewObject(graphql.ObjectConfig{
+				versionedQueryType := graphql.NewObject(graphql.ObjectConfig{
 					Name:   typeInformation.Name + crd.Spec.Names.Kind,
 					Fields: graphql.Fields{},
 				})
 
-				versionMutationType := graphql.NewObject(graphql.ObjectConfig{
+				versionedMutationType := graphql.NewObject(graphql.ObjectConfig{
 					Name:   typeInformation.Name + crd.Spec.Names.Kind + "Mutation",
 					Fields: graphql.Fields{},
 				})
@@ -320,7 +328,7 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 					Description: "Standard object's metadata.",
 				})
 
-				versionQueryType.AddFieldConfig(crd.Spec.Names.Plural, &graphql.Field{
+				versionedQueryType.AddFieldConfig(crd.Spec.Names.Plural, &graphql.Field{
 					Type: graphql.NewNonNull(graphql.NewList(graphql.NewNonNull(crdType))),
 					Args: graphql.FieldConfigArgument{
 						"labelselector": &graphql.ArgumentConfig{
@@ -387,7 +395,7 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 					},
 				})
 
-				versionQueryType.AddFieldConfig(crd.Spec.Names.Singular, &graphql.Field{
+				versionedQueryType.AddFieldConfig(crd.Spec.Names.Singular, &graphql.Field{
 					Type: graphql.NewNonNull(crdType),
 					Args: graphql.FieldConfigArgument{
 						"name": &graphql.ArgumentConfig{
@@ -441,7 +449,7 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 
 				capitalizedSingular := cases.Title(language.English).String(crd.Spec.Names.Singular)
 
-				versionMutationType.AddFieldConfig("delete"+capitalizedSingular, &graphql.Field{
+				versionedMutationType.AddFieldConfig("delete"+capitalizedSingular, &graphql.Field{
 					Type: graphql.Boolean,
 					Args: graphql.FieldConfigArgument{
 						"name": &graphql.ArgumentConfig{
@@ -484,11 +492,11 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 					},
 				})
 
-				versionMutationType.AddFieldConfig("create"+capitalizedSingular, &graphql.Field{
+				versionedMutationType.AddFieldConfig("create"+capitalizedSingular, &graphql.Field{
 					Type: crdType,
 					Args: graphql.FieldConfigArgument{
 						"spec": &graphql.ArgumentConfig{
-							Type: inputFields["spec"].Type,
+							Type: graphql.NewNonNull(inputFields["spec"].Type), // TODO: this is kind of unsafe, as we assume that the spec field is always present
 						},
 						"metadata": &graphql.ArgumentConfig{
 							Type: graphql.NewNonNull(metadataInput),
@@ -498,12 +506,18 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 						ctx, span := otel.Tracer("").Start(p.Context, "Create", trace.WithAttributes(attribute.String("kind", crd.Spec.Names.Kind)))
 						defer span.End()
 
+						var metadatInput MetadatInput
+						if err := mapstructure.Decode(p.Args["metadata"], &metadatInput); err != nil {
+							slog.Error("unable to decode metadata input", "error", err)
+							return nil, err
+						}
+
 						if err := isAuthorized(ctx, conf.Client, authzv1.ResourceAttributes{
 							Verb:      "create",
 							Group:     crd.Spec.Group,
 							Version:   typeInformation.Name,
 							Resource:  crd.Spec.Names.Plural,
-							Namespace: p.Args["metadata"].(map[string]interface{})["namespace"].(string),
+							Namespace: metadatInput.Namespace,
 						}); err != nil {
 							return nil, err
 						}
@@ -515,17 +529,17 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 							Kind:    crd.Spec.Names.Kind,
 						})
 
-						us.SetNamespace(p.Args["metadata"].(map[string]interface{})["namespace"].(string))
-						if name := p.Args["metadata"].(map[string]interface{})["name"]; name != nil {
-							us.SetName(name.(string))
+						us.SetNamespace(metadatInput.Namespace)
+						if metadatInput.Name != "" {
+							us.SetName(metadatInput.Name)
 						}
 
-						if generateName := p.Args["metadata"].(map[string]interface{})["generateName"]; generateName != nil {
-							us.SetGenerateName(generateName.(string))
+						if metadatInput.GenerateName != "" {
+							us.SetGenerateName(metadatInput.GenerateName)
 						}
 
-						if labels := p.Args["metadata"].(map[string]interface{})["labels"]; labels != nil {
-							us.SetLabels(labels.(map[string]string))
+						if metadatInput.Labels != nil {
+							us.SetLabels(metadatInput.Labels)
 						}
 
 						if us.GetName() == "" && us.GetGenerateName() == "" {
@@ -540,28 +554,33 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 					},
 				})
 
-				versionMutationType.AddFieldConfig("update"+capitalizedSingular, &graphql.Field{
+				versionedMutationType.AddFieldConfig("update"+capitalizedSingular, &graphql.Field{
 					Type: crdType,
 					Args: graphql.FieldConfigArgument{
 						"spec": &graphql.ArgumentConfig{
-							Type: inputFields["spec"].Type,
+							Type: graphql.NewNonNull(inputFields["spec"].Type),
 						},
 						"metadata": &graphql.ArgumentConfig{
 							Type: graphql.NewNonNull(metadataInput),
 						},
 					},
 					Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-
 						ctx, span := otel.Tracer("").Start(p.Context, "Update", trace.WithAttributes(attribute.String("kind", crd.Spec.Names.Kind)))
 						defer span.End()
+
+						var metadatInput MetadatInput
+						if err := mapstructure.Decode(p.Args["metadata"], &metadatInput); err != nil {
+							slog.Error("unable to decode metadata input", "error", err)
+							return nil, err
+						}
 
 						if err := isAuthorized(ctx, conf.Client, authzv1.ResourceAttributes{
 							Verb:      "update",
 							Group:     crd.Spec.Group,
 							Version:   typeInformation.Name,
 							Resource:  crd.Spec.Names.Plural,
-							Namespace: p.Args["metadata"].(map[string]interface{})["namespace"].(string),
-							Name:      p.Args["metadata"].(map[string]interface{})["name"].(string),
+							Namespace: metadatInput.Namespace,
+							Name:      metadatInput.Name,
 						}); err != nil {
 							return nil, err
 						}
@@ -573,8 +592,8 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 							Kind:    crd.Spec.Names.Kind,
 						})
 
-						us.SetNamespace(p.Args["metadata"].(map[string]interface{})["namespace"].(string))
-						us.SetName(p.Args["metadata"].(map[string]interface{})["name"].(string))
+						us.SetNamespace(metadatInput.Namespace)
+						us.SetName(metadatInput.Name)
 
 						err = conf.Client.Get(ctx, client.ObjectKey{Namespace: us.GetNamespace(), Name: us.GetName()}, us)
 						if err != nil {
@@ -612,8 +631,6 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 							return nil, errors.New("no typed client available for the reuqested type")
 						}
 
-						list := listType()
-
 						if err := isAuthorized(ctx, conf.Client, authzv1.ResourceAttributes{
 							Verb:      "watch",
 							Group:     crd.Spec.Group,
@@ -624,7 +641,7 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 							return nil, err
 						}
 
-						listWatch, err := conf.Client.Watch(ctx, list, client.InNamespace(p.Args["namespace"].(string)))
+						listWatch, err := conf.Client.Watch(ctx, listType(), client.InNamespace(p.Args["namespace"].(string)))
 						if err != nil {
 							return nil, err
 						}
@@ -657,9 +674,8 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 												break
 											}
 										}
-									}
-
-									if ev.Type == watch.Bookmark {
+									default:
+										slog.Info("skipping event", "event", ev.Type, "object", ev.Object)
 										continue
 									}
 
@@ -673,12 +689,12 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 				}
 
 				queryGroupType.AddFieldConfig(typeInformation.Name, &graphql.Field{
-					Type:    graphql.NewNonNull(versionQueryType),
+					Type:    graphql.NewNonNull(versionedQueryType),
 					Resolve: func(p graphql.ResolveParams) (interface{}, error) { return p.Source, nil },
 				})
 
 				mutationGroupType.AddFieldConfig(typeInformation.Name, &graphql.Field{
-					Type:    graphql.NewNonNull(versionMutationType),
+					Type:    graphql.NewNonNull(versionedMutationType),
 					Resolve: func(p graphql.ResolveParams) (interface{}, error) { return p.Source, nil },
 				})
 			}
@@ -753,7 +769,6 @@ func Handler(conf HandlerConfig) http.Handler {
 
 			w.Header().Set("Cache-Control", "no-cache")
 			w.Header().Set("Connection", "keep-alive")
-			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("Content-Type", "text/event-stream")
 			fmt.Fprintf(w, ":\n\n")
 			rc.Flush()
@@ -784,6 +799,9 @@ func AddUserToContext(ctx context.Context, user string) context.Context {
 }
 
 func isAuthorized(ctx context.Context, c client.Client, resourceAttributes authzv1.ResourceAttributes) error {
+	ctx, span := otel.Tracer("").Start(ctx, "AuthorizationCheck")
+	defer span.End()
+
 	user, ok := ctx.Value(userContextKey{}).(string)
 	if !ok || user == "" {
 		return errors.New("no user found in context")
