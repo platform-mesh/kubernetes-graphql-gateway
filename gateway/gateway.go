@@ -262,6 +262,42 @@ func crdsByGroup(crds []apiextensionsv1.CustomResourceDefinition) map[string][]a
 	return byGroup
 }
 
+func getRequestedFields(params graphql.ResolveParams) []string {
+	fieldSet := make(map[string]struct{})
+	var traverseSelections func([]*ast.Field, string)
+
+	traverseSelections = func(fields []*ast.Field, parentPath string) {
+		for _, currentField := range fields {
+			for _, selection := range currentField.SelectionSet.Selections {
+				field, ok := selection.(*ast.Field)
+				if !ok || field == nil {
+					continue
+				}
+
+				fieldPath := field.Name.Value
+				if parentPath != "" {
+					fieldPath = parentPath + "." + field.Name.Value
+				}
+
+				if field.SelectionSet != nil {
+					traverseSelections([]*ast.Field{field}, fieldPath)
+				} else {
+					fieldSet[fieldPath] = struct{}{}
+				}
+			}
+		}
+	}
+
+	traverseSelections(params.Info.FieldASTs, "")
+
+	fields := make([]string, 0, len(fieldSet))
+	for field := range fieldSet {
+		fields = append(fields, field)
+	}
+
+	return fields
+}
+
 func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 
 	if conf.Client == nil {
@@ -632,6 +668,11 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 							Type:        graphql.NewNonNull(graphql.String),
 							Description: "the metadata.namesapce of the objects you want to watch",
 						},
+						"emitOnlyFieldChanges": &graphql.ArgumentConfig{
+							Type:         graphql.Boolean,
+							DefaultValue: false,
+							Description:  "only emit events if the fields that are requested have changed",
+						},
 					},
 					Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 						return p.Source, nil
@@ -667,6 +708,7 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 
 							// TODO: only publish a event if one of the subcribed fields has changed
 							for ev := range listWatch.ResultChan() {
+								changed := false
 								select {
 								case <-ctx.Done():
 									slog.Info("stopping watch due to client cancel")
@@ -676,9 +718,53 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 									switch ev.Type {
 									case watch.Added:
 										items = append(items, ev.Object.(client.Object))
+										changed = true
 									case watch.Modified:
 										for i, item := range items {
 											if item.GetName() == ev.Object.(client.Object).GetName() {
+
+												if val, ok := p.Args["emitOnlyFieldChanges"].(bool); ok && val {
+													unstructuredObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(ev.Object)
+													if err != nil {
+														// TODO: handle error
+														close(resultChannel)
+													}
+
+													fields := getRequestedFields(p)
+
+													currentItemUnstructured, err := runtime.DefaultUnstructuredConverter.ToUnstructured(item)
+													if err != nil {
+														// TODO: handle error
+														close(resultChannel)
+													}
+
+													for _, field := range fields {
+														fieldValue, found, err := unstructured.NestedFieldNoCopy(unstructuredObj, strings.Split(field, ".")...)
+														if err != nil {
+															// TODO: handle error
+															slog.Error("unable to get field value", "error", err)
+															close(resultChannel)
+														}
+
+														currentFieldValue, currentFound, err := unstructured.NestedFieldNoCopy(currentItemUnstructured, strings.Split(field, ".")...)
+														if err != nil {
+															// TODO: handle error
+															slog.Error("unable to get field value", "error", err)
+															close(resultChannel)
+														}
+
+														if !found || !currentFound {
+															continue
+														}
+														if fieldValue == currentFieldValue {
+															continue
+														}
+
+														changed = true
+
+													}
+												}
+
 												items[i] = ev.Object.(client.Object)
 												break
 											}
@@ -687,6 +773,7 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 										for i, item := range items {
 											if item.GetName() == ev.Object.(client.Object).GetName() {
 												items = append(items[:i], items[i+1:]...)
+												changed = true
 												break
 											}
 										}
@@ -695,7 +782,11 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 										continue
 									}
 
-									resultChannel <- items
+									if val, ok := p.Args["emitOnlyFieldChanges"].(bool); ok && val && changed {
+										resultChannel <- items
+									} else if !ok || !val {
+										resultChannel <- items
+									}
 								}
 							}
 						}()
