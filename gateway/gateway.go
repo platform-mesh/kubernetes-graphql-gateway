@@ -297,19 +297,30 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 			Fields: graphql.Fields{},
 		})
 
+		versionToQueryType := map[string]*graphql.Object{}
+		versionToMutationType := map[string]*graphql.Object{}
+
+		for _, crd := range crds {
+			for _, typeInformation := range crd.Spec.Versions {
+				if _, ok := versionToQueryType[typeInformation.Name]; ok {
+					continue
+				}
+
+				versionToQueryType[typeInformation.Name] = graphql.NewObject(graphql.ObjectConfig{
+					Name:   typeInformation.Name + "Type",
+					Fields: graphql.Fields{},
+				})
+
+				versionToMutationType[typeInformation.Name] = graphql.NewObject(graphql.ObjectConfig{
+					Name:   typeInformation.Name + "Mutation",
+					Fields: graphql.Fields{},
+				})
+			}
+		}
+
 		for _, crd := range crds {
 
 			for _, typeInformation := range crd.Spec.Versions {
-
-				versionedQueryType := graphql.NewObject(graphql.ObjectConfig{
-					Name:   typeInformation.Name + crd.Spec.Names.Kind,
-					Fields: graphql.Fields{},
-				})
-
-				versionedMutationType := graphql.NewObject(graphql.ObjectConfig{
-					Name:   typeInformation.Name + crd.Spec.Names.Kind + "Mutation",
-					Fields: graphql.Fields{},
-				})
 
 				fields, inputFields := gqlTypeForOpenAPIProperties(typeInformation.Schema.OpenAPIV3Schema.Properties, graphql.Fields{}, graphql.InputObjectConfigFieldMap{}, cases.Title(language.English).String(crd.Spec.Names.Singular), nil)
 
@@ -327,6 +338,9 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 					Type:        objectMeta,
 					Description: "Standard object's metadata.",
 				})
+
+				versionedQueryType := versionToQueryType[typeInformation.Name]
+				versionedMutationType := versionToMutationType[typeInformation.Name]
 
 				versionedQueryType.AddFieldConfig(crd.Spec.Names.Plural, &graphql.Field{
 					Type: graphql.NewNonNull(graphql.NewList(graphql.NewNonNull(crdType))),
@@ -650,6 +664,8 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 						go func() {
 							// TODO: i would like to figure out if there is another way than to buffer all the items
 							items := []client.Object{}
+
+							// TODO: only publish a event if one of the subcribed fields has changed
 							for ev := range listWatch.ResultChan() {
 								select {
 								case <-ctx.Done():
