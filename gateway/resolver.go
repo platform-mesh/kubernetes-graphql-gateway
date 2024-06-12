@@ -45,12 +45,15 @@ func (r *resolver) getListArguments() graphql.FieldConfigArgument {
 }
 
 func (r *resolver) listItems(crd apiextensionsv1.CustomResourceDefinition, typeInformation apiextensionsv1.CustomResourceDefinitionVersion) func(p graphql.ResolveParams) (interface{}, error) {
+	logger := slog.With(slog.String("operation", "list"), slog.String("kind", crd.Spec.Names.Kind), slog.String("version", typeInformation.Name))
+
 	return func(p graphql.ResolveParams) (interface{}, error) {
 		ctx, span := otel.Tracer("").Start(p.Context, "Resolve", trace.WithAttributes(attribute.String("kind", crd.Spec.Names.Kind)))
 		defer span.End()
 
 		listFunc, ok := r.conf.pluralToListType[crd.Spec.Names.Plural]
 		if !ok {
+			logger.Error("no typed client available for the reuqested type")
 			return nil, errors.New("no typed client available for the reuqested type")
 		}
 
@@ -60,7 +63,7 @@ func (r *resolver) listItems(crd apiextensionsv1.CustomResourceDefinition, typeI
 		if labelSelector, ok := p.Args["labelselector"].(string); ok && labelSelector != "" {
 			selector, err := labels.Parse(labelSelector)
 			if err != nil {
-				slog.Error("unable to parse given label selector", "error", err)
+				logger.Error("unable to parse given label selector", slog.Any("error", err))
 				return nil, err
 			}
 			opts = append(opts, client.MatchingLabelsSelector{Selector: selector})
@@ -83,11 +86,13 @@ func (r *resolver) listItems(crd apiextensionsv1.CustomResourceDefinition, typeI
 
 		err := r.conf.Client.List(ctx, list, opts...)
 		if err != nil {
+			logger.Error("unable to list objects", slog.Any("error", err))
 			return nil, err
 		}
 
 		items, err := meta.ExtractList(list)
 		if err != nil {
+			logger.Error("unable to extract list", slog.Any("error", err))
 			return nil, err
 		}
 
@@ -127,6 +132,7 @@ func (r *resolver) getChangeArguments(input graphql.Input) graphql.FieldConfigAr
 }
 
 func (r *resolver) getItem(crd apiextensionsv1.CustomResourceDefinition, typeInformation apiextensionsv1.CustomResourceDefinitionVersion) func(p graphql.ResolveParams) (interface{}, error) {
+	logger := slog.With(slog.String("operation", "get"), slog.String("kind", crd.Spec.Names.Kind), slog.String("version", typeInformation.Name))
 	return func(p graphql.ResolveParams) (interface{}, error) {
 		ctx, span := otel.Tracer("").Start(p.Context, "Resolve", trace.WithAttributes(attribute.String("kind", crd.Spec.Names.Kind)))
 		defer span.End()
@@ -154,12 +160,14 @@ func (r *resolver) getItem(crd apiextensionsv1.CustomResourceDefinition, typeInf
 
 		objectFunc, ok := r.conf.pluralToObjectType[crd.Spec.Names.Plural]
 		if !ok {
+			logger.Error("no typed client available for the reuqested type")
 			return nil, errors.New("no typed client available for the reuqested type")
 		}
 
 		obj := objectFunc()
 		err := r.conf.Client.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, obj)
 		if err != nil {
+			logger.Error("unable to get object", slog.Any("error", err))
 			return nil, err
 		}
 
@@ -168,6 +176,7 @@ func (r *resolver) getItem(crd apiextensionsv1.CustomResourceDefinition, typeInf
 }
 
 func (r *resolver) deleteItem(crd apiextensionsv1.CustomResourceDefinition, typeInformation apiextensionsv1.CustomResourceDefinitionVersion) func(p graphql.ResolveParams) (interface{}, error) {
+	logger := slog.With(slog.String("operation", "delete"), slog.String("kind", crd.Spec.Names.Kind), slog.String("version", typeInformation.Name))
 	return func(p graphql.ResolveParams) (interface{}, error) {
 		ctx, span := otel.Tracer("").Start(p.Context, "Delete", trace.WithAttributes(attribute.String("kind", crd.Spec.Names.Kind)))
 		defer span.End()
@@ -194,21 +203,28 @@ func (r *resolver) deleteItem(crd apiextensionsv1.CustomResourceDefinition, type
 		us.SetName(p.Args["name"].(string))
 
 		err := r.conf.Client.Delete(ctx, us)
+		if err != nil {
+			logger.Error("unable to delete object", slog.Any("error", err))
+			return false, err
+		}
 
-		return err == nil, err
+		return true, nil
 	}
 }
 
 func (r *resolver) createItem(crd apiextensionsv1.CustomResourceDefinition, typeInformation apiextensionsv1.CustomResourceDefinitionVersion) func(p graphql.ResolveParams) (interface{}, error) {
+	logger := slog.With(slog.String("operation", "create"), slog.String("kind", crd.Spec.Names.Kind), slog.String("version", typeInformation.Name))
 	return func(p graphql.ResolveParams) (interface{}, error) {
 		ctx, span := otel.Tracer("").Start(p.Context, "Create", trace.WithAttributes(attribute.String("kind", crd.Spec.Names.Kind)))
 		defer span.End()
 
 		var metadatInput MetadatInput
 		if err := mapstructure.Decode(p.Args["metadata"], &metadatInput); err != nil {
-			slog.Error("unable to decode metadata input", "error", err)
+			logger.Error("unable to decode metadata input", slog.Any("error", err))
 			return nil, err
 		}
+
+		logger = logger.With(slog.Group("metadata", slog.String("name", metadatInput.Name), slog.String("namespace", metadatInput.Namespace)))
 
 		if err := isAuthorized(ctx, r.conf.Client, authzv1.ResourceAttributes{
 			Verb:      "create",
@@ -241,27 +257,35 @@ func (r *resolver) createItem(crd apiextensionsv1.CustomResourceDefinition, type
 		}
 
 		if us.GetName() == "" && us.GetGenerateName() == "" {
+			logger.Error("either name or generateName must be set")
 			return nil, errors.New("either name or generateName must be set")
 		}
 
 		unstructured.SetNestedField(us.Object, p.Args["spec"], "spec")
 
 		err := r.conf.Client.Create(ctx, us)
+		if err != nil {
+			logger.Error("unable to create object", slog.Any("error", err))
+			return nil, err
+		}
 
-		return us.Object, err
+		return us.Object, nil
 	}
 }
 
 func (r *resolver) updateItem(crd apiextensionsv1.CustomResourceDefinition, typeInformation apiextensionsv1.CustomResourceDefinitionVersion) func(p graphql.ResolveParams) (interface{}, error) {
+	logger := slog.With(slog.String("operation", "update"), slog.String("kind", crd.Spec.Names.Kind), slog.String("version", typeInformation.Name))
 	return func(p graphql.ResolveParams) (interface{}, error) {
 		ctx, span := otel.Tracer("").Start(p.Context, "Update", trace.WithAttributes(attribute.String("kind", crd.Spec.Names.Kind)))
 		defer span.End()
 
 		var metadatInput MetadatInput
 		if err := mapstructure.Decode(p.Args["metadata"], &metadatInput); err != nil {
-			slog.Error("unable to decode metadata input", "error", err)
+			logger.Error("unable to decode metadata input", "error", err)
 			return nil, err
 		}
+
+		logger = logger.With(slog.Group("metadata", slog.String("name", metadatInput.Name), slog.String("namespace", metadatInput.Namespace)))
 
 		if err := isAuthorized(ctx, r.conf.Client, authzv1.ResourceAttributes{
 			Verb:      "update",
@@ -286,6 +310,7 @@ func (r *resolver) updateItem(crd apiextensionsv1.CustomResourceDefinition, type
 
 		err := r.conf.Client.Get(ctx, client.ObjectKey{Namespace: us.GetNamespace(), Name: us.GetName()}, us)
 		if err != nil {
+			logger.Error("unable to get object", slog.Any("error", err))
 			return nil, err
 		}
 
@@ -293,6 +318,7 @@ func (r *resolver) updateItem(crd apiextensionsv1.CustomResourceDefinition, type
 
 		err = r.conf.Client.Update(ctx, us)
 		if err != nil {
+			logger.Error("unable to update object", slog.Any("error", err))
 			return nil, err
 		}
 
@@ -439,7 +465,14 @@ func isAuthorized(ctx context.Context, c client.Client, resourceAttributes authz
 	if err != nil {
 		return err
 	}
-	slog.Info("SAR result", "allowed", sar.Status.Allowed, "user", sar.Spec.User, "namespace", sar.Spec.ResourceAttributes.Namespace, "resource", sar.Spec.ResourceAttributes.Resource)
+
+	slog.LogAttrs(ctx, slog.LevelInfo, "SAR result",
+		slog.String("kind", resourceAttributes.Resource),
+		slog.String("namespace", resourceAttributes.Namespace),
+		slog.String("user", user),
+		slog.Bool("allowed", sar.Status.Allowed),
+		slog.String("verb", resourceAttributes.Verb),
+	)
 
 	if !sar.Status.Allowed {
 		return errors.New("access denied")
