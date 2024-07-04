@@ -19,6 +19,8 @@ import (
 	"golang.org/x/text/language"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/client-go/transport"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -584,4 +586,39 @@ func Handler(conf HandlerConfig) http.Handler {
 
 func AddUserToContext(ctx context.Context, user string) context.Context {
 	return context.WithValue(ctx, userContextKey{}, user)
+}
+
+func GetUserFromContext(ctx context.Context) (string, bool) {
+	user, ok := ctx.Value(userContextKey{}).(string)
+	return user, ok
+}
+
+type impersonation struct {
+	delegate http.RoundTripper
+}
+
+func (i *impersonation) RoundTrip(req *http.Request) (*http.Response, error) {
+
+	// use the user header as marker for the rest.
+	if len(req.Header.Get(transport.ImpersonateUserHeader)) != 0 {
+		return i.delegate.RoundTrip(req)
+	}
+
+	user, ok := GetUserFromContext(req.Context())
+	if !ok || user == "" {
+		return i.delegate.RoundTrip(req)
+	}
+
+	slog.Debug("impersonating request", "user", user)
+
+	fmt.Println("impersonating", user)
+
+	req = utilnet.CloneRequest(req)
+	req.Header.Set(transport.ImpersonateUserHeader, user)
+
+	return i.delegate.RoundTrip(req)
+}
+
+func NewImpersonationTransport(rt http.RoundTripper) http.RoundTripper {
+	return &impersonation{delegate: rt}
 }

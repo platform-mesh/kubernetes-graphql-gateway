@@ -46,6 +46,8 @@ var startCmd = &cobra.Command{
 			panic("no cache sync")
 		}
 
+		cfg.Wrap(gateway.NewImpersonationTransport)
+
 		cl, err := client.NewWithWatch(cfg, client.Options{
 			Scheme: schema,
 			Cache: &client.CacheOptions{

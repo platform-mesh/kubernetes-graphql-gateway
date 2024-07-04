@@ -69,19 +69,8 @@ func (r *resolver) listItems(crd apiextensionsv1.CustomResourceDefinition, typeI
 			opts = append(opts, client.MatchingLabelsSelector{Selector: selector})
 		}
 
-		ras := authzv1.ResourceAttributes{
-			Verb:     "list",
-			Group:    crd.Spec.Group,
-			Version:  typeInformation.Name,
-			Resource: crd.Spec.Names.Plural,
-		}
 		if namespace, ok := p.Args["namespace"].(string); ok && namespace != "" {
 			opts = append(opts, client.InNamespace(namespace))
-			ras.Namespace = namespace
-		}
-
-		if err := isAuthorized(ctx, r.conf.Client, ras); err != nil {
-			return nil, err
 		}
 
 		err := r.conf.Client.List(ctx, list, opts...)
@@ -181,17 +170,6 @@ func (r *resolver) deleteItem(crd apiextensionsv1.CustomResourceDefinition, type
 		ctx, span := otel.Tracer("").Start(p.Context, "Delete", trace.WithAttributes(attribute.String("kind", crd.Spec.Names.Kind)))
 		defer span.End()
 
-		if err := isAuthorized(ctx, r.conf.Client, authzv1.ResourceAttributes{
-			Verb:      "delete",
-			Group:     crd.Spec.Group,
-			Version:   typeInformation.Name,
-			Resource:  crd.Spec.Names.Plural,
-			Namespace: p.Args["namespace"].(string),
-			Name:      p.Args["name"].(string),
-		}); err != nil {
-			return nil, err
-		}
-
 		us := &unstructured.Unstructured{}
 		us.SetGroupVersionKind(schema.GroupVersionKind{
 			Group:   crd.Spec.Group,
@@ -225,16 +203,6 @@ func (r *resolver) createItem(crd apiextensionsv1.CustomResourceDefinition, type
 		}
 
 		logger = logger.With(slog.Group("metadata", slog.String("name", metadatInput.Name), slog.String("namespace", metadatInput.Namespace)))
-
-		if err := isAuthorized(ctx, r.conf.Client, authzv1.ResourceAttributes{
-			Verb:      "create",
-			Group:     crd.Spec.Group,
-			Version:   typeInformation.Name,
-			Resource:  crd.Spec.Names.Plural,
-			Namespace: metadatInput.Namespace,
-		}); err != nil {
-			return nil, err
-		}
 
 		us := &unstructured.Unstructured{}
 		us.SetGroupVersionKind(schema.GroupVersionKind{
@@ -286,17 +254,6 @@ func (r *resolver) updateItem(crd apiextensionsv1.CustomResourceDefinition, type
 		}
 
 		logger = logger.With(slog.Group("metadata", slog.String("name", metadatInput.Name), slog.String("namespace", metadatInput.Namespace)))
-
-		if err := isAuthorized(ctx, r.conf.Client, authzv1.ResourceAttributes{
-			Verb:      "update",
-			Group:     crd.Spec.Group,
-			Version:   typeInformation.Name,
-			Resource:  crd.Spec.Names.Plural,
-			Namespace: metadatInput.Namespace,
-			Name:      metadatInput.Name,
-		}); err != nil {
-			return nil, err
-		}
 
 		us := &unstructured.Unstructured{}
 		us.SetGroupVersionKind(schema.GroupVersionKind{
