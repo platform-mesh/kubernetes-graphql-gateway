@@ -604,14 +604,16 @@ func (i *impersonation) RoundTrip(req *http.Request) (*http.Response, error) {
 		return i.delegate.RoundTrip(req)
 	}
 
+	if strings.Contains(req.URL.Path, "authorization.k8s.io") { // skip impersonation for subjectaccessreviews
+		return i.delegate.RoundTrip(req)
+	}
+
 	user, ok := GetUserFromContext(req.Context())
 	if !ok || user == "" {
 		return i.delegate.RoundTrip(req)
 	}
 
 	slog.Debug("impersonating request", "user", user)
-
-	fmt.Println("impersonating", user)
 
 	req = utilnet.CloneRequest(req)
 	req.Header.Set(transport.ImpersonateUserHeader, user)
