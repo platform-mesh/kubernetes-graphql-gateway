@@ -517,11 +517,15 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 	})
 }
 
-type userContextKey struct{}
+type (
+	userContextKey   struct{}
+	groupsContextKey struct{}
+)
 
 type HandlerConfig struct {
 	*handler.Config
-	UserClaim string
+	UserClaim   string
+	GroupsClaim string
 }
 
 func Handler(conf HandlerConfig) http.Handler {
@@ -550,6 +554,21 @@ func Handler(conf HandlerConfig) http.Handler {
 		}
 
 		ctx := AddUserToContext(r.Context(), userIdentifier)
+
+		if conf.GroupsClaim != "" {
+			groups, ok := claims[conf.GroupsClaim].([]any)
+
+			var parsedGroups []string
+			for _, group := range groups {
+				if group, ok := group.(string); ok {
+					parsedGroups = append(parsedGroups, group)
+				}
+			}
+
+			if ok && len(groups) >= 0 {
+				ctx = AddGroupsToContext(ctx, parsedGroups)
+			}
+		}
 
 		if r.Header.Get("Accept") == "text/event-stream" {
 			opts := handler.NewRequestOptions(r)
@@ -588,9 +607,18 @@ func AddUserToContext(ctx context.Context, user string) context.Context {
 	return context.WithValue(ctx, userContextKey{}, user)
 }
 
+func AddGroupsToContext(ctx context.Context, groups []string) context.Context {
+	return context.WithValue(ctx, groupsContextKey{}, groups)
+}
+
 func GetUserFromContext(ctx context.Context) (string, bool) {
 	user, ok := ctx.Value(userContextKey{}).(string)
 	return user, ok
+}
+
+func GetGroupsFromContext(ctx context.Context) ([]string, bool) {
+	groups, ok := ctx.Value(groupsContextKey{}).([]string)
+	return groups, ok
 }
 
 type impersonation struct {
@@ -617,6 +645,13 @@ func (i *impersonation) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	req = utilnet.CloneRequest(req)
 	req.Header.Set(transport.ImpersonateUserHeader, user)
+
+	groups, ok := GetGroupsFromContext(req.Context())
+	if ok && len(groups) > 0 {
+		for _, group := range groups {
+			req.Header.Set(transport.ImpersonateGroupHeader, group)
+		}
+	}
 
 	return i.delegate.RoundTrip(req)
 }

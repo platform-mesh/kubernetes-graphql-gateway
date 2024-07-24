@@ -406,7 +406,7 @@ func isAuthorized(ctx context.Context, c client.Client, resourceAttributes authz
 	ctx, span := otel.Tracer("").Start(ctx, "AuthorizationCheck")
 	defer span.End()
 
-	user, ok := ctx.Value(userContextKey{}).(string)
+	user, ok := GetUserFromContext(ctx)
 	if !ok || user == "" {
 		return errors.New("no user found in context")
 	}
@@ -416,6 +416,11 @@ func isAuthorized(ctx context.Context, c client.Client, resourceAttributes authz
 			User:               user,
 			ResourceAttributes: &resourceAttributes,
 		},
+	}
+
+	groups, ok := GetGroupsFromContext(ctx)
+	if ok {
+		sar.Spec.Groups = groups
 	}
 
 	err := c.Create(ctx, &sar)

@@ -71,7 +71,8 @@ var startCmd = &cobra.Command{
 				Pretty:     true,
 				Playground: true,
 			},
-			UserClaim: "mail",
+			UserClaim:   "mail",
+			GroupsClaim: "groups",
 		}))
 
 		return http.ListenAndServe(":3000", nil)
