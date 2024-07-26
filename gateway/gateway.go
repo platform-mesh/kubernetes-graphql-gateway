@@ -399,6 +399,7 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 				}
 
 				capitalizedSingular := cases.Title(language.English).String(crd.Spec.Names.Singular)
+				capitalizedPlural := cases.Title(language.English).String(crd.Spec.Names.Plural)
 
 				versionedMutationType.AddFieldConfig("delete"+capitalizedSingular, &graphql.Field{
 					Type:    graphql.Boolean,
@@ -439,6 +440,29 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 				}
 
 				subscriptions[group+typeInformation.Name+capitalizedSingular] = &graphql.Field{
+					Type: crdType,
+					Args: graphql.FieldConfigArgument{
+						"name": &graphql.ArgumentConfig{
+							Type:        graphql.NewNonNull(graphql.String),
+							Description: "the metadata.name of the object you want to watch",
+						},
+						"namespace": &graphql.ArgumentConfig{
+							Type:        graphql.NewNonNull(graphql.String),
+							Description: "the metadata.namesapce of the objects you want to watch",
+						},
+						"emitOnlyFieldChanges": &graphql.ArgumentConfig{
+							Type:         graphql.Boolean,
+							DefaultValue: false,
+							Description:  "only emit events if the fields that are requested have changed",
+						},
+					},
+					Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+						return p.Source, nil
+					},
+					Subscribe: resolver.subscribeItem(crd, typeInformation),
+				}
+
+				subscriptions[group+typeInformation.Name+capitalizedPlural] = &graphql.Field{
 					Type: graphql.NewList(crdType),
 					Args: graphql.FieldConfigArgument{
 						"namespace": &graphql.ArgumentConfig{
@@ -459,6 +483,28 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 
 				if typeInformation.Storage {
 					subscriptions[group+capitalizedSingular] = &graphql.Field{
+						Type: crdType,
+						Args: graphql.FieldConfigArgument{
+							"name": &graphql.ArgumentConfig{
+								Type:        graphql.NewNonNull(graphql.String),
+								Description: "the metadata.name of the object you want to watch",
+							},
+							"namespace": &graphql.ArgumentConfig{
+								Type:        graphql.NewNonNull(graphql.String),
+								Description: "the metadata.namesapce of the objects you want to watch",
+							},
+							"emitOnlyFieldChanges": &graphql.ArgumentConfig{
+								Type:         graphql.Boolean,
+								DefaultValue: false,
+								Description:  "only emit events if the fields that are requested have changed",
+							},
+						},
+						Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+							return p.Source, nil
+						},
+						Subscribe: resolver.subscribeItem(crd, typeInformation),
+					}
+					subscriptions[group+capitalizedPlural] = &graphql.Field{
 						Type: graphql.NewList(crdType),
 						Args: graphql.FieldConfigArgument{
 							"namespace": &graphql.ArgumentConfig{

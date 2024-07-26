@@ -14,6 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	jenxv1 "github.tools.sap/automaticd/automaticd/operators/jenx/api/v1"
 	jirav1alpha1 "github.tools.sap/automaticd/automaticd/operators/jira/api/v1alpha1"
 	authzv1 "k8s.io/api/authorization/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -30,6 +31,7 @@ var startCmd = &cobra.Command{
 		authzv1.AddToScheme(schema)
 
 		jirav1alpha1.AddToScheme(schema)
+		jenxv1.AddToScheme(schema)
 
 		k8sCache, err := cache.New(cfg, cache.Options{
 			Scheme: schema,

@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/graphql-go/graphql"
 	"github.com/mitchellh/mapstructure"
 	"go.opentelemetry.io/otel"
@@ -283,9 +284,94 @@ func (r *resolver) updateItem(crd apiextensionsv1.CustomResourceDefinition, type
 	}
 }
 
+func (r *resolver) subscribeItem(crd apiextensionsv1.CustomResourceDefinition, typeInformation apiextensionsv1.CustomResourceDefinitionVersion) func(p graphql.ResolveParams) (interface{}, error) {
+	logger := slog.With(slog.String("operation", "subribeItem"), slog.String("kind", crd.Spec.Names.Kind), slog.String("version", typeInformation.Name))
+	return func(p graphql.ResolveParams) (interface{}, error) {
+		ctx, span := otel.Tracer("").Start(p.Context, "SubscribeForObject", trace.WithAttributes(attribute.String("kind", crd.Spec.Names.Kind)))
+		defer span.End()
+
+		var metadatInput MetadatInput
+		if err := mapstructure.Decode(p.Args, &metadatInput); err != nil {
+			logger.Error("unable to decode metadata input", "error", err)
+			return nil, err
+		}
+
+		listType, ok := r.conf.pluralToListType[crd.Spec.Names.Plural]
+		if !ok {
+			logger.Error("no typed client available for the reuqested type")
+			return nil, errors.New("no typed client available for the reuqested type")
+		}
+
+		if err := isAuthorized(ctx, r.conf.Client, authzv1.ResourceAttributes{
+			Verb:      "watch",
+			Group:     crd.Spec.Group,
+			Version:   typeInformation.Name,
+			Resource:  crd.Spec.Names.Plural,
+			Namespace: metadatInput.Namespace,
+			Name:      metadatInput.Name,
+		}); err != nil {
+			return nil, err
+		}
+
+		listWatch, err := r.conf.Client.Watch(ctx, listType(), client.InNamespace(metadatInput.Namespace), client.MatchingFields{"metadata.name": metadatInput.Name})
+		if err != nil {
+			logger.Error("unable to watch object", slog.Any("error", err))
+			return nil, err
+		}
+
+		resultChannel := make(chan interface{})
+
+		go func() {
+			var item client.Object
+			for ev := range listWatch.ResultChan() {
+				changed := false
+				select {
+				case <-ctx.Done():
+					slog.Info("stopping watch due to client cancel")
+					listWatch.Stop()
+					close(resultChannel)
+					return
+				default:
+					switch ev.Type {
+					case watch.Added:
+						item = ev.Object.(client.Object)
+						changed = true
+					case watch.Modified:
+
+						emitOnlyFieldChanges, ok := p.Args["emitOnlyFieldChanges"].(bool)
+
+						changed = determineFieldChanged(ok && emitOnlyFieldChanges, ev.Object.(client.Object), resultChannel, p, item)
+						item = ev.Object.(client.Object)
+					case watch.Deleted:
+						itemType, ok := r.conf.pluralToObjectType[crd.Spec.Names.Plural]
+						if !ok {
+							logger.Error("no typed client available for the reuqested type")
+							listWatch.Stop()
+							close(resultChannel)
+						}
+
+						item = itemType()
+					default:
+						logger.Info("skipping event", "event", ev.Type, "object", ev.Object)
+						continue
+					}
+				}
+
+				if val, ok := p.Args["emitOnlyFieldChanges"].(bool); ok && val && changed {
+					resultChannel <- item
+				} else if !ok || !val {
+					resultChannel <- item
+				}
+			}
+		}()
+
+		return resultChannel, nil
+	}
+}
+
 func (r *resolver) subscribeItems(crd apiextensionsv1.CustomResourceDefinition, typeInformation apiextensionsv1.CustomResourceDefinitionVersion) func(p graphql.ResolveParams) (interface{}, error) {
 	return func(p graphql.ResolveParams) (interface{}, error) {
-		ctx, span := otel.Tracer("").Start(p.Context, "Subscribe", trace.WithAttributes(attribute.String("kind", crd.Spec.Names.Kind)))
+		ctx, span := otel.Tracer("").Start(p.Context, "SubscribeForNamespace", trace.WithAttributes(attribute.String("kind", crd.Spec.Names.Kind)))
 		defer span.End()
 
 		listType, ok := r.conf.pluralToListType[crd.Spec.Names.Plural]
@@ -330,47 +416,9 @@ func (r *resolver) subscribeItems(crd apiextensionsv1.CustomResourceDefinition, 
 						for i, item := range items {
 							if item.GetName() == ev.Object.(client.Object).GetName() {
 
-								if val, ok := p.Args["emitOnlyFieldChanges"].(bool); ok && val {
-									unstructuredObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(ev.Object)
-									if err != nil {
-										// TODO: handle error
-										close(resultChannel)
-									}
+								emitOnlyFieldChanges, ok := p.Args["emitOnlyFieldChanges"].(bool)
 
-									fields := getRequestedFields(p)
-
-									currentItemUnstructured, err := runtime.DefaultUnstructuredConverter.ToUnstructured(item)
-									if err != nil {
-										// TODO: handle error
-										close(resultChannel)
-									}
-
-									for _, field := range fields {
-										fieldValue, found, err := unstructured.NestedFieldNoCopy(unstructuredObj, strings.Split(field, ".")...)
-										if err != nil {
-											// TODO: handle error
-											slog.Error("unable to get field value", "error", err)
-											close(resultChannel)
-										}
-
-										currentFieldValue, currentFound, err := unstructured.NestedFieldNoCopy(currentItemUnstructured, strings.Split(field, ".")...)
-										if err != nil {
-											// TODO: handle error
-											slog.Error("unable to get field value", "error", err)
-											close(resultChannel)
-										}
-
-										if !found || !currentFound {
-											continue
-										}
-										if fieldValue == currentFieldValue {
-											continue
-										}
-
-										changed = true
-
-									}
-								}
+								changed = determineFieldChanged(ok && emitOnlyFieldChanges, ev.Object.(client.Object), resultChannel, p, item)
 
 								items[i] = ev.Object.(client.Object)
 								break
@@ -400,6 +448,53 @@ func (r *resolver) subscribeItems(crd apiextensionsv1.CustomResourceDefinition, 
 
 		return resultChannel, nil
 	}
+}
+
+func determineFieldChanged(emitOnlyFieldChanges bool, obj client.Object, resultChannel chan interface{}, p graphql.ResolveParams, currentItem client.Object) bool {
+	if !emitOnlyFieldChanges {
+		return true
+	}
+
+	unstructuredObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
+	if err != nil {
+		// TODO: handle error
+		close(resultChannel)
+	}
+
+	fields := getRequestedFields(p)
+
+	currentItemUnstructured, err := runtime.DefaultUnstructuredConverter.ToUnstructured(currentItem)
+	if err != nil {
+		// TODO: handle error
+		close(resultChannel)
+	}
+
+	for _, field := range fields {
+		fieldValue, found, err := unstructured.NestedFieldNoCopy(unstructuredObj, strings.Split(field, ".")...)
+		if err != nil {
+			// TODO: handle error
+			slog.Error("unable to get field value", "error", err)
+			close(resultChannel)
+		}
+
+		currentFieldValue, currentFound, err := unstructured.NestedFieldNoCopy(currentItemUnstructured, strings.Split(field, ".")...)
+		if err != nil {
+			// TODO: handle error
+			slog.Error("unable to get field value", "error", err)
+			close(resultChannel)
+		}
+
+		if !found || !currentFound {
+			continue
+		}
+		if cmp.Equal(fieldValue, currentFieldValue) {
+			continue
+		}
+
+		return true
+	}
+
+	return false
 }
 
 func isAuthorized(ctx context.Context, c client.Client, resourceAttributes authzv1.ResourceAttributes) error {
