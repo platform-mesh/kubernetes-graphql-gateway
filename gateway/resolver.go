@@ -20,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -117,6 +118,23 @@ func (r *resolver) getChangeArguments(input graphql.Input) graphql.FieldConfigAr
 		"spec": &graphql.ArgumentConfig{
 			Type:        graphql.NewNonNull(input),
 			Description: "the spec of the object",
+		},
+	}
+}
+
+func (r *resolver) getPatchArguments() graphql.FieldConfigArgument {
+	return graphql.FieldConfigArgument{
+		"type": &graphql.ArgumentConfig{
+			Type:        graphql.NewNonNull(graphql.String),
+			Description: "The JSON patch type, it can be json-patch, merge-patch, strategic-merge-patch",
+		},
+		"payload": &graphql.ArgumentConfig{
+			Type:        graphql.NewNonNull(graphql.String),
+			Description: "The JSON patch to apply to the object",
+		},
+		"metadata": &graphql.ArgumentConfig{
+			Type:        graphql.NewNonNull(metadataInput),
+			Description: "Metadata including name and namespace of the object you want to patch",
 		},
 	}
 }
@@ -280,6 +298,74 @@ func (r *resolver) updateItem(crd apiextensionsv1.CustomResourceDefinition, type
 			return nil, err
 		}
 
+		return us.Object, nil
+	}
+}
+
+func (r *resolver) patchItem(crd apiextensionsv1.CustomResourceDefinition, typeInformation apiextensionsv1.CustomResourceDefinitionVersion) func(p graphql.ResolveParams) (interface{}, error) {
+	logger := slog.With(slog.String("operation", "patch-json"), slog.String("kind", crd.Spec.Names.Kind), slog.String("version", typeInformation.Name))
+	return func(p graphql.ResolveParams) (interface{}, error) {
+		ctx, span := otel.Tracer("").Start(p.Context, "Patch", trace.WithAttributes(attribute.String("kind", crd.Spec.Names.Kind)))
+		defer span.End()
+
+		var metadatInput MetadatInput
+		if err := mapstructure.Decode(p.Args["metadata"], &metadatInput); err != nil {
+			logger.Error("unable to decode metadata input", "error", err)
+			return nil, err
+		}
+
+		logger = logger.With(slog.Group("metadata", slog.String("name", metadatInput.Name), slog.String("namespace", metadatInput.Namespace)))
+
+		us := &unstructured.Unstructured{}
+		us.SetGroupVersionKind(schema.GroupVersionKind{
+			Group:   crd.Spec.Group,
+			Version: typeInformation.Name,
+			Kind:    crd.Spec.Names.Kind,
+		})
+
+		us.SetNamespace(metadatInput.Namespace)
+		us.SetName(metadatInput.Name)
+
+		err := r.conf.Client.Get(ctx, client.ObjectKey{Namespace: us.GetNamespace(), Name: us.GetName()}, us)
+		if err != nil {
+			logger.Error("unable to get object", slog.Any("error", err))
+			return nil, err
+		}
+
+		payload, ok := p.Args["payload"].(string)
+		if !ok {
+			logger.Error("unable to parse payload field")
+			return nil, errors.New("unable to parse payload field")
+		}
+		
+		patchTypeArg, ok := p.Args["type"].(string)
+		if !ok {
+			logger.Error("unable to parse patch type field")
+			return nil, errors.New("unable to parse patch type field")
+		}
+		
+		var patchType types.PatchType
+		switch patchTypeArg {
+		case "json-patch":
+			patchType = types.JSONPatchType
+		case "merge-patch":
+			patchType = types.MergePatchType
+		case "strategic-merge-patch":
+			patchType = types.StrategicMergePatchType
+		default:
+			logger.Error("invalid patch type, patch type can be json-patch, merge-patch or strategic-merge-patch")
+			return nil, errors.New("invalid patch type, patch type can be json-patch, merge-patch or strategic-merge-patch")
+		}
+
+		patch := client.RawPatch(patchType, []byte(payload))
+
+		err = r.conf.Client.Patch(ctx, us, patch, &client.PatchOptions{})
+
+		if err != nil {
+			logger.Error("unable to patch object", slog.Any("error", err))
+			return nil, err
+		}
+		
 		return us.Object, nil
 	}
 }
