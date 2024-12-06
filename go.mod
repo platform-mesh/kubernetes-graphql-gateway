@@ -11,7 +11,7 @@ require (
 	github.com/spf13/cobra v1.8.1
 	go.opentelemetry.io/otel v1.32.0
 	go.opentelemetry.io/otel/trace v1.32.0
-	golang.org/x/text v0.16.0
+	golang.org/x/text v0.21.0
 	k8s.io/api v0.31.0
 	k8s.io/apiextensions-apiserver v0.31.0
 	k8s.io/apimachinery v0.31.0
