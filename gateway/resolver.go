@@ -248,9 +248,13 @@ func (r *resolver) createItem(crd apiextensionsv1.CustomResourceDefinition, type
 			return nil, errors.New("either name or generateName must be set")
 		}
 
-		unstructured.SetNestedField(us.Object, p.Args["spec"], "spec")
+		err := unstructured.SetNestedField(us.Object, p.Args["spec"], "spec")
+		if err != nil {
+			logger.Error("unable to set spec field", slog.Any("error", err))
+			return nil, err
+		}
 
-		err := r.conf.Client.Create(ctx, us)
+		err = r.conf.Client.Create(ctx, us)
 		if err != nil {
 			logger.Error("unable to create object", slog.Any("error", err))
 			return nil, err
@@ -290,7 +294,11 @@ func (r *resolver) updateItem(crd apiextensionsv1.CustomResourceDefinition, type
 			return nil, err
 		}
 
-		unstructured.SetNestedField(us.Object, p.Args["spec"], "spec")
+		err = unstructured.SetNestedField(us.Object, p.Args["spec"], "spec")
+		if err != nil {
+			logger.Error("unable to set spec field", slog.Any("error", err))
+			return nil, err
+		}
 
 		err = r.conf.Client.Update(ctx, us)
 		if err != nil {
@@ -337,13 +345,13 @@ func (r *resolver) patchItem(crd apiextensionsv1.CustomResourceDefinition, typeI
 			logger.Error("unable to parse payload field")
 			return nil, errors.New("unable to parse payload field")
 		}
-		
+
 		patchTypeArg, ok := p.Args["type"].(string)
 		if !ok {
 			logger.Error("unable to parse patch type field")
 			return nil, errors.New("unable to parse patch type field")
 		}
-		
+
 		var patchType types.PatchType
 		switch patchTypeArg {
 		case "json-patch":
@@ -365,7 +373,7 @@ func (r *resolver) patchItem(crd apiextensionsv1.CustomResourceDefinition, typeI
 			logger.Error("unable to patch object", slog.Any("error", err))
 			return nil, err
 		}
-		
+
 		return us.Object, nil
 	}
 }

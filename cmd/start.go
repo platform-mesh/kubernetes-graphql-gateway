@@ -10,6 +10,7 @@ import (
 
 	"github.com/openmfp/crd-gql-gateway/gateway"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -25,8 +26,8 @@ var startCmd = &cobra.Command{
 		cfg := controllerruntime.GetConfigOrDie()
 
 		schema := runtime.NewScheme()
-		apiextensionsv1.AddToScheme(schema)
-		authzv1.AddToScheme(schema)
+		utilruntime.Must(apiextensionsv1.AddToScheme(schema))
+		utilruntime.Must(authzv1.AddToScheme(schema))
 
 		k8sCache, err := cache.New(cfg, cache.Options{
 			Scheme: schema,
@@ -36,7 +37,10 @@ var startCmd = &cobra.Command{
 		}
 
 		go func() {
-			k8sCache.Start(context.Background())
+			err := k8sCache.Start(context.Background())
+			if err != nil {
+				panic(err)
+			}
 		}()
 
 		if !k8sCache.WaitForCacheSync(context.Background()) {
