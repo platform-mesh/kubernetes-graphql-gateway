@@ -1,0 +1,293 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Pod and Service API",
+    "version": "v1"
+  },
+  "definitions": {
+    "io.k8s.api.core.v1.Pod": {
+      "type": "object",
+      "x-kubernetes-group-version-kind": [
+        {
+          "group": "",
+          "version": "v1",
+          "kind": "Pod"
+        }
+      ],
+      "properties": {
+        "apiVersion": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+        },
+        "spec": {
+          "$ref": "#/definitions/io.k8s.api.core.v1.PodSpec"
+        },
+        "status": {
+          "$ref": "#/definitions/io.k8s.api.core.v1.PodStatus"
+        }
+      }
+    },
+    "io.k8s.api.core.v1.Service": {
+      "type": "object",
+      "x-kubernetes-group-version-kind": [
+        {
+          "group": "",
+          "version": "v1",
+          "kind": "Service"
+        }
+      ],
+      "properties": {
+        "apiVersion": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+        },
+        "spec": {
+          "$ref": "#/definitions/io.k8s.api.core.v1.ServiceSpec"
+        },
+        "status": {
+          "$ref": "#/definitions/io.k8s.api.core.v1.ServiceStatus"
+        }
+      }
+    },
+    "io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "namespace": {
+          "type": "string"
+        },
+        "labels": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "io.k8s.api.core.v1.PodSpec": {
+      "type": "object",
+      "properties": {
+        "containers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/io.k8s.api.core.v1.Container"
+          }
+        },
+        "restartPolicy": {
+          "type": "string"
+        },
+        "nodeSelector": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "io.k8s.api.core.v1.Container": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "image": {
+          "type": "string"
+        },
+        "ports": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/io.k8s.api.core.v1.ContainerPort"
+          }
+        },
+        "env": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/io.k8s.api.core.v1.EnvVar"
+          }
+        }
+      }
+    },
+    "io.k8s.api.core.v1.ContainerPort": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "containerPort": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "protocol": {
+          "type": "string"
+        }
+      }
+    },
+    "io.k8s.api.core.v1.EnvVar": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      }
+    },
+    "io.k8s.api.core.v1.PodStatus": {
+      "type": "object",
+      "properties": {
+        "phase": {
+          "type": "string"
+        },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/io.k8s.api.core.v1.PodCondition"
+          }
+        },
+        "hostIP": {
+          "type": "string"
+        },
+        "podIP": {
+          "type": "string"
+        },
+        "startTime": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "io.k8s.api.core.v1.PodCondition": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "lastProbeTime": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "lastTransitionTime": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "io.k8s.api.core.v1.ServiceSpec": {
+      "type": "object",
+      "properties": {
+        "ports": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/io.k8s.api.core.v1.ServicePort"
+          }
+        },
+        "selector": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "clusterIP": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "externalIPs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "sessionAffinity": {
+          "type": "string"
+        },
+        "loadBalancerIP": {
+          "type": "string"
+        }
+      }
+    },
+    "io.k8s.api.core.v1.ServicePort": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "protocol": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "targetPort": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "format": "int32"
+            },
+            {
+              "type": "string"
+            }
+          ]
+        },
+        "nodePort": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "io.k8s.api.core.v1.ServiceStatus": {
+      "type": "object",
+      "properties": {
+        "loadBalancer": {
+          "$ref": "#/definitions/io.k8s.api.core.v1.LoadBalancerStatus"
+        }
+      }
+    },
+    "io.k8s.api.core.v1.LoadBalancerStatus": {
+      "type": "object",
+      "properties": {
+        "ingress": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/io.k8s.api.core.v1.LoadBalancerIngress"
+          }
+        }
+      }
+    },
+    "io.k8s.api.core.v1.LoadBalancerIngress": {
+      "type": "object",
+      "properties": {
+        "ip": {
+          "type": "string"
+        },
+        "hostname": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

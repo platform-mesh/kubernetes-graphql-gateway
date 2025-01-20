@@ -437,10 +437,10 @@ func New(ctx context.Context, conf Config) (graphql.Schema, error) {
 						Args:    resolver.getChangeArguments(inputFields["spec"].Type),
 						Resolve: resolver.updateItem(crd, typeInformation),
 					})
-					
+
 					mutationGroupType.AddFieldConfig("patch"+capitalizedSingular, &graphql.Field{
-						Type: 	 crdType,
-						Args:    resolver.getPatchArguments(),	
+						Type:    crdType,
+						Args:    resolver.getPatchArguments(),
 						Resolve: resolver.patchItem(crd, typeInformation),
 					})
 				}

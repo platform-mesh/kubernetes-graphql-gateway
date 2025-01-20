@@ -1,0 +1,68 @@
+version: '3'
+
+dotenv: ['.taskenv', '.secret/.env', '{{.HOME}}/.env' ]
+vars:
+  LOCAL_BIN: bin
+  ENVTEST_K8S_VERSION: "1.29.0"
+  ENVTEST_VERSION: release-0.17
+tasks:
+  ## Setup
+  setup:envtest:
+    internal: true
+    cmds:
+      - test -s {{.LOCAL_BIN}}/setup-envtest|| GOBIN=$(pwd)/{{.LOCAL_BIN}} go install sigs.k8s.io/controller-runtime/tools/setup-envtest@{{.ENVTEST_VERSION}}
+  setup:golangci-lint:
+    internal: true
+    cmds:
+      - test -s {{.LOCAL_BIN}}/golangci-lint || GOBIN=$(pwd)/{{.LOCAL_BIN}} go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+  setup:go-test-coverage:
+    internal: true
+    cmds:
+      - test -s {{.LOCAL_BIN}}/go-test-coverage || GOBIN=$(pwd)/{{.LOCAL_BIN}} go install github.com/vladopajic/go-test-coverage/v2@latest
+
+  ## Development
+  build:
+    cmds:
+      - go build ./...
+  docker:
+    cmds:
+      - docker build -t ghcr.io/openmfp/gql-gateway .
+  ## Testing
+  fmt:
+    cmds:
+      - go fmt ./...
+  lint:
+    deps: [setup:golangci-lint]
+    cmds:
+      - task: fmt
+      - "{{.LOCAL_BIN}}/golangci-lint run --timeout 10m ./..."
+  envtest:
+    env:
+      KUBEBUILDER_ASSETS:
+        sh: $(pwd)/{{.LOCAL_BIN}}/setup-envtest use {{.ENVTEST_K8S_VERSION}} --bin-dir $(pwd)/{{.LOCAL_BIN}} -p path
+      GO111MODULE: on
+    cmds:
+      - go test ./... {{.ADDITIONAL_COMMAND_ARGS}}
+  test:
+    deps: [setup:envtest]
+    cmds:
+      - task: envtest
+        vars:
+          ADDITIONAL_COMMAND_ARGS: -coverprofile=./cover.out -covermode=atomic -coverpkg=./...
+  cover:
+    deps:
+      - task: setup:go-test-coverage
+      - task: test
+    cmds:
+      - "{{.LOCAL_BIN}}/go-test-coverage --threshold-file 50 --threshold-package 51 --threshold-total 56 --profile cover.out --config ./.testcoverage.yml"
+  validate:
+    cmds:
+      - task: lint
+      - task: test
+  start:
+    cmds:
+      - go run main.go start
+
+  gql-gateway:
+    cmds:
+      - go run main.go gql-gateway

@@ -10,6 +10,7 @@ var rootCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(startCmd)
+	rootCmd.AddCommand(gatewayCmd)
 }
 
 func Execute() {
