@@ -26,7 +26,7 @@ tasks:
       - go build ./...
   docker:
     cmds:
-      - docker build -t ghcr.io/openmfp/gql-gateway .
+      - docker build -t ghcr.io/openmfp/crd-gql-gateway .
   ## Testing
   fmt:
     cmds:
@@ -63,6 +63,10 @@ tasks:
     cmds:
       - go run main.go start
 
-  gql-gateway:
+  gateway:
     cmds:
       - go run main.go gql-gateway
+
+  listen:
+    cmds:
+      - go run main.go listen --openapi-out-dir=./definitions

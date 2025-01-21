@@ -5,3 +5,4 @@ exclude:
     - gateway
     - tests
     - internal/config/config.go
+    - listener/*

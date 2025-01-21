@@ -1,0 +1,29 @@
+with-expecter: true
+packages:
+  github.com/openmfp/crd-gql-gateway/listener/apischema:
+    config:
+      dir: listener/apischema/mocks
+      outpkg: mocks
+    interfaces:
+      Resolver:
+
+  github.com/openmfp/crd-gql-gateway/listener/discoveryclient:
+    config:
+      dir: listener/discoveryclient/mocks
+      outpkg: mocks
+    interfaces:
+      Factory:
+
+  github.com/openmfp/crd-gql-gateway/listener/workspacefile:
+    config:
+      dir: listener/workspacefile/mocks
+      outpkg: mocks
+    interfaces:
+      IOHandler:
+
+  sigs.k8s.io/controller-runtime/pkg/client:
+    config:
+      dir: listener/controller/mocks
+      outpkg: mocks
+    interfaces:
+      Client:
