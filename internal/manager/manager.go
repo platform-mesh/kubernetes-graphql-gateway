@@ -268,7 +268,6 @@ func (s *Service) handleSubscription(w http.ResponseWriter, r *http.Request, sch
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
-	w.Header().Set("Transfer-Encoding", "chunked")
 
 	flusher := http.NewResponseController(w)
 
@@ -291,8 +290,8 @@ func (s *Service) handleSubscription(w http.ResponseWriter, r *http.Request, sch
 		Context:        r.Context(),
 	}
 
-	sub := graphql.Subscribe(subscriptionParams)
-	for res := range sub {
+	subscriptionChannel := graphql.Subscribe(subscriptionParams)
+	for res := range subscriptionChannel {
 		if res == nil {
 			continue
 		}
@@ -301,9 +300,11 @@ func (s *Service) handleSubscription(w http.ResponseWriter, r *http.Request, sch
 		if err != nil {
 			continue
 		}
-		fmt.Fprintf(w, "data: %s\n\n", data)
+		fmt.Fprintf(w, "event: next\ndata: %s\n\n", data)
 		flusher.Flush()
 	}
+
+	fmt.Fprint(w, "event: complete\n\n")
 }
 
 func readDefinitionFromFile(filePath string) (spec.Definitions, error) {
