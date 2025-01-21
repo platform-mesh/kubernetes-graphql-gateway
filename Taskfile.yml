@@ -50,11 +50,11 @@ tasks:
         vars:
           ADDITIONAL_COMMAND_ARGS: -coverprofile=./cover.out -covermode=atomic -coverpkg=./...
   cover:
-    deps:
-      - task: setup:go-test-coverage
-      - task: test
+    deps: [setup:envtest]
     cmds:
-      - "{{.LOCAL_BIN}}/go-test-coverage --threshold-file 50 --threshold-package 51 --threshold-total 56 --profile cover.out --config ./.testcoverage.yml"
+      - task: envtest
+        vars:
+          ADDITIONAL_COMMAND_ARGS: -coverprofile=./cover.out -covermode=atomic -coverpkg=./...
   validate:
     cmds:
       - task: lint

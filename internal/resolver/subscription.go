@@ -3,11 +3,12 @@ package resolver
 import (
 	"context"
 	"errors"
-	"github.com/graphql-go/graphql/language/ast"
-	"k8s.io/apimachinery/pkg/watch"
 	"reflect"
 	"sort"
 	"strings"
+
+	"github.com/graphql-go/graphql/language/ast"
+	"k8s.io/apimachinery/pkg/watch"
 
 	"github.com/graphql-go/graphql"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"

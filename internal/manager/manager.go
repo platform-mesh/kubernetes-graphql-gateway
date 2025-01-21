@@ -15,14 +15,18 @@ import (
 	"github.com/go-openapi/spec"
 	"github.com/graphql-go/graphql"
 	"github.com/graphql-go/handler"
+	"github.com/kcp-dev/logicalcluster/v3"
 	appConfig "github.com/openmfp/crd-gql-gateway/internal/config"
 	"github.com/openmfp/crd-gql-gateway/internal/gateway"
 	"github.com/openmfp/crd-gql-gateway/internal/resolver"
 	"github.com/openmfp/golang-commons/logger"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/kcp"
+	"sigs.k8s.io/controller-runtime/pkg/kontext"
 )
 
 type Provider interface {
@@ -200,6 +204,7 @@ func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	r = r.WithContext(context.WithValue(r.Context(), resolver.RuntimeClientKey{}, runtimeClient))
+	r = r.WithContext(kontext.WithCluster(r.Context(), logicalcluster.Name(workspace)))
 
 	switch endpoint {
 	case "graphql":
@@ -337,13 +342,27 @@ func setupK8sClients(ctx context.Context, cfg *rest.Config) (client.WithWatch, e
 		return nil, fmt.Errorf("failed to sync cache")
 	}
 
-	runtimeClient, err := client.NewWithWatch(cfg, client.Options{
+	opts := client.Options{
 		Scheme: scheme.Scheme,
 		Cache: &client.CacheOptions{
 			Reader:       k8sCache,
 			Unstructured: true,
 		},
-	})
+	}
+
+	if cluster, ok := kontext.ClusterFrom(ctx); ok && !cluster.Empty() {
+		httpClient, err := kcp.NewClusterAwareHTTPClient(cfg)
+		if err != nil {
+			return nil, err
+		}
+
+		opts.HTTPClient = httpClient
+		opts.MapperWithContext = func(ctx context.Context) (meta.RESTMapper, error) {
+			return kcp.NewClusterAwareMapperProvider(cfg, httpClient)(ctx)
+		}
+	}
+
+	runtimeClient, err := client.NewWithWatch(cfg, opts)
 
 	return runtimeClient, err
 }
