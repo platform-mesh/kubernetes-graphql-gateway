@@ -10,11 +10,12 @@ type Flags struct {
 	ProbeAddr              string `envconfig:"default=:8081,optional"`
 	SecureMetrics          bool   `envconfig:"default=true,optional"`
 	EnableHTTP2            bool   `envconfig:"default=false,optional"`
-	OpenAPIdefinitionsPath string `envconfig:"default=./bin/definitions,optional"`
+	OpenAPIdefinitionsPath string `envconfig:"OPEN_API_DEFINITIONS_PATH,default=./bin/definitions"`
 }
 
 func NewFromEnv() (*Flags, error) {
 	opFlags := &Flags{}
 	err := envconfig.Init(opFlags)
+
 	return opFlags, err
 }

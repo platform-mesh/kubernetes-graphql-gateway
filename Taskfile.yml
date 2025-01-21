@@ -69,4 +69,4 @@ tasks:
 
   listen:
     cmds:
-      - go run main.go listen --openapi-out-dir=./definitions
+      - go run main.go listen
