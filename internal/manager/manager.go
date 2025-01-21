@@ -256,7 +256,8 @@ func (s *Service) getConfigForRuntimeClient(workspace, token string) (*rest.Conf
 	}
 
 	base := fmt.Sprintf("%s://%s", u.Scheme, u.Host)
-	requestConfig.Host = fmt.Sprintf("%s/clusters/%s", base, workspace)
+	requestConfig.Host = base
+	requestConfig.APIPath = fmt.Sprintf("/clusters/%s", workspace)
 
 	return requestConfig, nil
 }
