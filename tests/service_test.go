@@ -2,14 +2,15 @@ package tests
 
 import (
 	"fmt"
-	"github.com/openmfp/crd-gql-gateway/tests/graphql"
-	"github.com/stretchr/testify/require"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/openmfp/crd-gql-gateway/tests/graphql"
+	"github.com/stretchr/testify/require"
 )
 
 const sleepTime = 2000 * time.Millisecond
@@ -230,7 +231,7 @@ func (suite *CommonTestSuite) TestSubscribeToDeployments() {
 	graphqlUrl := fmt.Sprintf("%s/%s/graphql", suite.server.URL, workspaceName)
 
 	// Subscribe to the GraphQL subscription
-	subscriptionUrl := fmt.Sprintf("%s/%s/subscriptions", suite.server.URL, workspaceName)
+	subscriptionUrl := fmt.Sprintf("%s/%s/graphql", suite.server.URL, workspaceName)
 	msgChan, cancelSubscription, err := graphql.SubscribeToGraphQL(subscriptionUrl, graphql.SubscribeDeploymentsQuery())
 	if err != nil {
 		log.Fatalf("Failed to subscribe: %v", err)

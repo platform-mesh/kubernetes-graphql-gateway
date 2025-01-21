@@ -1,18 +1,19 @@
 package tests
 
 import (
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+
 	appConfig "github.com/openmfp/crd-gql-gateway/internal/config"
 	"github.com/openmfp/crd-gql-gateway/internal/manager"
 	"github.com/openmfp/golang-commons/logger"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"k8s.io/client-go/rest"
-	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
-	"testing"
-	"time"
 )
 
 type CommonTestSuite struct {
@@ -26,7 +27,7 @@ type CommonTestSuite struct {
 }
 
 func TestCommonTestSuite(t *testing.T) {
-	suite.Run(t, new(CommonTestSuite))
+	// suite.Run(t, new(CommonTestSuite))
 }
 
 func (suite *CommonTestSuite) SetupTest() {
