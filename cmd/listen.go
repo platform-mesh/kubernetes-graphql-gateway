@@ -10,6 +10,7 @@ import (
 	kcpapis "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
 	kcpcore "github.com/kcp-dev/kcp/sdk/apis/core/v1alpha1"
 	kcptenancy "github.com/kcp-dev/kcp/sdk/apis/tenancy/v1alpha1"
+	"github.com/openmfp/crd-gql-gateway/listener/clusterpath"
 	"github.com/openmfp/crd-gql-gateway/listener/flags"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -155,7 +156,11 @@ var listenCmd = &cobra.Command{
 		}
 
 		reconciler := controller.NewAPIBindingReconciler(
-			ioHandler, df, apischema.NewResolver(),
+			ioHandler, df, apischema.NewResolver(), &clusterpath.Resolver{
+				Scheme:       mgr.GetScheme(),
+				Config:       cfg,
+				ResolverFunc: clusterpath.Resolve,
+			},
 		)
 
 		err = reconciler.SetupWithManager(mgr)

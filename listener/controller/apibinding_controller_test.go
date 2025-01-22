@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	schemamocks "github.com/openmfp/crd-gql-gateway/listener/apischema/mocks"
+	"github.com/openmfp/crd-gql-gateway/listener/clusterpath"
 	"github.com/openmfp/crd-gql-gateway/listener/controller"
 	discoverymocks "github.com/openmfp/crd-gql-gateway/listener/discoveryclient/mocks"
 	iomocks "github.com/openmfp/crd-gql-gateway/listener/workspacefile/mocks"
@@ -267,5 +268,6 @@ func setupMocks(t *testing.T, tc testCase) *controller.APIBindingReconciler {
 		tc.schemaMocks(sc)
 	}
 
-	return controller.NewAPIBindingReconciler(ioHandler, df, sc)
+	//TODO: add fake impl for clusterpath resolver
+	return controller.NewAPIBindingReconciler(ioHandler, df, sc, &clusterpath.Resolver{})
 }
