@@ -163,8 +163,9 @@ func (s *Service) loadSchemaFromFile(filename string) (*graphql.Schema, error) {
 func (s *Service) createHandler(schema *graphql.Schema) *graphqlHandler {
 	h := handler.New(&handler.Config{
 		Schema:     schema,
-		Pretty:     s.appCfg.Handler.Pretty,
-		Playground: s.appCfg.Handler.Playground,
+		Pretty:     s.appCfg.HandlerCfg.Pretty,
+		Playground: s.appCfg.HandlerCfg.Playground,
+		GraphiQL:   s.appCfg.HandlerCfg.GraphiQL,
 	})
 	return &graphqlHandler{
 		schema:  schema,
