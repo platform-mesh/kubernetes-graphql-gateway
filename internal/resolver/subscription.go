@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"reflect"
-	"sort"
 	"strings"
 
 	"github.com/graphql-go/graphql/language/ast"
@@ -149,17 +148,15 @@ func (r *Service) runWatch(
 					select {
 					case <-ctx.Done():
 						return
-					case resultChannel <- singleObj:
+					case resultChannel <- singleObj.Object:
 					}
 				} else {
 					// Multiple items mode
-					items := make([]unstructured.Unstructured, 0, len(previousObjects))
+					items := make([]map[string]any, 0, len(previousObjects))
 					for _, item := range previousObjects {
-						items = append(items, *item)
+						items = append(items, item.DeepCopy().Object)
 					}
-					sort.Slice(items, func(i, j int) bool {
-						return items[i].GetName() < items[j].GetName()
-					})
+
 					select {
 					case <-ctx.Done():
 						return
