@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
-	"sort"
 
 	"github.com/graphql-go/graphql"
 	"go.opentelemetry.io/otel"
@@ -47,7 +46,6 @@ type CrudProvider interface {
 
 type FieldResolverProvider interface {
 	CommonResolver() graphql.FieldResolveFn
-	UnstructuredFieldResolver(fieldName string) graphql.FieldResolveFn
 	SanitizeGroupName(string) string
 	GetOriginalGroupName(string) string
 }
@@ -68,38 +66,6 @@ func New(log *logger.Logger) *Service {
 	return &Service{
 		log:        log,
 		groupNames: make(map[string]string),
-	}
-}
-
-// UnstructuredFieldResolver returns a GraphQL FieldResolveFn to resolve a field from an unstructured object.
-func (r *Service) UnstructuredFieldResolver(fieldName string) graphql.FieldResolveFn {
-	return func(p graphql.ResolveParams) (interface{}, error) {
-		var objMap map[string]interface{}
-
-		switch source := p.Source.(type) {
-		case *unstructured.Unstructured:
-			objMap = source.Object
-		case unstructured.Unstructured:
-			objMap = source.Object
-		case map[string]interface{}:
-			objMap = source
-		default:
-			r.log.Error().
-				Str("type", fmt.Sprintf("%T", p.Source)).
-				Msg("Source is of unexpected type")
-			return nil, errors.New("source is of unexpected type")
-		}
-
-		value, found, err := unstructured.NestedFieldNoCopy(objMap, fieldName)
-		if err != nil {
-			r.log.Error().Err(err).Str("field", fieldName).Msg("Error retrieving field")
-			return nil, err
-		}
-		if !found {
-			return nil, nil
-		}
-
-		return value, nil
 	}
 }
 
@@ -130,20 +96,14 @@ func (r *Service) ListItems(gvk schema.GroupVersionKind) graphql.FieldResolveFn 
 
 		// Create an unstructured list to hold the results
 		list := &unstructured.UnstructuredList{}
-		list.SetGroupVersionKind(schema.GroupVersionKind{
-			Group:   gvk.Group,
-			Version: gvk.Version,
-			Kind:    gvk.Kind + "List",
-		})
+		list.SetGroupVersionKind(gvk)
 
 		var opts []client.ListOption
 		// Handle label selector argument
 		if labelSelector, ok := p.Args[labelSelectorArg].(string); ok && labelSelector != "" {
 			selector, err := labels.Parse(labelSelector)
 			if err != nil {
-				log.Error().Err(err).
-					Str(labelSelectorArg, labelSelector).
-					Msg("Unable to parse given label selector")
+				log.Error().Err(err).Str(labelSelectorArg, labelSelector).Msg("Unable to parse given label selector")
 				return nil, err
 			}
 			opts = append(opts, client.MatchingLabelsSelector{Selector: selector})
@@ -155,18 +115,14 @@ func (r *Service) ListItems(gvk schema.GroupVersionKind) graphql.FieldResolveFn 
 		}
 
 		if err = runtimeClient.List(ctx, list, opts...); err != nil {
-			log.Error().
-				Err(err).
-				Msg("Unable to list objects")
+			log.Error().Err(err).Msg("Unable to list objects")
 			return nil, err
 		}
 
-		items := list.Items
-
-		// Sort the items by name for consistent ordering
-		sort.Slice(items, func(i, j int) bool {
-			return items[i].GetName() < items[j].GetName()
-		})
+		items := make([]map[string]any, len(list.Items))
+		for i, item := range list.Items {
+			items[i] = item.Object
+		}
 
 		return items, nil
 	}
@@ -198,17 +154,15 @@ func (r *Service) GetItem(gvk schema.GroupVersionKind) graphql.FieldResolveFn {
 		}
 
 		// Retrieve required arguments
-		name, nameOK := p.Args["name"].(string)
-		namespace, nsOK := p.Args["namespace"].(string)
-
-		if !nameOK || name == "" {
-			err := errors.New("missing required argument: name")
-			log.Error().Err(err).Msg("Name argument is required")
+		name, ok := p.Args["name"].(string)
+		if !ok || name == "" {
+			log.Error().Err(errors.New("missing required argument: name")).Msg("Name argument is required")
 			return nil, err
 		}
-		if !nsOK || namespace == "" {
-			err := errors.New("missing required argument: namespace")
-			log.Error().Err(err).Msg("Namespace argument is required")
+
+		namespace, ok := p.Args["namespace"].(string)
+		if !ok || namespace == "" {
+			log.Error().Err(errors.New("missing required argument: namespace")).Msg("Namespace argument is required")
 			return nil, err
 		}
 
@@ -216,21 +170,16 @@ func (r *Service) GetItem(gvk schema.GroupVersionKind) graphql.FieldResolveFn {
 		obj := &unstructured.Unstructured{}
 		obj.SetGroupVersionKind(gvk)
 
-		key := client.ObjectKey{
+		// Get the object using the runtime client
+		if err = runtimeClient.Get(ctx, client.ObjectKey{
 			Namespace: namespace,
 			Name:      name,
-		}
-
-		// Get the object using the runtime client
-		if err = runtimeClient.Get(ctx, key, obj); err != nil {
-			log.Error().Err(err).
-				Str("name", name).
-				Str("namespace", namespace).
-				Msg("Unable to get object")
+		}, obj); err != nil {
+			log.Error().Err(err).Str("name", name).Str("namespace", namespace).Msg("Unable to get object")
 			return nil, err
 		}
 
-		return obj, nil
+		return obj.Object, nil
 	}
 }
 
@@ -266,7 +215,7 @@ func (r *Service) CreateItem(gvk schema.GroupVersionKind) graphql.FieldResolveFn
 			return nil, err
 		}
 
-		return obj, nil
+		return obj.Object, nil
 	}
 }
 
@@ -317,7 +266,7 @@ func (r *Service) UpdateItem(gvk schema.GroupVersionKind) graphql.FieldResolveFn
 			return nil, err
 		}
 
-		return existingObj, nil
+		return existingObj.Object, nil
 	}
 }
 
@@ -355,10 +304,6 @@ func (r *Service) DeleteItem(gvk schema.GroupVersionKind) graphql.FieldResolveFn
 
 func (r *Service) CommonResolver() graphql.FieldResolveFn {
 	return func(p graphql.ResolveParams) (interface{}, error) {
-		if p.Source == nil {
-			// At the example level, return a non-nil value (e.g., an empty map)
-			return map[string]interface{}{}, nil
-		}
 		return p.Source, nil
 	}
 }

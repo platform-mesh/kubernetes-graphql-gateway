@@ -143,7 +143,6 @@ func (s *Service) OnFileDeleted(filename string) {
 	defer s.mu.Unlock()
 
 	delete(s.handlers, filename)
-
 }
 
 func (s *Service) loadSchemaFromFile(filename string) (*graphql.Schema, error) {
@@ -174,24 +173,35 @@ func (s *Service) createHandler(schema *graphql.Schema) *graphqlHandler {
 }
 
 func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	workspace, endpoint, err := s.parsePath(r.URL.Path)
+	workspace, err := s.parsePath(r.URL.Path)
 	if err != nil {
+		s.log.Error().Err(err).Str("path", r.URL.Path).Msg("Error parsing path")
 		http.NotFound(w, r)
 		return
 	}
 
-	h, ok := s.getHandler(workspace)
+	s.mu.RLock()
+	h, ok := s.handlers[workspace]
+	s.mu.RUnlock()
+
 	if !ok {
+		s.log.Info().Str("workspace", workspace).Msg("no handler found for workspace")
 		http.NotFound(w, r)
 		return
 	}
 
-	if endpoint == "graphql" && r.Method == http.MethodGet {
+	if r.Method == http.MethodGet {
 		h.handler.ServeHTTP(w, r)
 		return
 	}
 
-	cfg, err := s.getConfigForRuntimeClient(workspace, r.Header.Get("Authorization"))
+	token := r.Header.Get("Authorization")
+	if token == "" {
+		http.Error(w, "Authorization header is required", http.StatusUnauthorized)
+		return
+	}
+
+	cfg, err := s.getConfigForRuntimeClient(workspace, token)
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "Error getting a runtime client's config")
 		return
@@ -228,28 +238,17 @@ func writeJSONError(w http.ResponseWriter, status int, message string) {
 }
 
 // parsePath extracts filename and endpoint from the requested URL path.
-func (s *Service) parsePath(path string) (workspace, endpoint string, err error) {
+func (s *Service) parsePath(path string) (workspace string, err error) {
 	parts := strings.Split(strings.Trim(path, "/"), "/")
 	if len(parts) != 2 {
-		return "", "", fmt.Errorf("invalid path")
+		return "", fmt.Errorf("invalid path")
 	}
-	return parts[0], parts[1], nil
-}
 
-// getHandler retrieves the graphqlHandler associated with the given filename.
-func (s *Service) getHandler(filename string) (*graphqlHandler, bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	h, ok := s.handlers[filename]
-	return h, ok
+	return parts[0], nil
 }
 
 // getConfigForRuntimeClient initializes a runtime client for the given server address.
 func (s *Service) getConfigForRuntimeClient(workspace, token string) (*rest.Config, error) {
-	if token == "" { // if no token, use current-context
-		return s.restCfg, nil
-	}
-
 	requestConfig := rest.CopyConfig(s.restCfg)
 	requestConfig.BearerToken = token
 	u, err := url.Parse(s.restCfg.Host)
@@ -270,8 +269,6 @@ func (s *Service) handleSubscription(w http.ResponseWriter, r *http.Request, sch
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 
-	flusher := http.NewResponseController(w)
-
 	var params struct {
 		Query         string                 `json:"query"`
 		OperationName string                 `json:"operationName"`
@@ -282,6 +279,10 @@ func (s *Service) handleSubscription(w http.ResponseWriter, r *http.Request, sch
 		http.Error(w, "Error parsing JSON request body", http.StatusBadRequest)
 		return
 	}
+
+	flusher := http.NewResponseController(w)
+
+	r.Body.Close()
 
 	subscriptionParams := graphql.Params{
 		Schema:         *schema,
@@ -299,8 +300,10 @@ func (s *Service) handleSubscription(w http.ResponseWriter, r *http.Request, sch
 
 		data, err := json.Marshal(res)
 		if err != nil {
+			s.log.Error().Err(err).Msg("Error marshalling subscription response")
 			continue
 		}
+
 		fmt.Fprintf(w, "event: next\ndata: %s\n\n", data)
 		flusher.Flush()
 	}
@@ -309,13 +312,14 @@ func (s *Service) handleSubscription(w http.ResponseWriter, r *http.Request, sch
 }
 
 func readDefinitionFromFile(filePath string) (spec.Definitions, error) {
-	data, err := os.ReadFile(filePath)
+	f, err := os.Open(filePath)
 	if err != nil {
 		return nil, err
 	}
+	defer f.Close()
 
 	var swagger spec.Swagger
-	err = json.Unmarshal(data, &swagger)
+	err = json.NewDecoder(f).Decode(&swagger)
 	if err != nil {
 		return nil, err
 	}

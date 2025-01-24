@@ -3,13 +3,14 @@ package gateway
 import (
 	"errors"
 	"fmt"
+	"regexp"
+	"strings"
+
 	"github.com/go-openapi/spec"
 	"github.com/graphql-go/graphql"
 	"github.com/openmfp/crd-gql-gateway/internal/resolver"
 	"github.com/openmfp/golang-commons/logger"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"regexp"
-	"strings"
 )
 
 type Provider interface {
@@ -21,8 +22,7 @@ type Gateway struct {
 	resolver      resolver.Provider
 	graphqlSchema graphql.Schema
 
-	definitions   spec.Definitions
-	subscriptions graphql.Fields
+	definitions spec.Definitions
 
 	// typesCache stores generated GraphQL object types(fields) to prevent redundant repeated generation.
 	typesCache map[string]*graphql.Object
@@ -37,7 +37,6 @@ func New(log *logger.Logger, definitions spec.Definitions, resolver resolver.Pro
 		log:              log,
 		resolver:         resolver,
 		definitions:      definitions,
-		subscriptions:    graphql.Fields{},
 		typesCache:       make(map[string]*graphql.Object),
 		inputTypesCache:  make(map[string]*graphql.InputObject),
 		typeNameRegistry: make(map[string]string),
@@ -248,8 +247,7 @@ func (g *Gateway) generateGraphQLFields(resourceScheme *spec.Schema, typePrefix 
 		}
 
 		fields[sanitizedFieldName] = &graphql.Field{
-			Type:    fieldType,
-			Resolve: g.resolver.UnstructuredFieldResolver(fieldName),
+			Type: fieldType,
 		}
 
 		inputFields[sanitizedFieldName] = &graphql.InputObjectFieldConfig{
