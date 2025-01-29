@@ -18,7 +18,7 @@ require (
 	github.com/kcp-dev/kcp/sdk v0.26.1
 	github.com/kcp-dev/logicalcluster/v3 v3.0.5
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/openmfp/golang-commons v0.128.0
+	github.com/openmfp/golang-commons v0.129.0
 	github.com/rs/zerolog v1.33.0
 	github.com/spf13/cobra v1.8.1
 	github.com/stretchr/testify v1.10.0
@@ -95,7 +95,7 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/crypto v0.32.0 // indirect
-	golang.org/x/exp v0.0.0-20250128144449-3edf0e91c1ae // indirect
+	golang.org/x/exp v0.0.0-20250128182459-e0ece0dbea4c // indirect
 	golang.org/x/net v0.34.0 // indirect
 	golang.org/x/oauth2 v0.25.0 // indirect
 	golang.org/x/sync v0.10.0 // indirect
