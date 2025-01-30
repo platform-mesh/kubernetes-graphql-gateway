@@ -20,8 +20,6 @@ import (
 	"github.com/openmfp/crd-gql-gateway/internal/gateway"
 	"github.com/openmfp/crd-gql-gateway/internal/resolver"
 	"github.com/openmfp/golang-commons/logger"
-	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/kcp"
@@ -40,11 +38,11 @@ type FileWatcher interface {
 
 type Service struct {
 	appCfg   appConfig.Config
-	restCfg  *rest.Config
-	log      *logger.Logger
-	resolver resolver.Provider
 	handlers map[string]*graphqlHandler
+	log      *logger.Logger
 	mu       sync.RWMutex
+	resolver resolver.Provider
+	restCfg  *rest.Config
 	watcher  *fsnotify.Watcher
 }
 
@@ -59,12 +57,28 @@ func NewManager(log *logger.Logger, cfg *rest.Config, appCfg appConfig.Config) (
 		return nil, err
 	}
 
+	// lets ensure that kcp url points directly to kcp domain
+	u, err := url.Parse(cfg.Host)
+	if err != nil {
+		return nil, err
+	}
+	cfg.Host = fmt.Sprintf("%s://%s", u.Scheme, u.Host)
+
+	cfg.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
+		return NewRoundTripper(log, rt)
+	}
+
+	runtimeClient, err := kcp.NewClusterAwareClientWithWatch(cfg, client.Options{})
+	if err != nil {
+		return nil, err
+	}
+
 	m := &Service{
 		appCfg:   appCfg,
-		restCfg:  cfg,
-		log:      log,
-		resolver: resolver.New(log),
 		handlers: make(map[string]*graphqlHandler),
+		log:      log,
+		resolver: resolver.New(log, runtimeClient),
+		restCfg:  cfg,
 		watcher:  watcher,
 	}
 
@@ -201,39 +215,15 @@ func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cfg, err := s.getConfigForRuntimeClient(workspace, token)
-	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "Error getting a runtime client's config")
-		return
-	}
-
+	// let's store the token in the context for further use in the roundTripper
+	r = r.WithContext(context.WithValue(r.Context(), TokenKey{}, token))
+	// let's store the workspace in the context for cluster aware client
 	r = r.WithContext(kontext.WithCluster(r.Context(), logicalcluster.Name(workspace)))
-
-	runtimeClient, err := setupK8sClients(r.Context(), cfg)
-	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "Error setting up Kubernetes client")
-		return
-	}
-
-	r = r.WithContext(context.WithValue(r.Context(), resolver.RuntimeClientKey{}, runtimeClient))
 
 	if r.Header.Get("Accept") == "text/event-stream" {
 		s.handleSubscription(w, r, h.schema)
 	} else {
 		h.handler.ServeHTTP(w, r)
-	}
-}
-
-func writeJSONError(w http.ResponseWriter, status int, message string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	err := json.NewEncoder(w).Encode(map[string]interface{}{
-		"errors": []map[string]string{
-			{"message": message},
-		},
-	})
-	if err != nil {
-		http.Error(w, "Error writing JSON response", http.StatusInternalServerError)
 	}
 }
 
@@ -245,22 +235,6 @@ func (s *Service) parsePath(path string) (workspace string, err error) {
 	}
 
 	return parts[0], nil
-}
-
-// getConfigForRuntimeClient initializes a runtime client for the given server address.
-func (s *Service) getConfigForRuntimeClient(workspace, token string) (*rest.Config, error) {
-	requestConfig := rest.CopyConfig(s.restCfg)
-	requestConfig.BearerToken = token
-	u, err := url.Parse(s.restCfg.Host)
-	if err != nil {
-		return nil, err
-	}
-
-	base := fmt.Sprintf("%s://%s", u.Scheme, u.Host)
-	requestConfig.Host = base
-	requestConfig.APIPath = fmt.Sprintf("/clusters/%s", workspace)
-
-	return requestConfig, nil
 }
 
 func (s *Service) handleSubscription(w http.ResponseWriter, r *http.Request, schema *graphql.Schema) {
@@ -325,27 +299,4 @@ func readDefinitionFromFile(filePath string) (spec.Definitions, error) {
 	}
 
 	return swagger.Definitions, nil
-}
-
-// setupK8sClients initializes and returns the runtime client for Kubernetes.
-func setupK8sClients(ctx context.Context, cfg *rest.Config) (client.WithWatch, error) {
-	opts := client.Options{
-		Scheme: scheme.Scheme,
-	}
-
-	if cluster, ok := kontext.ClusterFrom(ctx); ok && !cluster.Empty() {
-		httpClient, err := kcp.NewClusterAwareHTTPClient(cfg)
-		if err != nil {
-			return nil, err
-		}
-
-		opts.HTTPClient = httpClient
-		opts.MapperWithContext = func(ctx context.Context) (meta.RESTMapper, error) {
-			return kcp.NewClusterAwareMapperProvider(cfg, httpClient)(ctx)
-		}
-	}
-
-	runtimeClient, err := client.NewWithWatch(cfg, opts)
-
-	return runtimeClient, err
 }

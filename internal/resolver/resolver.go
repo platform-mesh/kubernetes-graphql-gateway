@@ -19,8 +19,6 @@ import (
 	"github.com/openmfp/golang-commons/logger"
 )
 
-type RuntimeClientKey struct{}
-
 const (
 	labelSelectorArg  = "labelselector"
 	nameArg           = "name"
@@ -58,14 +56,16 @@ type ArgumentsProvider interface {
 }
 
 type Service struct {
-	log        *logger.Logger
-	groupNames map[string]string
+	log           *logger.Logger
+	groupNames    map[string]string
+	runtimeClient client.WithWatch
 }
 
-func New(log *logger.Logger) *Service {
+func New(log *logger.Logger, runtimeClient client.WithWatch) *Service {
 	return &Service{
-		log:        log,
-		groupNames: make(map[string]string),
+		log:           log,
+		groupNames:    make(map[string]string),
+		runtimeClient: runtimeClient,
 	}
 }
 
@@ -74,11 +74,6 @@ func (r *Service) ListItems(gvk schema.GroupVersionKind) graphql.FieldResolveFn 
 	return func(p graphql.ResolveParams) (interface{}, error) {
 		ctx, span := otel.Tracer("").Start(p.Context, "ListItems", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
-
-		runtimeClient, ok := p.Context.Value(RuntimeClientKey{}).(client.WithWatch)
-		if !ok {
-			return nil, errors.New("no runtime client in context")
-		}
 
 		gvk.Group = r.GetOriginalGroupName(gvk.Group)
 
@@ -114,7 +109,7 @@ func (r *Service) ListItems(gvk schema.GroupVersionKind) graphql.FieldResolveFn 
 			opts = append(opts, client.InNamespace(namespace))
 		}
 
-		if err = runtimeClient.List(ctx, list, opts...); err != nil {
+		if err = r.runtimeClient.List(ctx, list, opts...); err != nil {
 			log.Error().Err(err).Msg("Unable to list objects")
 			return nil, err
 		}
@@ -133,11 +128,6 @@ func (r *Service) GetItem(gvk schema.GroupVersionKind) graphql.FieldResolveFn {
 	return func(p graphql.ResolveParams) (interface{}, error) {
 		ctx, span := otel.Tracer("").Start(p.Context, "GetItem", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
-
-		runtimeClient, ok := p.Context.Value(RuntimeClientKey{}).(client.WithWatch)
-		if !ok {
-			return nil, errors.New("no runtime client in context")
-		}
 
 		gvk.Group = r.GetOriginalGroupName(gvk.Group)
 
@@ -171,7 +161,7 @@ func (r *Service) GetItem(gvk schema.GroupVersionKind) graphql.FieldResolveFn {
 		obj.SetGroupVersionKind(gvk)
 
 		// Get the object using the runtime client
-		if err = runtimeClient.Get(ctx, client.ObjectKey{
+		if err = r.runtimeClient.Get(ctx, client.ObjectKey{
 			Namespace: namespace,
 			Name:      name,
 		}, obj); err != nil {
@@ -187,11 +177,6 @@ func (r *Service) CreateItem(gvk schema.GroupVersionKind) graphql.FieldResolveFn
 	return func(p graphql.ResolveParams) (interface{}, error) {
 		ctx, span := otel.Tracer("").Start(p.Context, "CreateItem", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
-
-		runtimeClient, ok := p.Context.Value(RuntimeClientKey{}).(client.WithWatch)
-		if !ok {
-			return nil, errors.New("no runtime client in context")
-		}
 
 		gvk.Group = r.GetOriginalGroupName(gvk.Group)
 
@@ -210,7 +195,7 @@ func (r *Service) CreateItem(gvk schema.GroupVersionKind) graphql.FieldResolveFn
 			return nil, errors.New("object metadata.name is required")
 		}
 
-		if err := runtimeClient.Create(ctx, obj); err != nil {
+		if err := r.runtimeClient.Create(ctx, obj); err != nil {
 			log.Error().Err(err).Msg("Failed to create object")
 			return nil, err
 		}
@@ -223,11 +208,6 @@ func (r *Service) UpdateItem(gvk schema.GroupVersionKind) graphql.FieldResolveFn
 	return func(p graphql.ResolveParams) (interface{}, error) {
 		ctx, span := otel.Tracer("").Start(p.Context, "UpdateItem", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
-
-		runtimeClient, ok := p.Context.Value(RuntimeClientKey{}).(client.WithWatch)
-		if !ok {
-			return nil, errors.New("no runtime client in context")
-		}
 
 		gvk.Group = r.GetOriginalGroupName(gvk.Group)
 
@@ -253,7 +233,7 @@ func (r *Service) UpdateItem(gvk schema.GroupVersionKind) graphql.FieldResolveFn
 		existingObj.SetGroupVersionKind(gvk)
 
 		// Fetch the existing object from the cluster
-		err = runtimeClient.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, existingObj)
+		err = r.runtimeClient.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, existingObj)
 		if err != nil {
 			log.Error().Err(err).Msg("Failed to get existing object")
 			return nil, err
@@ -261,7 +241,7 @@ func (r *Service) UpdateItem(gvk schema.GroupVersionKind) graphql.FieldResolveFn
 
 		// Apply the merge patch to the existing object
 		patch := client.RawPatch(types.MergePatchType, patchData)
-		if err := runtimeClient.Patch(ctx, existingObj, patch); err != nil {
+		if err := r.runtimeClient.Patch(ctx, existingObj, patch); err != nil {
 			log.Error().Err(err).Msg("Failed to patch object")
 			return nil, err
 		}
@@ -276,11 +256,6 @@ func (r *Service) DeleteItem(gvk schema.GroupVersionKind) graphql.FieldResolveFn
 		ctx, span := otel.Tracer("").Start(p.Context, "DeleteItem", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
 
-		runtimeClient, ok := p.Context.Value(RuntimeClientKey{}).(client.WithWatch)
-		if !ok {
-			return nil, errors.New("no runtime client in context")
-		}
-
 		gvk.Group = r.GetOriginalGroupName(gvk.Group)
 
 		log := r.log.With().Str("operation", "delete").Str("kind", gvk.Kind).Logger()
@@ -293,7 +268,7 @@ func (r *Service) DeleteItem(gvk schema.GroupVersionKind) graphql.FieldResolveFn
 		obj.SetNamespace(namespace)
 		obj.SetName(name)
 
-		if err := runtimeClient.Delete(ctx, obj); err != nil {
+		if err := r.runtimeClient.Delete(ctx, obj); err != nil {
 			log.Error().Err(err).Msg("Failed to delete object")
 			return nil, err
 		}

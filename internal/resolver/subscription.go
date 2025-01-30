@@ -2,7 +2,6 @@ package resolver
 
 import (
 	"context"
-	"errors"
 	"reflect"
 	"strings"
 
@@ -18,11 +17,6 @@ import (
 
 func (r *Service) SubscribeItem(gvk schema.GroupVersionKind) graphql.FieldResolveFn {
 	return func(p graphql.ResolveParams) (interface{}, error) {
-		runtimeClient, ok := p.Context.Value(RuntimeClientKey{}).(client.WithWatch)
-		if !ok {
-			return nil, errors.New("no runtime client in context")
-		}
-
 		gvk.Group = r.GetOriginalGroupName(gvk.Group)
 
 		ctx := p.Context
@@ -33,7 +27,7 @@ func (r *Service) SubscribeItem(gvk schema.GroupVersionKind) graphql.FieldResolv
 		fieldsToWatch := extractRequestedFields(p.Info)
 
 		resultChannel := make(chan interface{})
-		go r.runWatch(ctx, runtimeClient, gvk, namespace, name, labelSelector, subscribeToAll, fieldsToWatch, resultChannel, true)
+		go r.runWatch(ctx, gvk, namespace, name, labelSelector, subscribeToAll, fieldsToWatch, resultChannel, true)
 
 		return resultChannel, nil
 	}
@@ -41,11 +35,6 @@ func (r *Service) SubscribeItem(gvk schema.GroupVersionKind) graphql.FieldResolv
 
 func (r *Service) SubscribeItems(gvk schema.GroupVersionKind) graphql.FieldResolveFn {
 	return func(p graphql.ResolveParams) (interface{}, error) {
-		runtimeClient, ok := p.Context.Value(RuntimeClientKey{}).(client.WithWatch)
-		if !ok {
-			return nil, errors.New("no runtime client in context")
-		}
-
 		gvk.Group = r.GetOriginalGroupName(gvk.Group)
 
 		ctx := p.Context
@@ -55,7 +44,7 @@ func (r *Service) SubscribeItems(gvk schema.GroupVersionKind) graphql.FieldResol
 		fieldsToWatch := extractRequestedFields(p.Info)
 
 		resultChannel := make(chan interface{})
-		go r.runWatch(ctx, runtimeClient, gvk, namespace, "", labelSelector, subscribeToAll, fieldsToWatch, resultChannel, false)
+		go r.runWatch(ctx, gvk, namespace, "", labelSelector, subscribeToAll, fieldsToWatch, resultChannel, false)
 
 		return resultChannel, nil
 	}
@@ -63,7 +52,6 @@ func (r *Service) SubscribeItems(gvk schema.GroupVersionKind) graphql.FieldResol
 
 func (r *Service) runWatch(
 	ctx context.Context,
-	runtimeClient client.WithWatch,
 	gvk schema.GroupVersionKind,
 	namespace, name, labelSelector string,
 	subscribeToAll bool,
@@ -95,7 +83,7 @@ func (r *Service) runWatch(
 		opts = append(opts, client.MatchingFields{"metadata.name": name})
 	}
 
-	watcher, err := runtimeClient.Watch(ctx, list, opts...)
+	watcher, err := r.runtimeClient.Watch(ctx, list, opts...)
 	if err != nil {
 		r.log.Error().Err(err).Str("gvk", gvk.String()).Msg("Failed to start watch")
 		return

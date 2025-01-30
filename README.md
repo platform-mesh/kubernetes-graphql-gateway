@@ -199,20 +199,36 @@ To subscribe to events, you should use the SSE (Server-Sent Events) protocol.
 
 Since GraphQL playground doesn't support it, you should use curl.
 
-For instance, to subscribe to a change of a specific fields of the deployments, you can run the following command:
+For instance, to subscribe to a change of a displayName field in a specific account in root workspace, you can run the following command:
 ```shell
-curl -H "Accept: text/event-stream" -H "Content-Type: application/json" http://localhost:3000/fullSchema/subscriptions \
--d '{"query": "subscription { apps_deployments(namespace: \"default\") { metadata { name } spec { replicas } } }"}'
+curl \
+  -H "Accept: text/event-stream" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: 7f41d4ea-6809-4714-b345-f9281981b2dd" \
+  -d '{"query": "subscription { core_openmfp_io_account(name: \"root-account\", namespace: \"default\") { spec { displayName }}}"}' \
+  http://localhost:8080/root/graphql
 ```
 Fields that will be listened are defined in the graphql query within the `{}` brackets.
 
+P.S. Don't forget to replace the `Authorization` header with the token from the kubeconfig.
+
 If you want to listen to all fields, you can set `subscribeToAll` to `true`:
 ```shell
-curl -H "Accept: text/event-stream" -H "Content-Type: application/json" http://localhost:3000/fullSchema/subscriptions \
--d '{"query": "subscription { apps_deployments(namespace: \"default\", subscribeToAll: true) { metadata { name } spec { replicas } } }"}'
+curl \
+  -H "Accept: text/event-stream" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: 7f41d4ea-6809-4714-b345-f9281981b2dd" \
+  -d '{"query": "subscription { core_openmfp_io_account(name: \"root-account\", namespace: \"default\", subscribeToAll: true) { metadata { name } }}"}' \
+  http://localhost:8080/root/graphql
 ```
-If you want to listen to a specific deployment:
+P.S. Note, that only fields specified in `{}` brackets will be returned.
+
+To subscribe to all accounts in the root workspace, you can run the following command:
 ```shell
-curl -H "Accept: text/event-stream" -H "Content-Type: application/json" http://localhost:3000/fullSchema/subscriptions \
--d '{"query": "subscription { apps_deployment(namespace: \"default\", name: \"my-new-deployment\") { metadata { name } spec { replicas } } }"}'
+curl \
+  -H "Accept: text/event-stream" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: 7f41d4ea-6809-4714-b345-f9281981b2dd" \
+  -d '{"query": "subscription { core_openmfp_io_accounts(namespace: \"default\") { spec { displayName }}}"}' \
+  http://localhost:8080/root/graphql
 ```

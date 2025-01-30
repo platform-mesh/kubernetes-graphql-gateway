@@ -2,7 +2,7 @@ module github.com/openmfp/crd-gql-gateway
 
 go 1.23.2
 
-replace sigs.k8s.io/controller-runtime => github.com/kcp-dev/controller-runtime v0.19.0-kcp.1
+replace sigs.k8s.io/controller-runtime => github.com/kcp-dev/controller-runtime v0.19.0-kcp.1.0.20250129100209-5eaf4c7b6056
 
 // this PR introduces newer version of graphiQL that supports headers
 // https://github.com/graphql-go/handler/pull/93
