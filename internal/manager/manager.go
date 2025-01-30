@@ -64,9 +64,9 @@ func NewManager(log *logger.Logger, cfg *rest.Config, appCfg appConfig.Config) (
 	}
 	cfg.Host = fmt.Sprintf("%s://%s", u.Scheme, u.Host)
 
-	cfg.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
+	cfg.Wrap(func(rt http.RoundTripper) http.RoundTripper {
 		return NewRoundTripper(log, rt)
-	}
+	})
 
 	runtimeClient, err := kcp.NewClusterAwareClientWithWatch(cfg, client.Options{})
 	if err != nil {
@@ -215,10 +215,14 @@ func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// let's store the token in the context for further use in the roundTripper
-	r = r.WithContext(context.WithValue(r.Context(), TokenKey{}, token))
-	// let's store the workspace in the context for cluster aware client
 	r = r.WithContext(kontext.WithCluster(r.Context(), logicalcluster.Name(workspace)))
+
+	split := strings.Split(token, " ")
+	if len(split) == 1 {
+		r = r.WithContext(context.WithValue(r.Context(), TokenKey{}, token))
+	} else {
+		r = r.WithContext(context.WithValue(r.Context(), TokenKey{}, split[1]))
+	}
 
 	if r.Header.Get("Accept") == "text/event-stream" {
 		s.handleSubscription(w, r, h.schema)

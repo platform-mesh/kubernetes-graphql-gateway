@@ -1,9 +1,11 @@
 package manager
 
 import (
-	"github.com/openmfp/golang-commons/logger"
-	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"net/http"
+
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/openmfp/golang-commons/logger"
+	"k8s.io/client-go/transport"
 )
 
 type TokenKey struct{}
@@ -23,14 +25,20 @@ func NewRoundTripper(log *logger.Logger, base http.RoundTripper) http.RoundTripp
 func (rt *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	token, ok := req.Context().Value(TokenKey{}).(string)
 	if !ok {
-		rt.log.Debug().Str("requestURI", req.RequestURI).Msg("No token found in context")
+		rt.log.Debug().Msg("No token found in context")
 		return rt.base.RoundTrip(req)
 	}
 
-	rt.log.Debug().Str("requestURI", req.RequestURI).Msg("Adding token to request")
+	claims := jwt.MapClaims{}
+	_, _, err := jwt.NewParser().ParseUnverified(token, claims)
+	if err != nil {
+		rt.log.Error().Err(err).Msg("Failed to parse token")
+		return rt.base.RoundTrip(req)
+	}
 
-	req = utilnet.CloneRequest(req)
-	req.Header.Set("Authorization", "Bearer "+token)
+	t := transport.NewImpersonatingRoundTripper(transport.ImpersonationConfig{
+		UserName: claims["email"].(string),
+	}, rt.base)
 
-	return rt.base.RoundTrip(req)
+	return t.RoundTrip(req)
 }
