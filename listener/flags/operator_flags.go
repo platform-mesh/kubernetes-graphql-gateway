@@ -11,6 +11,7 @@ type Flags struct {
 	SecureMetrics          bool   `envconfig:"default=true,optional"`
 	EnableHTTP2            bool   `envconfig:"default=false,optional"`
 	OpenAPIdefinitionsPath string `envconfig:"OPEN_API_DEFINITIONS_PATH,default=./bin/definitions"`
+	EnableKcp              bool   `envconfig:"default=true,optional"`
 }
 
 func NewFromEnv() (*Flags, error) {

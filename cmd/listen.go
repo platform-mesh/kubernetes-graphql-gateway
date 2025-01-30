@@ -1,38 +1,29 @@
 package cmd
 
 import (
-	"context"
 	"crypto/tls"
-	"errors"
-	"net/url"
 	"os"
 
 	kcpapis "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
 	kcpcore "github.com/kcp-dev/kcp/sdk/apis/core/v1alpha1"
 	kcptenancy "github.com/kcp-dev/kcp/sdk/apis/tenancy/v1alpha1"
-	"github.com/openmfp/crd-gql-gateway/listener/clusterpath"
-	"github.com/openmfp/crd-gql-gateway/listener/flags"
-	"github.com/rs/zerolog/log"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+
 	"github.com/spf13/cobra"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	kcpctrl "sigs.k8s.io/controller-runtime/pkg/kcp"
 
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	"github.com/openmfp/crd-gql-gateway/listener/apischema"
-	"github.com/openmfp/crd-gql-gateway/listener/controller"
-	"github.com/openmfp/crd-gql-gateway/listener/discoveryclient"
-	"github.com/openmfp/crd-gql-gateway/listener/workspacefile"
+	"github.com/openmfp/crd-gql-gateway/listener/flags"
+	"github.com/openmfp/crd-gql-gateway/listener/kcp"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -50,26 +41,27 @@ var (
 
 var listenCmd = &cobra.Command{
 	Use:     "listen",
-	Example: "KUBECONFIG=.kcp/admin.kubeconfig go run . listen",
+	Example: "KUBECONFIG=<path to kubeconfig file> go run . listen",
 	PreRun: func(cmd *cobra.Command, args []string) {
 		utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 		utilruntime.Must(kcpapis.AddToScheme(scheme))
 		utilruntime.Must(kcpcore.AddToScheme(scheme))
 		utilruntime.Must(kcptenancy.AddToScheme(scheme))
-		utilruntime.Must(apiextensions.AddToScheme(scheme))
+		utilruntime.Must(apiextensionsv1.AddToScheme(scheme))
 		// +kubebuilder:scaffold:scheme
+
+		opts := zap.Options{
+			Development: true,
+		}
+		ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 		var err error
 		opFlags, err = flags.NewFromEnv()
 		if err != nil {
-			log.Fatal().Err(err).Msg("Error getting app restCfg, exiting")
+			setupLog.Error(err, "failed to get operator flags from env, exiting...")
+			os.Exit(1)
 		}
-		opts := zap.Options{
-			Development: true,
-		}
-
-		ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 		disableHTTP2 := func(c *tls.Config) {
 			setupLog.Info("disabling http/2")
@@ -97,75 +89,40 @@ var listenCmd = &cobra.Command{
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		cfg := ctrl.GetConfigOrDie()
-		cfgURL, err := url.Parse(cfg.Host)
-		if err != nil {
-			setupLog.Error(err, "failed to parse config Host")
-			os.Exit(1)
-		}
-		clt, err := client.New(cfg, client.Options{
-			Scheme: scheme,
-		})
-		if err != nil {
-			setupLog.Error(err, "failed to create client from config")
-			os.Exit(1)
-		}
-		tenancyAPIExport := &kcpapis.APIExport{}
-		err = clt.Get(context.TODO(), client.ObjectKey{Name: kcptenancy.SchemeGroupVersion.Group}, tenancyAPIExport)
-		if err != nil {
-			setupLog.Error(err, "failed to get tenancy APIExport")
-			os.Exit(1)
-		}
-		virtualWorkspaces := tenancyAPIExport.Status.VirtualWorkspaces // nolint: staticcheck
-		if len(virtualWorkspaces) == 0 {
-			err := errors.New("empty virtual workspace list")
-			setupLog.Error(err, "failed to get at least one virtual workspace")
-			os.Exit(1)
-		}
-		vwCFGURL, err := url.Parse(virtualWorkspaces[0].URL)
-		if err != nil {
-			setupLog.Error(err, "failed to parse virtual workspace config URL")
-			os.Exit(1)
-		}
-		cfgURL.Path = vwCFGURL.Path
-		virtualWorkspaceCfg := rest.CopyConfig(cfg)
-		virtualWorkspaceCfg.Host = cfgURL.String()
 
-		mgr, err := kcpctrl.NewClusterAwareManager(virtualWorkspaceCfg, ctrl.Options{
+		mgrOpts := ctrl.Options{
 			Scheme:                 scheme,
 			Metrics:                metricsServerOptions,
 			WebhookServer:          webhookServer,
 			HealthProbeBindAddress: opFlags.ProbeAddr,
 			LeaderElection:         opFlags.EnableLeaderElection,
 			LeaderElectionID:       "72231e1f.openmfp.io",
-		})
+		}
+
+		newMgrFunc := kcp.ManagerFactory(opFlags)
+
+		mgr, err := newMgrFunc(cfg, mgrOpts)
 		if err != nil {
 			setupLog.Error(err, "unable to start manager")
 			os.Exit(1)
 		}
 
-		ioHandler, err := workspacefile.NewIOHandler(opFlags.OpenAPIdefinitionsPath)
+		reconcilerOpts := kcp.ReconcilerOpts{
+			Scheme:                 scheme,
+			Config:                 cfg,
+			OpenAPIDefinitionsPath: opFlags.OpenAPIdefinitionsPath,
+		}
+
+		newReconcilerFunc := kcp.ReconcilerFactory(opFlags)
+
+		reconciler, err := newReconcilerFunc(reconcilerOpts)
 		if err != nil {
-			setupLog.Error(err, "failed to create IO Handler")
+			setupLog.Error(err, "unable to instantiate reconciler")
 			os.Exit(1)
 		}
 
-		df, err := discoveryclient.NewFactory(virtualWorkspaceCfg)
-		if err != nil {
-			setupLog.Error(err, "failed to create Discovery client factory")
-			os.Exit(1)
-		}
-
-		reconciler := controller.NewAPIBindingReconciler(
-			ioHandler, df, apischema.NewResolver(), &clusterpath.Resolver{
-				Scheme:       mgr.GetScheme(),
-				Config:       cfg,
-				ResolverFunc: clusterpath.Resolve,
-			},
-		)
-
-		err = reconciler.SetupWithManager(mgr)
-		if err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "Workspace")
+		if err := reconciler.SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller")
 			os.Exit(1)
 		}
 		// +kubebuilder:scaffold:builder
@@ -181,8 +138,7 @@ var listenCmd = &cobra.Command{
 
 		setupLog.Info("starting manager")
 		signalHandler := ctrl.SetupSignalHandler()
-		err = mgr.Start(signalHandler)
-		if err != nil {
+		if err := mgr.Start(signalHandler); err != nil {
 			setupLog.Error(err, "problem running manager")
 			os.Exit(1)
 		}
