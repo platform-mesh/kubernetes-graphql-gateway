@@ -165,17 +165,7 @@ func (s *Service) loadSchemaFromFile(filename string) (*graphql.Schema, error) {
 		return nil, err
 	}
 
-	l := spec.Definitions{}
-
-	for key, def := range definitions {
-		if !strings.Contains(key, "automaticd") {
-			continue
-		}
-
-		l[key] = def
-	}
-
-	g, err := gateway.New(s.log, l, s.resolver)
+	g, err := gateway.New(s.log, definitions, s.resolver)
 	if err != nil {
 		return nil, err
 	}
