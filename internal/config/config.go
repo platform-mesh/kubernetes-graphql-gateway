@@ -7,7 +7,8 @@ import (
 type Config struct {
 	Port       string `envconfig:"default=8080,optional"`
 	LogLevel   string `envconfig:"default=INFO,optional"`
-	WatchedDir string `envconfig:"default=definitions,required"`
+	WatchedDir string `envconfig:"default=bin/definitions,required"`
+	EnableKCP  bool   `envconfig:"default=true,optional"`
 	HandlerCfg HandlerConfig
 }
 
