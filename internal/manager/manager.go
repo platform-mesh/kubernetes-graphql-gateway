@@ -165,7 +165,17 @@ func (s *Service) loadSchemaFromFile(filename string) (*graphql.Schema, error) {
 		return nil, err
 	}
 
-	g, err := gateway.New(s.log, definitions, s.resolver)
+	l := spec.Definitions{}
+
+	for key, def := range definitions {
+		if !strings.Contains(key, "automaticd") {
+			continue
+		}
+
+		l[key] = def
+	}
+
+	g, err := gateway.New(s.log, l, s.resolver)
 	if err != nil {
 		return nil, err
 	}
@@ -215,7 +225,9 @@ func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	r = r.WithContext(kontext.WithCluster(r.Context(), logicalcluster.Name(workspace)))
+	if s.appCfg.EnableKCP {
+		r = r.WithContext(kontext.WithCluster(r.Context(), logicalcluster.Name(workspace)))
+	}
 
 	split := strings.Split(token, " ")
 	if len(split) == 1 {
