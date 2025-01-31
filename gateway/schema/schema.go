@@ -1,4 +1,4 @@
-package gateway
+package schema
 
 import (
 	"errors"
@@ -8,7 +8,7 @@ import (
 
 	"github.com/go-openapi/spec"
 	"github.com/graphql-go/graphql"
-	"github.com/openmfp/crd-gql-gateway/internal/resolver"
+	"github.com/openmfp/crd-gql-gateway/gateway/resolver"
 	"github.com/openmfp/golang-commons/logger"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -165,21 +165,21 @@ func (g *Gateway) generateGraphqlSchema() error {
 
 	newSchema, err := graphql.NewSchema(graphql.SchemaConfig{
 		Query: graphql.NewObject(graphql.ObjectConfig{
-			Name:   "Query",
+			Name:   "PrivateNameForQuery", // we must keep those name unique to avoid collision with objects having the same names
 			Fields: rootQueryFields,
 		}),
 		Mutation: graphql.NewObject(graphql.ObjectConfig{
-			Name:   "Mutation",
+			Name:   "PrivateNameForMutation",
 			Fields: rootMutationFields,
 		}),
 		Subscription: graphql.NewObject(graphql.ObjectConfig{
-			Name:   "Subscription",
+			Name:   "PrivateNameForSubscription",
 			Fields: rootSubscriptionFields,
 		}),
 	})
 
 	if err != nil {
-		g.log.Error().Err(err).Msg("Error creating GraphQL example:alpha")
+		g.log.Error().Err(err).Msg("Error creating GraphQL schema")
 		return err
 	}
 

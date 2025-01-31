@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	appConfig "github.com/openmfp/crd-gql-gateway/internal/config"
-	"github.com/openmfp/crd-gql-gateway/internal/manager"
+	appConfig "github.com/openmfp/crd-gql-gateway/gateway/config"
+	"github.com/openmfp/crd-gql-gateway/gateway/manager"
 	"github.com/openmfp/golang-commons/logger"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"

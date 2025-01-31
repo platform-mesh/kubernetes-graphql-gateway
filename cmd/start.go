@@ -8,7 +8,7 @@ import (
 	"github.com/graphql-go/handler"
 	"github.com/spf13/cobra"
 
-	"github.com/openmfp/crd-gql-gateway/gateway"
+	"github.com/openmfp/crd-gql-gateway/deprecated"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	controllerruntime "sigs.k8s.io/controller-runtime"
@@ -47,7 +47,7 @@ var startCmd = &cobra.Command{
 			panic("no cache sync")
 		}
 
-		cfg.Wrap(gateway.NewImpersonationTransport)
+		cfg.Wrap(deprecated.NewImpersonationTransport)
 
 		cl, err := client.NewWithWatch(cfg, client.Options{
 			Scheme: schema,
@@ -59,14 +59,14 @@ var startCmd = &cobra.Command{
 			return err
 		}
 
-		gqlSchema, err := gateway.New(cmd.Context(), gateway.Config{
+		gqlSchema, err := deprecated.New(cmd.Context(), deprecated.Config{
 			Client: cl,
 		})
 		if err != nil {
 			return err
 		}
 
-		http.Handle("/graphql", gateway.Handler(gateway.HandlerConfig{
+		http.Handle("/graphql", deprecated.Handler(deprecated.HandlerConfig{
 			Config: &handler.Config{
 				Schema:     &gqlSchema,
 				Pretty:     true,

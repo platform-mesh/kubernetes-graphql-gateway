@@ -1,4 +1,4 @@
-package gateway
+package schema
 
 import (
 	"github.com/graphql-go/graphql"

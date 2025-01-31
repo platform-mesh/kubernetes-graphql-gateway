@@ -16,9 +16,9 @@ import (
 	"github.com/graphql-go/graphql"
 	"github.com/graphql-go/handler"
 	"github.com/kcp-dev/logicalcluster/v3"
-	appConfig "github.com/openmfp/crd-gql-gateway/internal/config"
-	"github.com/openmfp/crd-gql-gateway/internal/gateway"
-	"github.com/openmfp/crd-gql-gateway/internal/resolver"
+	appConfig "github.com/openmfp/crd-gql-gateway/gateway/config"
+	"github.com/openmfp/crd-gql-gateway/gateway/resolver"
+	"github.com/openmfp/crd-gql-gateway/gateway/schema"
 	"github.com/openmfp/golang-commons/logger"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -141,7 +141,7 @@ func (s *Service) handleEvent(event fsnotify.Event) {
 func (s *Service) OnFileChanged(filename string) {
 	schema, err := s.loadSchemaFromFile(filename)
 	if err != nil {
-		s.log.Error().Err(err).Str("file", filename).Msg("Error loading example:alpha from file")
+		s.log.Error().Err(err).Str("file", filename).Msg("Error loading schema from file")
 		return
 	}
 
@@ -165,7 +165,7 @@ func (s *Service) loadSchemaFromFile(filename string) (*graphql.Schema, error) {
 		return nil, err
 	}
 
-	g, err := gateway.New(s.log, definitions, s.resolver)
+	g, err := schema.New(s.log, definitions, s.resolver)
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +210,7 @@ func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	token := r.Header.Get("Authorization")
-	if token == "" {
+	if !s.appCfg.LocalDevelopment && token == "" {
 		http.Error(w, "Authorization header is required", http.StatusUnauthorized)
 		return
 	}
