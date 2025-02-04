@@ -19,9 +19,9 @@ import (
 )
 
 var gatewayCmd = &cobra.Command{
-	Use:     "gql-gateway",
+	Use:     "gateway",
 	Short:   "Run the GQL Gateway",
-	Example: "go run main.go start --watched-dir=./definitions",
+	Example: "go run main.go gateway",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		start := time.Now()
 

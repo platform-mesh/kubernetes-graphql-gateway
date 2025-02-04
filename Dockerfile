@@ -13,4 +13,4 @@ COPY --from=builder  /app/main .
 USER 1001:1001
 
 ENTRYPOINT ["./main"]
-CMD ["gql-gateway"]
+CMD ["gateway"]

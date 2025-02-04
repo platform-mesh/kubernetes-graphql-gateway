@@ -58,14 +58,17 @@ tasks:
     cmds:
       - task: lint
       - task: test
+        
+  # start uses deprecated gateway
   start:
     cmds:
       - go run main.go start
 
+  # new gateway
   gateway:
     cmds:
-      - go run main.go gql-gateway
+      - go run main.go gateway
 
-  listen:
+  listener:
     cmds:
-      - go run main.go listen
+      - go run main.go listener

@@ -40,8 +40,8 @@ var (
 )
 
 var listenCmd = &cobra.Command{
-	Use:     "listen",
-	Example: "KUBECONFIG=<path to kubeconfig file> go run . listen",
+	Use:     "listener",
+	Example: "KUBECONFIG=<path to kubeconfig file> go run . listener",
 	PreRun: func(cmd *cobra.Command, args []string) {
 		utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
@@ -110,7 +110,7 @@ var listenCmd = &cobra.Command{
 		reconcilerOpts := kcp.ReconcilerOpts{
 			Scheme:                 scheme,
 			Config:                 cfg,
-			OpenAPIDefinitionsPath: opFlags.OpenAPIdefinitionsPath,
+			OpenAPIDefinitionsPath: opFlags.OpenApiDefinitionsPath,
 		}
 
 		newReconcilerFunc := kcp.ReconcilerFactory(opFlags)

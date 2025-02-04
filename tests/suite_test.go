@@ -40,7 +40,7 @@ func (suite *CommonTestSuite) SetupTest() {
 	suite.cfg, err = suite.testEnv.Start()
 	require.NoError(suite.T(), err)
 
-	suite.appCfg.WatchedDir, err = os.MkdirTemp("", "watchedDir")
+	suite.appCfg.OpenApiDefinitionsPath, err = os.MkdirTemp("", "watchedDir")
 	require.NoError(suite.T(), err)
 
 	logCfg := logger.DefaultConfig()
@@ -55,14 +55,14 @@ func (suite *CommonTestSuite) SetupTest() {
 }
 
 func (suite *CommonTestSuite) TearDownTest() {
-	require.NoError(suite.T(), os.RemoveAll(suite.appCfg.WatchedDir))
+	require.NoError(suite.T(), os.RemoveAll(suite.appCfg.OpenApiDefinitionsPath))
 	require.NoError(suite.T(), suite.testEnv.Stop())
 	suite.server.Close()
 }
 
 // writeToFile adds a new file to the watched directory which will trigger schema generation
 func (suite *CommonTestSuite) writeToFile(sourceName, dest string) {
-	specFilePath := filepath.Join(suite.appCfg.WatchedDir, dest)
+	specFilePath := filepath.Join(suite.appCfg.OpenApiDefinitionsPath, dest)
 
 	sourceSpecFilePath := filepath.Join("testdata", sourceName)
 

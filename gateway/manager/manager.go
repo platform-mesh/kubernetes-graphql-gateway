@@ -82,12 +82,12 @@ func NewManager(log *logger.Logger, cfg *rest.Config, appCfg appConfig.Config) (
 		watcher:  watcher,
 	}
 
-	err = m.watcher.Add(appCfg.WatchedDir)
+	err = m.watcher.Add(appCfg.OpenApiDefinitionsPath)
 	if err != nil {
 		return nil, err
 	}
 
-	files, err := filepath.Glob(filepath.Join(appCfg.WatchedDir, "*"))
+	files, err := filepath.Glob(filepath.Join(appCfg.OpenApiDefinitionsPath, "*"))
 	if err != nil {
 		return nil, err
 	}
@@ -160,7 +160,7 @@ func (s *Service) OnFileDeleted(filename string) {
 }
 
 func (s *Service) loadSchemaFromFile(filename string) (*graphql.Schema, error) {
-	definitions, err := readDefinitionFromFile(filepath.Join(s.appCfg.WatchedDir, filename))
+	definitions, err := readDefinitionFromFile(filepath.Join(s.appCfg.OpenApiDefinitionsPath, filename))
 	if err != nil {
 		return nil, err
 	}
@@ -215,7 +215,7 @@ func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if s.appCfg.EnableKCP {
+	if s.appCfg.EnableKcp {
 		r = r.WithContext(kontext.WithCluster(r.Context(), logicalcluster.Name(workspace)))
 	}
 

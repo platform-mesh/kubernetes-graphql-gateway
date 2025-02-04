@@ -5,10 +5,13 @@ import (
 )
 
 type Config struct {
+	// common with listener
+	OpenApiDefinitionsPath string `envconfig:"default=./bin/definitions"`
+	EnableKcp              bool   `envconfig:"default=true,optional"`
+
+	// for gateway
 	Port             string `envconfig:"default=8080,optional"`
 	LogLevel         string `envconfig:"default=INFO,optional"`
-	WatchedDir       string `envconfig:"default=bin/definitions,required"`
-	EnableKCP        bool   `envconfig:"default=true,optional"`
 	LocalDevelopment bool   `envconfig:"default=false,optional"`
 	HandlerCfg       HandlerConfig
 }
