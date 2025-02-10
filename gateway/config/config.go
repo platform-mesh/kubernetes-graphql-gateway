@@ -14,6 +14,7 @@ type Config struct {
 	LogLevel         string `envconfig:"default=INFO,optional"`
 	LocalDevelopment bool   `envconfig:"default=false,optional"`
 	HandlerCfg       HandlerConfig
+	UserNameClaim    string `envconfig:"default=email,optional"`
 }
 
 type HandlerConfig struct {

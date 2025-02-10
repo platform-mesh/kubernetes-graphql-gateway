@@ -11,14 +11,16 @@ import (
 type TokenKey struct{}
 
 type roundTripper struct {
-	log  *logger.Logger
-	base http.RoundTripper // TODO change to awareBaseHttp
+	userClaim string
+	log       *logger.Logger
+	base      http.RoundTripper // TODO change to awareBaseHttp
 }
 
-func NewRoundTripper(log *logger.Logger, base http.RoundTripper) http.RoundTripper {
+func NewRoundTripper(log *logger.Logger, base http.RoundTripper, userNameClaim string) http.RoundTripper {
 	return &roundTripper{
-		log:  log,
-		base: base,
+		log:       log,
+		base:      base,
+		userClaim: userNameClaim,
 	}
 }
 
@@ -36,8 +38,20 @@ func (rt *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 		return rt.base.RoundTrip(req)
 	}
 
+	userNameRaw, ok := claims[rt.userClaim]
+	if !ok {
+		rt.log.Debug().Msg("No user claim found in token")
+		return rt.base.RoundTrip(req)
+	}
+
+	userName, ok := userNameRaw.(string)
+	if !ok {
+		rt.log.Debug().Msg("User claim is not a string")
+		return rt.base.RoundTrip(req)
+	}
+
 	t := transport.NewImpersonatingRoundTripper(transport.ImpersonationConfig{
-		UserName: claims["email"].(string),
+		UserName: userName,
 	}, rt.base)
 
 	return t.RoundTrip(req)
