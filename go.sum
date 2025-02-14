@@ -128,8 +128,8 @@ github.com/onsi/ginkgo/v2 v2.21.0 h1:7rg/4f3rB88pb5obDgNZrNHrQ4e6WpjonchcpuBRnZM
 github.com/onsi/ginkgo/v2 v2.21.0/go.mod h1:7Du3c42kxCUegi0IImZ1wUQzMBVecgIHjR1C+NkhLQo=
 github.com/onsi/gomega v1.35.1 h1:Cwbd75ZBPxFSuZ6T+rN/WCb/gOc6YgFBXLlZLhC7Ds4=
 github.com/onsi/gomega v1.35.1/go.mod h1:PvZbdDc8J6XJEpDK4HCuRBm8a6Fzp9/DmhC9C7yFlog=
-github.com/openmfp/golang-commons v0.133.0 h1:luZ8ikR3yw2s/3/Gk4eDq9tq2rjj4baw1/oEj+mhsqo=
-github.com/openmfp/golang-commons v0.133.0/go.mod h1:c/E589bS4tooq/kNTyE5gFIMfNTIVv6UGS/OZl9Zois=
+github.com/openmfp/golang-commons v0.134.0 h1:oqophHORXKCQuY9Rh39ZEKm/2HFz1o3JlZy15NBHM7o=
+github.com/openmfp/golang-commons v0.134.0/go.mod h1:tDuWXG1COI99BOLz50wnfKsS6BmXheU22lGl9Nmqs/Q=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
 github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=

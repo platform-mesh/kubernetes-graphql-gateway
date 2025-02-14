@@ -18,7 +18,7 @@ require (
 	github.com/kcp-dev/kcp/sdk v0.26.1
 	github.com/kcp-dev/logicalcluster/v3 v3.0.5
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/openmfp/golang-commons v0.133.0
+	github.com/openmfp/golang-commons v0.134.0
 	github.com/rs/zerolog v1.33.0
 	github.com/spf13/cobra v1.8.1
 	github.com/stretchr/testify v1.10.0
