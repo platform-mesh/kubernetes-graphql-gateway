@@ -11,16 +11,18 @@ import (
 type TokenKey struct{}
 
 type roundTripper struct {
-	userClaim string
-	log       *logger.Logger
-	base      http.RoundTripper // TODO change to awareBaseHttp
+	userClaim   string
+	log         *logger.Logger
+	base        http.RoundTripper // TODO change to awareBaseHttp
+	impersonate bool
 }
 
-func NewRoundTripper(log *logger.Logger, base http.RoundTripper, userNameClaim string) http.RoundTripper {
+func NewRoundTripper(log *logger.Logger, base http.RoundTripper, userNameClaim string, impersonate bool) http.RoundTripper {
 	return &roundTripper{
-		log:       log,
-		base:      base,
-		userClaim: userNameClaim,
+		log:         log,
+		base:        base,
+		userClaim:   userNameClaim,
+		impersonate: impersonate,
 	}
 }
 
@@ -29,6 +31,12 @@ func (rt *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	if !ok {
 		rt.log.Debug().Msg("No token found in context")
 		return rt.base.RoundTrip(req)
+	}
+
+	if !rt.impersonate {
+		req.Header.Del("Authorization")
+		t := transport.NewBearerAuthRoundTripper(token, rt.base)
+		return t.RoundTrip(req)
 	}
 
 	claims := jwt.MapClaims{}

@@ -15,6 +15,8 @@ type Config struct {
 	LocalDevelopment bool   `envconfig:"default=false,optional"`
 	HandlerCfg       HandlerConfig
 	UserNameClaim    string `envconfig:"default=email,optional"`
+
+	ShouldImpersonate bool `envconfig:"default=true,optional"`
 }
 
 type HandlerConfig struct {
