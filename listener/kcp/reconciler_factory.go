@@ -17,6 +17,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const kubernetesClusterName = "kubernetes"
+
 type CustomReconciler interface {
 	Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
 	SetupWithManager(mgr ctrl.Manager) error
@@ -54,7 +56,29 @@ func NewReconciler(opts ReconcilerOpts) (CustomReconciler, error) {
 		return nil, fmt.Errorf("failed to create IO Handler: %w", err)
 	}
 
-	return controller.NewCRDReconciler("kubernetes", clt, dc, ioHandler, apischema.NewResolver()), nil
+	schemaResolver := &apischema.CRDResolver{
+		DiscoveryClient: dc,
+	}
+
+	if err := preReconcile(schemaResolver, ioHandler); err != nil {
+		return nil, fmt.Errorf("failed to generate OpenAPI Schema for cluster: %w", err)
+	}
+
+	return controller.NewCRDReconciler(kubernetesClusterName, clt, schemaResolver, ioHandler), nil
+}
+
+func preReconcile(
+	cr *apischema.CRDResolver,
+	io workspacefile.IOHandler,
+) error {
+	JSON, err := cr.Resolve()
+	if err != nil {
+		return fmt.Errorf("failed to resolve server JSON schema: %w", err)
+	}
+	if err := io.Write(JSON, kubernetesClusterName); err != nil {
+		return fmt.Errorf("failed to write JSON to filesystem: %w", err)
+	}
+	return nil
 }
 
 func NewKcpReconciler(opts ReconcilerOpts) (CustomReconciler, error) {
