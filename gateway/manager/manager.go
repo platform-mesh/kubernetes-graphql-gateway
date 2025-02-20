@@ -160,7 +160,7 @@ func (s *Service) OnFileDeleted(filename string) {
 }
 
 func (s *Service) loadSchemaFromFile(filename string) (*graphql.Schema, error) {
-	definitions, err := readDefinitionFromFile(filepath.Join(s.appCfg.OpenApiDefinitionsPath, filename))
+	definitions, err := ReadDefinitionFromFile(filepath.Join(s.appCfg.OpenApiDefinitionsPath, filename))
 	if err != nil {
 		return nil, err
 	}
@@ -291,7 +291,7 @@ func (s *Service) handleSubscription(w http.ResponseWriter, r *http.Request, sch
 	fmt.Fprint(w, "event: complete\n\n")
 }
 
-func readDefinitionFromFile(filePath string) (spec.Definitions, error) {
+func ReadDefinitionFromFile(filePath string) (spec.Definitions, error) {
 	f, err := os.Open(filePath)
 	if err != nil {
 		return nil, err

@@ -20,9 +20,9 @@ func (r *Service) SubscribeItem(gvk schema.GroupVersionKind) graphql.FieldResolv
 		gvk.Group = r.GetOriginalGroupName(gvk.Group)
 
 		ctx := p.Context
-		namespace, _ := p.Args[namespaceArg].(string)
+		namespace, _ := p.Args[NamespaceArg].(string)
 		name, _ := p.Args["name"].(string)
-		labelSelector, _ := p.Args[labelSelectorArg].(string)
+		labelSelector, _ := p.Args[LabelSelectorArg].(string)
 		subscribeToAll, _ := p.Args["subscribeToAll"].(bool)
 		fieldsToWatch := extractRequestedFields(p.Info)
 
@@ -38,9 +38,9 @@ func (r *Service) SubscribeItems(gvk schema.GroupVersionKind) graphql.FieldResol
 		gvk.Group = r.GetOriginalGroupName(gvk.Group)
 
 		ctx := p.Context
-		namespace, _ := p.Args[namespaceArg].(string)
-		labelSelector, _ := p.Args[labelSelectorArg].(string)
-		subscribeToAll, _ := p.Args[subscribeToAllArg].(bool)
+		namespace, _ := p.Args[NamespaceArg].(string)
+		labelSelector, _ := p.Args[LabelSelectorArg].(string)
+		subscribeToAll, _ := p.Args[SubscribeToAllArg].(bool)
 		fieldsToWatch := extractRequestedFields(p.Info)
 
 		resultChannel := make(chan interface{})
@@ -196,31 +196,6 @@ func parseSelectionSet(selectionSet *ast.SelectionSet, prefix string) []string {
 		}
 	}
 	return result
-}
-
-// GetSubscriptionArguments returns the GraphQL arguments for delete mutations.
-func (r *Service) GetSubscriptionArguments(includeNameArg bool) graphql.FieldConfigArgument {
-	args := graphql.FieldConfigArgument{
-		namespaceArg: &graphql.ArgumentConfig{
-			Type:         graphql.String,
-			DefaultValue: "default",
-			Description:  "The namespace of the object",
-		},
-		subscribeToAllArg: &graphql.ArgumentConfig{
-			Type:         graphql.Boolean,
-			DefaultValue: false,
-			Description:  "If true, events will be emitted on every field change",
-		},
-	}
-
-	if includeNameArg {
-		args[nameArg] = &graphql.ArgumentConfig{
-			Type:        graphql.NewNonNull(graphql.String),
-			Description: "The name of the object",
-		}
-	}
-
-	return args
 }
 
 func determineFieldChanged(oldObj, newObj *unstructured.Unstructured, fields []string) (bool, error) {

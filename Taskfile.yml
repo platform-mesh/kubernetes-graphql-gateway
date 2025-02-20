@@ -7,6 +7,10 @@ vars:
   ENVTEST_VERSION: release-0.17
 tasks:
   ## Setup
+  setup:mockery:
+    internal: true
+    cmds:
+      - test -s {{.LOCAL_BIN}}/mockery || GOBIN=$(pwd)/{{.LOCAL_BIN}} go install github.com/vektra/mockery/v2@v2.43.2
   setup:envtest:
     internal: true
     cmds:
@@ -21,6 +25,10 @@ tasks:
       - test -s {{.LOCAL_BIN}}/go-test-coverage || GOBIN=$(pwd)/{{.LOCAL_BIN}} go install github.com/vladopajic/go-test-coverage/v2@latest
 
   ## Development
+  mockery:
+    deps: [ setup:mockery ]
+    cmds:
+      - "{{.LOCAL_BIN}}/mockery"
   build:
     cmds:
       - go build ./...
@@ -37,6 +45,7 @@ tasks:
       - task: fmt
       - "{{.LOCAL_BIN}}/golangci-lint run --timeout 10m ./..."
   envtest:
+    deps: [mockery]
     env:
       KUBEBUILDER_ASSETS:
         sh: $(pwd)/{{.LOCAL_BIN}}/setup-envtest use {{.ENVTEST_K8S_VERSION}} --bin-dir $(pwd)/{{.LOCAL_BIN}} -p path
@@ -56,6 +65,7 @@ tasks:
           ADDITIONAL_COMMAND_ARGS: -coverprofile=./cover.out -covermode=atomic -coverpkg=./...
   validate:
     cmds:
+      - task: mockery
       - task: lint
       - task: test
         

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/rs/zerolog/log"
 	"regexp"
 
 	"github.com/graphql-go/graphql"
@@ -19,17 +20,9 @@ import (
 	"github.com/openmfp/golang-commons/logger"
 )
 
-const (
-	labelSelectorArg  = "labelselector"
-	nameArg           = "name"
-	namespaceArg      = "namespace"
-	subscribeToAllArg = "subscribeToAll"
-)
-
 type Provider interface {
 	CrudProvider
 	FieldResolverProvider
-	ArgumentsProvider
 }
 
 type CrudProvider interface {
@@ -46,13 +39,6 @@ type FieldResolverProvider interface {
 	CommonResolver() graphql.FieldResolveFn
 	SanitizeGroupName(string) string
 	GetOriginalGroupName(string) string
-}
-
-type ArgumentsProvider interface {
-	GetListItemsArguments() graphql.FieldConfigArgument
-	GetMutationArguments(resourceInputType *graphql.InputObject) graphql.FieldConfigArgument
-	GetNameAndNamespaceArguments() graphql.FieldConfigArgument
-	GetSubscriptionArguments(includeNameArg bool) graphql.FieldConfigArgument
 }
 
 type Service struct {
@@ -95,17 +81,17 @@ func (r *Service) ListItems(gvk schema.GroupVersionKind) graphql.FieldResolveFn 
 
 		var opts []client.ListOption
 		// Handle label selector argument
-		if labelSelector, ok := p.Args[labelSelectorArg].(string); ok && labelSelector != "" {
+		if labelSelector, ok := p.Args[LabelSelectorArg].(string); ok && labelSelector != "" {
 			selector, err := labels.Parse(labelSelector)
 			if err != nil {
-				log.Error().Err(err).Str(labelSelectorArg, labelSelector).Msg("Unable to parse given label selector")
+				log.Error().Err(err).Str(LabelSelectorArg, labelSelector).Msg("Unable to parse given label selector")
 				return nil, err
 			}
 			opts = append(opts, client.MatchingLabelsSelector{Selector: selector})
 		}
 
 		// Handle namespace argument
-		if namespace, ok := p.Args[namespaceArg].(string); ok && namespace != "" {
+		if namespace, ok := p.Args[NamespaceArg].(string); ok && namespace != "" {
 			opts = append(opts, client.InNamespace(namespace))
 		}
 
@@ -144,15 +130,8 @@ func (r *Service) GetItem(gvk schema.GroupVersionKind) graphql.FieldResolveFn {
 		}
 
 		// Retrieve required arguments
-		name, ok := p.Args["name"].(string)
-		if !ok || name == "" {
-			log.Error().Err(errors.New("missing required argument: name")).Msg("Name argument is required")
-			return nil, err
-		}
-
-		namespace, ok := p.Args["namespace"].(string)
-		if !ok || namespace == "" {
-			log.Error().Err(errors.New("missing required argument: namespace")).Msg("Namespace argument is required")
+		name, namespace, err := getNameAndNamespace(p.Args)
+		if err != nil {
 			return nil, err
 		}
 
@@ -182,7 +161,7 @@ func (r *Service) CreateItem(gvk schema.GroupVersionKind) graphql.FieldResolveFn
 
 		log := r.log.With().Str("operation", "create").Str("kind", gvk.Kind).Logger()
 
-		namespace := p.Args[namespaceArg].(string)
+		namespace := p.Args[NamespaceArg].(string)
 		objectInput := p.Args["object"].(map[string]interface{})
 
 		obj := &unstructured.Unstructured{
@@ -213,15 +192,12 @@ func (r *Service) UpdateItem(gvk schema.GroupVersionKind) graphql.FieldResolveFn
 
 		log := r.log.With().Str("operation", "update").Str("kind", gvk.Kind).Logger()
 
-		namespace := p.Args[namespaceArg].(string)
-		objectInput := p.Args["object"].(map[string]interface{})
-
-		// Ensure metadata.name is set
-		name, found, err := unstructured.NestedString(objectInput, "metadata", "name")
-		if err != nil || !found || name == "" {
-			return nil, errors.New("object metadata.name is required")
+		name, namespace, err := getNameAndNamespace(p.Args)
+		if err != nil {
+			return nil, err
 		}
 
+		objectInput := p.Args["object"].(map[string]interface{})
 		// Marshal the input object to JSON to create the patch data
 		patchData, err := json.Marshal(objectInput)
 		if err != nil {
@@ -260,8 +236,10 @@ func (r *Service) DeleteItem(gvk schema.GroupVersionKind) graphql.FieldResolveFn
 
 		log := r.log.With().Str("operation", "delete").Str("kind", gvk.Kind).Logger()
 
-		name := p.Args[nameArg].(string)
-		namespace := p.Args[namespaceArg].(string)
+		name, namespace, err := getNameAndNamespace(p.Args)
+		if err != nil {
+			return nil, err
+		}
 
 		obj := &unstructured.Unstructured{}
 		obj.SetGroupVersionKind(gvk)
@@ -280,48 +258,6 @@ func (r *Service) DeleteItem(gvk schema.GroupVersionKind) graphql.FieldResolveFn
 func (r *Service) CommonResolver() graphql.FieldResolveFn {
 	return func(p graphql.ResolveParams) (interface{}, error) {
 		return p.Source, nil
-	}
-}
-
-// GetListItemsArguments returns the GraphQL arguments for listing resources.
-func (r *Service) GetListItemsArguments() graphql.FieldConfigArgument {
-	return graphql.FieldConfigArgument{
-		labelSelectorArg: &graphql.ArgumentConfig{
-			Type:        graphql.String,
-			Description: "A label selector to filter the objects by",
-		},
-		namespaceArg: &graphql.ArgumentConfig{
-			Type:        graphql.String,
-			Description: "The namespace in which to search for the objects",
-		},
-	}
-}
-
-// GetMutationArguments returns the GraphQL arguments for create and update mutations.
-func (r *Service) GetMutationArguments(resourceInputType *graphql.InputObject) graphql.FieldConfigArgument {
-	return graphql.FieldConfigArgument{
-		namespaceArg: &graphql.ArgumentConfig{
-			Type:        graphql.NewNonNull(graphql.String),
-			Description: "The namespace of the object",
-		},
-		"object": &graphql.ArgumentConfig{
-			Type:        graphql.NewNonNull(resourceInputType),
-			Description: "The object to create or update",
-		},
-	}
-}
-
-// GetNameAndNamespaceArguments returns the GraphQL arguments for delete mutations.
-func (r *Service) GetNameAndNamespaceArguments() graphql.FieldConfigArgument {
-	return graphql.FieldConfigArgument{
-		nameArg: &graphql.ArgumentConfig{
-			Type:        graphql.NewNonNull(graphql.String),
-			Description: "The name of the object",
-		},
-		namespaceArg: &graphql.ArgumentConfig{
-			Type:        graphql.NewNonNull(graphql.String),
-			Description: "The namespace of the object",
-		},
 	}
 }
 
@@ -349,4 +285,42 @@ func (r *Service) GetOriginalGroupName(groupName string) string {
 	}
 
 	return groupName
+}
+
+func getNameAndNamespace(args map[string]interface{}) (string, string, error) {
+	name, err := getStringArg(args, NameArg)
+	if err != nil {
+		return "", "", err
+	}
+
+	namespace, err := getStringArg(args, NamespaceArg)
+	if err != nil {
+		return "", "", err
+	}
+
+	return name, namespace, nil
+}
+
+func getStringArg(args map[string]interface{}, key string) (string, error) {
+	val, exists := args[key]
+	if !exists {
+		err := errors.New("missing required argument: " + key)
+		log.Error().Err(err).Msg(key + " argument is required")
+		return "", err
+	}
+
+	str, ok := val.(string)
+	if !ok {
+		err := errors.New("invalid type for argument: " + key)
+		log.Error().Err(err).Msg(key + " argument must be a string")
+		return "", err
+	}
+
+	if str == "" {
+		err := errors.New("empty value for argument: " + key)
+		log.Error().Err(err).Msg(key + " argument cannot be empty")
+		return "", err
+	}
+
+	return str, nil
 }
