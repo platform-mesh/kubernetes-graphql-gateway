@@ -17,6 +17,12 @@ type Config struct {
 	UserNameClaim    string `envconfig:"default=email,optional"`
 
 	ShouldImpersonate bool `envconfig:"default=true,optional"`
+
+	Cors struct {
+		Enabled        bool     `envconfig:"default=false,optional"`
+		AllowedOrigins []string `envconfig:"default=*,optional"`
+		AllowedHeaders []string `envconfig:"default=*,optional"`
+	}
 }
 
 type HandlerConfig struct {
