@@ -20,7 +20,7 @@ type v2RootWrapper struct {
 	Definitions map[string]any `json:"definitions"`
 }
 
-func convertJSON(v3JSON []byte) ([]byte, error) {
+func ConvertJSON(v3JSON []byte) ([]byte, error) {
 	data := &v3RootWrapper{}
 	if err := json.Unmarshal(v3JSON, data); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal JSON: %w", err)
