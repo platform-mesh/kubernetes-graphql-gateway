@@ -1,6 +1,10 @@
 package resolver
 
-import "github.com/graphql-go/graphql"
+import (
+	"errors"
+	"github.com/graphql-go/graphql"
+	"github.com/rs/zerolog/log"
+)
 
 const (
 	LabelSelectorArg  = "labelselector"
@@ -66,4 +70,68 @@ func (b *FieldConfigArgumentsBuilder) WithSubscribeToAllArg() *FieldConfigArgume
 // Complete returns the constructed arguments
 func (b *FieldConfigArgumentsBuilder) Complete() graphql.FieldConfigArgument {
 	return b.arguments
+}
+
+func getRequiredNameAndNamespaceArgs(args map[string]interface{}) (string, string, error) {
+	name, err := getStringArg(args, NameArg, true)
+	if err != nil {
+		return "", "", err
+	}
+
+	namespace, err := getStringArg(args, NamespaceArg, true)
+	if err != nil {
+		return "", "", err
+	}
+
+	return name, namespace, nil
+}
+
+func getStringArg(args map[string]interface{}, key string, required bool) (string, error) {
+	val, exists := args[key]
+	if !exists {
+		if required {
+			err := errors.New("missing required argument: " + key)
+			log.Error().Err(err).Msg(key + " argument is required")
+			return "", err
+		}
+
+		return "", nil
+	}
+
+	str, ok := val.(string)
+	if !ok {
+		err := errors.New("invalid type for argument: " + key)
+		log.Error().Err(err).Msg(key + " argument must be a string")
+		return "", err
+	}
+
+	if str == "" {
+		err := errors.New("empty value for argument: " + key)
+		log.Error().Err(err).Msg(key + " argument cannot be empty")
+		return "", err
+	}
+
+	return str, nil
+}
+
+func getBoolArg(args map[string]interface{}, key string, required bool) (bool, error) {
+	val, exists := args[key]
+	if !exists {
+		if required {
+			err := errors.New("missing required argument: " + key)
+			log.Error().Err(err).Msg(key + " argument is required")
+			return false, err
+		}
+
+		return false, nil
+	}
+
+	res, ok := val.(bool)
+	if !ok {
+		err := errors.New("invalid type for argument: " + key)
+		log.Error().Err(err).Msg(key + " argument must be a bool")
+		return false, err
+	}
+
+	return res, nil
 }

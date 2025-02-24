@@ -1,7 +1,6 @@
 package resolver
 
 import (
-	"context"
 	"reflect"
 	"strings"
 
@@ -17,17 +16,10 @@ import (
 
 func (r *Service) SubscribeItem(gvk schema.GroupVersionKind) graphql.FieldResolveFn {
 	return func(p graphql.ResolveParams) (interface{}, error) {
-		gvk.Group = r.GetOriginalGroupName(gvk.Group)
-
-		ctx := p.Context
-		namespace, _ := p.Args[NamespaceArg].(string)
-		name, _ := p.Args["name"].(string)
-		labelSelector, _ := p.Args[LabelSelectorArg].(string)
-		subscribeToAll, _ := p.Args["subscribeToAll"].(bool)
-		fieldsToWatch := extractRequestedFields(p.Info)
 
 		resultChannel := make(chan interface{})
-		go r.runWatch(ctx, gvk, namespace, name, labelSelector, subscribeToAll, fieldsToWatch, resultChannel, true)
+
+		go r.runWatch(p, gvk, resultChannel, true)
 
 		return resultChannel, nil
 	}
@@ -35,31 +27,55 @@ func (r *Service) SubscribeItem(gvk schema.GroupVersionKind) graphql.FieldResolv
 
 func (r *Service) SubscribeItems(gvk schema.GroupVersionKind) graphql.FieldResolveFn {
 	return func(p graphql.ResolveParams) (interface{}, error) {
-		gvk.Group = r.GetOriginalGroupName(gvk.Group)
-
-		ctx := p.Context
-		namespace, _ := p.Args[NamespaceArg].(string)
-		labelSelector, _ := p.Args[LabelSelectorArg].(string)
-		subscribeToAll, _ := p.Args[SubscribeToAllArg].(bool)
-		fieldsToWatch := extractRequestedFields(p.Info)
 
 		resultChannel := make(chan interface{})
-		go r.runWatch(ctx, gvk, namespace, "", labelSelector, subscribeToAll, fieldsToWatch, resultChannel, false)
+
+		go r.runWatch(p, gvk, resultChannel, false)
 
 		return resultChannel, nil
 	}
 }
 
 func (r *Service) runWatch(
-	ctx context.Context,
+	p graphql.ResolveParams,
 	gvk schema.GroupVersionKind,
-	namespace, name, labelSelector string,
-	subscribeToAll bool,
-	fieldsToWatch []string,
 	resultChannel chan interface{},
 	singleItem bool,
 ) {
 	defer close(resultChannel)
+
+	ctx := p.Context
+
+	gvk.Group = r.getOriginalGroupName(gvk.Group)
+
+	namespace, err := getStringArg(p.Args, NamespaceArg, true)
+	if err != nil {
+		r.log.Error().Err(err).Msg("Failed to get namespace argument")
+		return
+	}
+
+	var name string
+	if singleItem {
+		name, err = getStringArg(p.Args, NameArg, true)
+		if err != nil {
+			r.log.Error().Err(err).Msg("Failed to get name argument")
+			return
+		}
+	}
+
+	labelSelector, err := getStringArg(p.Args, LabelSelectorArg, false)
+	if err != nil {
+		r.log.Error().Err(err).Msg("Failed to get label selector argument")
+		return
+	}
+
+	subscribeToAll, err := getBoolArg(p.Args, SubscribeToAllArg, false)
+	if err != nil {
+		r.log.Error().Err(err).Msg("Failed to get subscribeToAll argument")
+		return
+	}
+
+	fieldsToWatch := extractRequestedFields(p.Info)
 
 	list := &unstructured.UnstructuredList{}
 	list.SetGroupVersionKind(schema.GroupVersionKind{

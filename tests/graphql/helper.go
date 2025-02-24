@@ -1,9 +1,7 @@
 package graphql
 
 import (
-	"bufio"
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -76,70 +74,4 @@ func SendRequest(url, query string) (*GraphQLResponse, int, error) {
 	}
 
 	return &bodyResp, resp.StatusCode, err
-}
-
-// SubscribeToGraphQL sends an SSE request and streams data to a channel
-func SubscribeToGraphQL(url, query string) (chan map[string]interface{}, func(), error) {
-	ctx, cancelFn := context.WithCancel(context.Background())
-
-	payload := map[string]string{"query": query}
-	payloadBytes, err := json.Marshal(payload)
-	if err != nil {
-		return nil, cancelFn, fmt.Errorf("failed to marshal query: %w", err)
-	}
-
-	// Create HTTP request
-	req, err := http.NewRequestWithContext(ctx, "GET", url, bytes.NewReader(payloadBytes))
-	if err != nil {
-		return nil, cancelFn, fmt.Errorf("failed to create request: %w", err)
-	}
-	req.Header.Set("Accept", "text/event-stream")
-	req.Header.Set("Content-Type", "application/json")
-
-	msgChan := make(chan map[string]interface{})
-	go func(msgChan chan map[string]interface{}) {
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			fmt.Printf("Failed to send request: %v", err)
-			return
-		}
-
-		defer resp.Body.Close() // closes SSE stream
-
-		if resp.StatusCode != http.StatusOK {
-			fmt.Printf("Unexpected status code: %d", resp.StatusCode)
-			return
-		}
-
-		scanner := bufio.NewScanner(resp.Body)
-		for scanner.Scan() {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-				line := scanner.Text()
-				if len(line) == 0 || line == ":" {
-					continue // Skip heartbeat or empty lines
-				}
-
-				// Handle SSE message lines starting with "data: "
-				if len(line) > 6 && line[:6] == "data: " {
-					rawData := line[6:] // Extract data after "data: "
-					var data map[string]interface{}
-					err := json.Unmarshal([]byte(rawData), &data)
-					if err != nil {
-						fmt.Printf("Failed to parse message: %v", err)
-						continue
-					}
-					msgChan <- data
-				}
-			}
-		}
-
-		if err := scanner.Err(); err != nil {
-			fmt.Printf("Error reading SSE stream: %v", err)
-		}
-	}(msgChan)
-
-	return msgChan, cancelFn, nil
 }

@@ -5,10 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"regexp"
-
-	"github.com/rs/zerolog/log"
 	"gopkg.in/yaml.v3"
+	"regexp"
 
 	"github.com/graphql-go/graphql"
 	"go.opentelemetry.io/otel"
@@ -25,7 +23,8 @@ import (
 
 type Provider interface {
 	CrudProvider
-	FieldResolverProvider
+	CommonResolver() graphql.FieldResolveFn
+	SanitizeGroupName(string) string
 }
 
 type CrudProvider interface {
@@ -39,15 +38,10 @@ type CrudProvider interface {
 	SubscribeItems(gvk schema.GroupVersionKind) graphql.FieldResolveFn
 }
 
-type FieldResolverProvider interface {
-	CommonResolver() graphql.FieldResolveFn
-	SanitizeGroupName(string) string
-	GetOriginalGroupName(string) string
-}
-
 type Service struct {
-	log           *logger.Logger
-	groupNames    map[string]string
+	log *logger.Logger
+	// groupNames stores relation between sanitized group names and original group names that are used in the Kubernetes API
+	groupNames    map[string]string // map[sanitizedGroupName]originalGroupName
 	runtimeClient client.WithWatch
 }
 
@@ -65,7 +59,7 @@ func (r *Service) ListItems(gvk schema.GroupVersionKind) graphql.FieldResolveFn 
 		ctx, span := otel.Tracer("").Start(p.Context, "ListItems", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
 
-		gvk.Group = r.GetOriginalGroupName(gvk.Group)
+		gvk.Group = r.getOriginalGroupName(gvk.Group)
 
 		log, err := r.log.ChildLoggerWithAttributes(
 			"operation", "list",
@@ -119,7 +113,7 @@ func (r *Service) GetItem(gvk schema.GroupVersionKind) graphql.FieldResolveFn {
 		ctx, span := otel.Tracer("").Start(p.Context, "GetItem", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
 
-		gvk.Group = r.GetOriginalGroupName(gvk.Group)
+		gvk.Group = r.getOriginalGroupName(gvk.Group)
 
 		log, err := r.log.ChildLoggerWithAttributes(
 			"operation", "get",
@@ -134,7 +128,7 @@ func (r *Service) GetItem(gvk schema.GroupVersionKind) graphql.FieldResolveFn {
 		}
 
 		// Retrieve required arguments
-		name, namespace, err := getNameAndNamespace(p.Args)
+		name, namespace, err := getRequiredNameAndNamespaceArgs(p.Args)
 		if err != nil {
 			return nil, err
 		}
@@ -181,7 +175,7 @@ func (r *Service) CreateItem(gvk schema.GroupVersionKind) graphql.FieldResolveFn
 		ctx, span := otel.Tracer("").Start(p.Context, "CreateItem", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
 
-		gvk.Group = r.GetOriginalGroupName(gvk.Group)
+		gvk.Group = r.getOriginalGroupName(gvk.Group)
 
 		log := r.log.With().Str("operation", "create").Str("kind", gvk.Kind).Logger()
 
@@ -212,11 +206,11 @@ func (r *Service) UpdateItem(gvk schema.GroupVersionKind) graphql.FieldResolveFn
 		ctx, span := otel.Tracer("").Start(p.Context, "UpdateItem", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
 
-		gvk.Group = r.GetOriginalGroupName(gvk.Group)
+		gvk.Group = r.getOriginalGroupName(gvk.Group)
 
 		log := r.log.With().Str("operation", "update").Str("kind", gvk.Kind).Logger()
 
-		name, namespace, err := getNameAndNamespace(p.Args)
+		name, namespace, err := getRequiredNameAndNamespaceArgs(p.Args)
 		if err != nil {
 			return nil, err
 		}
@@ -256,11 +250,11 @@ func (r *Service) DeleteItem(gvk schema.GroupVersionKind) graphql.FieldResolveFn
 		ctx, span := otel.Tracer("").Start(p.Context, "DeleteItem", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
 
-		gvk.Group = r.GetOriginalGroupName(gvk.Group)
+		gvk.Group = r.getOriginalGroupName(gvk.Group)
 
 		log := r.log.With().Str("operation", "delete").Str("kind", gvk.Kind).Logger()
 
-		name, namespace, err := getNameAndNamespace(p.Args)
+		name, namespace, err := getRequiredNameAndNamespaceArgs(p.Args)
 		if err != nil {
 			return nil, err
 		}
@@ -286,7 +280,7 @@ func (r *Service) CommonResolver() graphql.FieldResolveFn {
 }
 
 func (r *Service) SanitizeGroupName(groupName string) string {
-	oldGroupName := groupName
+	originalGroupName := groupName
 
 	if groupName == "" {
 		groupName = "core"
@@ -298,53 +292,19 @@ func (r *Service) SanitizeGroupName(groupName string) string {
 		}
 	}
 
-	r.groupNames[groupName] = oldGroupName
+	r.storeOriginalGroupName(groupName, originalGroupName)
 
 	return groupName
 }
 
-func (r *Service) GetOriginalGroupName(groupName string) string {
+func (r *Service) storeOriginalGroupName(groupName, originalName string) {
+	r.groupNames[groupName] = originalName
+}
+
+func (r *Service) getOriginalGroupName(groupName string) string {
 	if originalName, ok := r.groupNames[groupName]; ok {
 		return originalName
 	}
 
 	return groupName
-}
-
-func getNameAndNamespace(args map[string]interface{}) (string, string, error) {
-	name, err := getStringArg(args, NameArg)
-	if err != nil {
-		return "", "", err
-	}
-
-	namespace, err := getStringArg(args, NamespaceArg)
-	if err != nil {
-		return "", "", err
-	}
-
-	return name, namespace, nil
-}
-
-func getStringArg(args map[string]interface{}, key string) (string, error) {
-	val, exists := args[key]
-	if !exists {
-		err := errors.New("missing required argument: " + key)
-		log.Error().Err(err).Msg(key + " argument is required")
-		return "", err
-	}
-
-	str, ok := val.(string)
-	if !ok {
-		err := errors.New("invalid type for argument: " + key)
-		log.Error().Err(err).Msg(key + " argument must be a string")
-		return "", err
-	}
-
-	if str == "" {
-		err := errors.New("empty value for argument: " + key)
-		log.Error().Err(err).Msg(key + " argument cannot be empty")
-		return "", err
-	}
-
-	return str, nil
 }

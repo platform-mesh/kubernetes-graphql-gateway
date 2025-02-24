@@ -172,6 +172,7 @@ func (g *Gateway) generateGraphqlSchema() error {
 				Type: graphql.NewList(resourceType),
 				Args: resolver.NewFieldConfigArguments().
 					WithNamespaceArg().
+					WithLabelSelectorArg().
 					WithSubscribeToAllArg().
 					Complete(),
 				Resolve:     g.resolver.CommonResolver(),
