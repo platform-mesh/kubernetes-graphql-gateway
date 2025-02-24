@@ -48,7 +48,7 @@ func (r *Service) runWatch(
 
 	gvk.Group = r.getOriginalGroupName(gvk.Group)
 
-	namespace, err := getStringArg(p.Args, NamespaceArg, true)
+	namespace, err := getStringArg(p.Args, NamespaceArg, false)
 	if err != nil {
 		r.log.Error().Err(err).Msg("Failed to get namespace argument")
 		return
