@@ -116,6 +116,15 @@ func (g *Gateway) generateGraphqlSchema() error {
 				Resolve: g.resolver.GetItem(*gvk),
 			})
 
+			queryGroupType.AddFieldConfig(singular+"Yaml", &graphql.Field{
+				Type: graphql.NewNonNull(graphql.String),
+				Args: resolver.NewFieldConfigArguments().
+					WithNameArg().
+					WithNamespaceArg().
+					Complete(),
+				Resolve: g.resolver.GetItemAsYAML(*gvk),
+			})
+
 			// Mutation definitions
 			mutationGroupType.AddFieldConfig("create"+singular, &graphql.Field{
 				Type: resourceType,

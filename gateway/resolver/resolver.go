@@ -1,11 +1,14 @@
 package resolver
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/rs/zerolog/log"
 	"regexp"
+
+	"github.com/rs/zerolog/log"
+	"gopkg.in/yaml.v3"
 
 	"github.com/graphql-go/graphql"
 	"go.opentelemetry.io/otel"
@@ -28,6 +31,7 @@ type Provider interface {
 type CrudProvider interface {
 	ListItems(gvk schema.GroupVersionKind) graphql.FieldResolveFn
 	GetItem(gvk schema.GroupVersionKind) graphql.FieldResolveFn
+	GetItemAsYAML(gvk schema.GroupVersionKind) graphql.FieldResolveFn
 	CreateItem(gvk schema.GroupVersionKind) graphql.FieldResolveFn
 	UpdateItem(gvk schema.GroupVersionKind) graphql.FieldResolveFn
 	DeleteItem(gvk schema.GroupVersionKind) graphql.FieldResolveFn
@@ -149,6 +153,26 @@ func (r *Service) GetItem(gvk schema.GroupVersionKind) graphql.FieldResolveFn {
 		}
 
 		return obj.Object, nil
+	}
+}
+
+func (r *Service) GetItemAsYAML(gvk schema.GroupVersionKind) graphql.FieldResolveFn {
+	return func(p graphql.ResolveParams) (interface{}, error) {
+		var span trace.Span
+		p.Context, span = otel.Tracer("").Start(p.Context, "GetItemAsYAML", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
+		defer span.End()
+
+		out, err := r.GetItem(gvk)(p)
+		if err != nil {
+			return "", err
+		}
+
+		var returnYaml bytes.Buffer
+		if err := yaml.NewEncoder(&returnYaml).Encode(out); err != nil {
+			return "", err
+		}
+
+		return returnYaml.String(), nil
 	}
 }
 
