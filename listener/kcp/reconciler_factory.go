@@ -10,11 +10,13 @@ import (
 	"github.com/openmfp/crd-gql-gateway/listener/discoveryclient"
 	"github.com/openmfp/crd-gql-gateway/listener/flags"
 	"github.com/openmfp/crd-gql-gateway/listener/workspacefile"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 )
 
 const kubernetesClusterName = "kubernetes"
@@ -56,8 +58,14 @@ func NewReconciler(opts ReconcilerOpts) (CustomReconciler, error) {
 		return nil, fmt.Errorf("failed to create IO Handler: %w", err)
 	}
 
+	rm, err := restMapperFromConfig(opts.Config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create rest mapper from config: %w", err)
+	}
+
 	schemaResolver := &apischema.CRDResolver{
 		DiscoveryClient: dc,
+		RESTMapper:      rm,
 	}
 
 	if err := preReconcile(schemaResolver, ioHandler); err != nil {
@@ -96,11 +104,33 @@ func NewKcpReconciler(opts ReconcilerOpts) (CustomReconciler, error) {
 		return nil, fmt.Errorf("failed to create Discovery client factory: %w", err)
 	}
 
+	rm, err := restMapperFromConfig(opts.Config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create rest mapper from config: %w", err)
+	}
+
+	sc, err := apischema.NewResolver(rm)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create schema resolver: %w", err)
+	}
+
 	return controller.NewAPIBindingReconciler(
-		ioHandler, df, apischema.NewResolver(), &clusterpath.Resolver{
+		ioHandler, df, sc, &clusterpath.Resolver{
 			Scheme:       opts.Scheme,
 			Config:       opts.Config,
 			ResolverFunc: clusterpath.Resolve,
 		},
 	), nil
+}
+
+func restMapperFromConfig(cfg *rest.Config) (meta.RESTMapper, error) {
+	httpClt, err := rest.HTTPClientFor(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create http client: %w", err)
+	}
+	rm, err := apiutil.NewDynamicRESTMapper(cfg, httpClt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create rest mapper: %w", err)
+	}
+	return rm, nil
 }
