@@ -2,8 +2,10 @@ package resolver
 
 import (
 	"context"
+	"testing"
+
 	"github.com/graphql-go/graphql"
-	"github.com/openmfp/crd-gql-gateway/listener/controller/mocks"
+	"github.com/openmfp/crd-gql-gateway/gateway/resolver/mocks"
 	"github.com/openmfp/golang-commons/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -12,7 +14,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"testing"
 )
 
 func getResolver(runtimeClientMock client.WithWatch) (*Service, error) {

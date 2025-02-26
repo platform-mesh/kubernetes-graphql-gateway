@@ -5,12 +5,13 @@ vars:
   LOCAL_BIN: bin
   ENVTEST_K8S_VERSION: "1.29.0"
   ENVTEST_VERSION: release-0.17
+  MOCKERY_VERSION: v2.52.3
 tasks:
   ## Setup
   setup:mockery:
     internal: true
     cmds:
-      - test -s {{.LOCAL_BIN}}/mockery || GOBIN=$(pwd)/{{.LOCAL_BIN}} go install github.com/vektra/mockery/v2@v2.43.2
+      - test -s {{.LOCAL_BIN}}/mockery || GOBIN=$(pwd)/{{.LOCAL_BIN}} go install github.com/vektra/mockery/v2@{{.MOCKERY_VERSION}}
   setup:envtest:
     internal: true
     cmds:

@@ -10,6 +10,8 @@ import (
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/openapi"
 	"k8s.io/kube-openapi/pkg/validation/spec"
@@ -23,10 +25,11 @@ var (
 
 type CRDResolver struct {
 	*discovery.DiscoveryClient
+	meta.RESTMapper
 }
 
 func (cr *CRDResolver) Resolve() ([]byte, error) {
-	return resolveSchema(cr.DiscoveryClient)
+	return resolveSchema(cr.DiscoveryClient, cr.RESTMapper)
 }
 
 func (cr *CRDResolver) ResolveApiSchema(crd *apiextensionsv1.CustomResourceDefinition) ([]byte, error) {
@@ -45,7 +48,7 @@ func (cr *CRDResolver) ResolveApiSchema(crd *apiextensionsv1.CustomResourceDefin
 		return nil, fmt.Errorf("failed to filter server preferred resources: %w", err)
 	}
 
-	return resolveForPaths(cr.OpenAPIV3(), preferredApiGroups)
+	return resolveForPaths(cr.OpenAPIV3(), preferredApiGroups, cr.RESTMapper)
 }
 
 func errorIfCRDNotInPreferredApiGroups(gvk *metav1.GroupVersionKind, apiResLists []*metav1.APIResourceList) ([]string, error) {
@@ -112,7 +115,7 @@ func getSchemaForPath(preferredApiGroups []string, path string, gv openapi.Group
 	return resp.Components.Schemas, nil
 }
 
-func resolveForPaths(oc openapi.Client, preferredApiGroups []string) ([]byte, error) {
+func resolveForPaths(oc openapi.Client, preferredApiGroups []string, rm meta.RESTMapper) ([]byte, error) {
 	apiv3Paths, err := oc.Paths()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get OpenAPI paths: %w", err)
@@ -127,9 +130,15 @@ func resolveForPaths(oc openapi.Client, preferredApiGroups []string) ([]byte, er
 		}
 		maps.Copy(schemas, schema)
 	}
+
+	scopedSchemas, err := addScopeInfo(schemas, rm)
+	if err != nil {
+		return nil, fmt.Errorf("failed to add scope info to v3 schema: %w", err)
+	}
+
 	v3JSON, err := json.Marshal(&schemaResponse{
 		Components: schemasComponentsWrapper{
-			Schemas: schemas,
+			Schemas: scopedSchemas,
 		},
 	})
 	if err != nil {
@@ -143,7 +152,7 @@ func resolveForPaths(oc openapi.Client, preferredApiGroups []string) ([]byte, er
 	return v2JSON, nil
 }
 
-func resolveSchema(dc discovery.DiscoveryInterface) ([]byte, error) {
+func resolveSchema(dc discovery.DiscoveryInterface, rm meta.RESTMapper) ([]byte, error) {
 	preferredApiGroups := []string{}
 	apiResList, err := dc.ServerPreferredResources()
 	if err != nil {
@@ -153,5 +162,5 @@ func resolveSchema(dc discovery.DiscoveryInterface) ([]byte, error) {
 		preferredApiGroups = append(preferredApiGroups, apiRes.GroupVersion)
 	}
 
-	return resolveForPaths(dc.OpenAPIV3(), preferredApiGroups)
+	return resolveForPaths(dc.OpenAPIV3(), preferredApiGroups, rm)
 }

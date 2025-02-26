@@ -1,6 +1,7 @@
 package apischema
 
 import (
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/discovery"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
@@ -18,16 +19,16 @@ type schemaResponse struct {
 }
 
 type Resolver interface {
-	Resolve(dc discovery.DiscoveryInterface) ([]byte, error)
+	Resolve(dc discovery.DiscoveryInterface, rm meta.RESTMapper) ([]byte, error)
 }
 
-func NewResolver() *ResolverImpl {
-	return &ResolverImpl{}
+type resolverImpl struct {
 }
 
-type ResolverImpl struct {
+func NewResolver() *resolverImpl {
+	return &resolverImpl{}
 }
 
-func (r *ResolverImpl) Resolve(dc discovery.DiscoveryInterface) ([]byte, error) {
-	return resolveSchema(dc)
+func (r *resolverImpl) Resolve(dc discovery.DiscoveryInterface, rm meta.RESTMapper) ([]byte, error) {
+	return resolveSchema(dc, rm)
 }
