@@ -22,12 +22,10 @@ type GroupVersionKind struct {
 }
 
 func addScopeInfo(schemas map[string]*spec.Schema, rm meta.RESTMapper) (map[string]*spec.Schema, error) {
-	scopedSchemas := make(map[string]*spec.Schema)
-	for name, schema := range schemas {
+	for _, schema := range schemas {
 		//skip resources that do not have the GVK extension:
 		//assumption: sub-resources do not have GVKs
 		if schema.VendorExtensible.Extensions == nil {
-			scopedSchemas[name] = schema
 			continue
 		}
 		var gvksVal any
@@ -70,7 +68,6 @@ func addScopeInfo(schemas map[string]*spec.Schema, rm meta.RESTMapper) (map[stri
 			schema.VendorExtensible.AddExtension(scopeExtensionKey, apiextensionsv1.ClusterScoped)
 		}
 
-		scopedSchemas[name] = schema
 	}
-	return scopedSchemas, nil
+	return schemas, nil
 }
