@@ -27,6 +27,7 @@ func addScopeInfo(schemas map[string]*spec.Schema, rm meta.RESTMapper) (map[stri
 		//skip resources that do not have the GVK extension:
 		//assumption: sub-resources do not have GVKs
 		if schema.VendorExtensible.Extensions == nil {
+			scopedSchemas[name] = schema
 			continue
 		}
 		var gvksVal any
