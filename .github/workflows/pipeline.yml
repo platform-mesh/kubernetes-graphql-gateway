@@ -16,7 +16,6 @@ jobs:
     uses: openmfp/gha/.github/workflows/pipeline-golang-app.yml@main
     secrets: inherit
     with:
-      use_semver_action: true
       useTask: true
       useLocalCoverageConfig: true
       imageTagName: ghcr.io/openmfp/crd-gql-gateway
