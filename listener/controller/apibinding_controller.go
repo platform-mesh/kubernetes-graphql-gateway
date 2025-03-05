@@ -41,10 +41,7 @@ func NewAPIBindingReconciler(
 	}
 }
 
-// +kubebuilder:rbac:groups=apis.kcp.io,resources=apibindings,verbs=get;list;watch
-// +kubebuilder:rbac:groups=apis.kcp.io,resources=apibindings/status,verbs=get
 func (r *APIBindingReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-
 	// ignore system workspaces (e.g. system:shard)
 	if strings.HasPrefix(req.ClusterName, "system") {
 		return ctrl.Result{}, nil

@@ -2,7 +2,7 @@ exclude:
   paths:
     - main.go
     - cmd
-    - gateway
     - tests
-    - internal/config/config.go
+    - gateway/config/config.go
     - listener/*
+    - deprecated/*

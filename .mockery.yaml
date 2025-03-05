@@ -1,5 +1,5 @@
-issue-845-fix: True
-resolve-type-alias: False
+issue-845-fix: true
+resolve-type-alias: false
 with-expecter: true
 packages:
   sigs.k8s.io/controller-runtime/pkg/client:

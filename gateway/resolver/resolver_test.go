@@ -2,6 +2,7 @@ package resolver
 
 import (
 	"context"
+	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"testing"
 
 	"github.com/graphql-go/graphql"
@@ -88,7 +89,7 @@ func TestListItems(t *testing.T) {
 				Group:   "group",
 				Version: "version",
 				Kind:    "kind",
-			})(graphql.ResolveParams{
+			}, v1.NamespaceScoped)(graphql.ResolveParams{
 				Context: context.Background(),
 				Args:    tt.args,
 			})
@@ -179,7 +180,7 @@ func TestGetItem(t *testing.T) {
 				Group:   "group",
 				Version: "version",
 				Kind:    "kind",
-			})(graphql.ResolveParams{
+			}, v1.NamespaceScoped)(graphql.ResolveParams{
 				Context: context.Background(),
 				Args:    tt.args,
 			})
@@ -269,7 +270,7 @@ func TestCreateItem(t *testing.T) {
 				Group:   "group",
 				Version: "version",
 				Kind:    "kind",
-			})(graphql.ResolveParams{
+			}, v1.NamespaceScoped)(graphql.ResolveParams{
 				Context: context.Background(),
 				Args:    tt.args,
 			})
@@ -390,7 +391,7 @@ func TestUpdateItem(t *testing.T) {
 				Group:   "group",
 				Version: "version",
 				Kind:    "kind",
-			})(graphql.ResolveParams{
+			}, v1.NamespaceScoped)(graphql.ResolveParams{
 				Context: context.Background(),
 				Args:    tt.args,
 			})
@@ -467,7 +468,7 @@ func TestDeleteItem(t *testing.T) {
 				Group:   "group",
 				Version: "version",
 				Kind:    "kind",
-			})(graphql.ResolveParams{
+			}, v1.NamespaceScoped)(graphql.ResolveParams{
 				Context: context.Background(),
 				Args:    tt.args,
 			})

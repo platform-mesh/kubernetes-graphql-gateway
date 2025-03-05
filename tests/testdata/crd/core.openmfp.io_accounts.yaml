@@ -12,6 +12,7 @@ spec:
     listKind: AccountList
     plural: accounts
     singular: account
+    categories: ["openmfp"]
   scope: Namespaced
   versions:
     - additionalPrinterColumns:

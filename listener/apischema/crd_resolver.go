@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"maps"
 	"slices"
 	"strings"
 
@@ -51,7 +50,10 @@ func (cr *CRDResolver) ResolveApiSchema(crd *apiextensionsv1.CustomResourceDefin
 		return nil, fmt.Errorf("failed to filter server preferred resources: %w", err)
 	}
 
-	return resolveForPaths(cr.OpenAPIV3(), preferredApiGroups, cr.RESTMapper)
+	return NewSchemaBuilder(cr.OpenAPIV3(), preferredApiGroups).
+		WithScope(cr.RESTMapper).
+		WithCRDCategories(crd).
+		Complete()
 }
 
 func errorIfCRDNotInPreferredApiGroups(gkv *GroupKindVersions, apiResLists []*metav1.APIResourceList) ([]string, error) {
@@ -122,52 +124,19 @@ func getSchemaForPath(preferredApiGroups []string, path string, gv openapi.Group
 	return resp.Components.Schemas, nil
 }
 
-func resolveForPaths(oc openapi.Client, preferredApiGroups []string, rm meta.RESTMapper) ([]byte, error) {
-	apiv3Paths, err := oc.Paths()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get OpenAPI paths: %w", err)
-	}
-
-	schemas := make(map[string]*spec.Schema)
-	for path, gv := range apiv3Paths {
-		schema, err := getSchemaForPath(preferredApiGroups, path, gv)
-		if err != nil {
-			//TODO: debug log?
-			continue
-		}
-		maps.Copy(schemas, schema)
-	}
-
-	scopedSchemas, err := addScopeInfo(schemas, rm)
-	if err != nil {
-		return nil, fmt.Errorf("failed to add scope info to v3 schema: %w", err)
-	}
-
-	v3JSON, err := json.Marshal(&schemaResponse{
-		Components: schemasComponentsWrapper{
-			Schemas: scopedSchemas,
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal openAPI v3 schema: %w", err)
-	}
-	v2JSON, err := ConvertJSON(v3JSON)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert openAPI v3 schema to v2: %w", err)
-	}
-
-	return v2JSON, nil
-}
-
 func resolveSchema(dc discovery.DiscoveryInterface, rm meta.RESTMapper) ([]byte, error) {
-	preferredApiGroups := []string{}
 	apiResList, err := dc.ServerPreferredResources()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get server preferred resources: %w", err)
 	}
+
+	var preferredApiGroups []string
 	for _, apiRes := range apiResList {
 		preferredApiGroups = append(preferredApiGroups, apiRes.GroupVersion)
 	}
 
-	return resolveForPaths(dc.OpenAPIV3(), preferredApiGroups, rm)
+	return NewSchemaBuilder(dc.OpenAPIV3(), preferredApiGroups).
+		WithScope(rm).
+		WithApiResourceCategories(apiResList).
+		Complete()
 }
