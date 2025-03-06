@@ -155,6 +155,11 @@ func (g *Gateway) processSingleResource(
 		return
 	}
 
+	if strings.HasSuffix(gvk.Kind, "List") {
+		// Skip List resources
+		return
+	}
+
 	resourceScope, err := g.getScope(resourceKey)
 	if err != nil {
 		g.log.Error().Err(err).Str("resource", resourceKey).Msg("Error getting resourceScope")
