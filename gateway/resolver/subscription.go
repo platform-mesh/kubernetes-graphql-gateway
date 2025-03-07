@@ -1,6 +1,7 @@
 package resolver
 
 import (
+	"fmt"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"reflect"
 	"strings"
@@ -255,6 +256,26 @@ func determineFieldChanged(oldObj, newObj *unstructured.Unstructured, fields []s
 // Helper function to get the value of a field from an unstructured object
 func getFieldValue(obj *unstructured.Unstructured, fieldPath string) (interface{}, bool, error) {
 	fields := strings.Split(fieldPath, ".")
-	value, found, err := unstructured.NestedFieldNoCopy(obj.Object, fields...)
-	return value, found, err
+	var current interface{} = obj.Object
+
+	for i, field := range fields {
+		switch v := current.(type) {
+		case map[string]interface{}:
+			value, found, err := unstructured.NestedFieldNoCopy(v, field)
+			if err != nil {
+				return nil, false, fmt.Errorf("error accessing field %s: %v", strings.Join(fields[:i+1], "."), err)
+			}
+			if !found {
+				return nil, false, nil
+			}
+			current = value
+		case []interface{}:
+			// in case of slice, we return it, and that slice will be compared later using deep equal
+			return current, true, nil
+		default:
+			return nil, false, fmt.Errorf("unexpected type at field %s, expected map[string]interface{} or []interface{}, got %T", strings.Join(fields[:i+1], "."), current)
+		}
+	}
+
+	return current, true, nil
 }
