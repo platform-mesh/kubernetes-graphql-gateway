@@ -1,6 +1,3 @@
-> [!WARNING]
-> This repository is under construction and not yet ready for public consumption. Please check back later for updates.
-
 # GQL Gateway 
 
 The goal of this library is to provide a reusable and generic way of exposing k8s resources from within a cluster using GraphQL.
