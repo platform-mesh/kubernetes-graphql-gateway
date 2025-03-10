@@ -22,8 +22,8 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	"github.com/openmfp/crd-gql-gateway/listener/flags"
-	"github.com/openmfp/crd-gql-gateway/listener/kcp"
+	"github.com/openmfp/kubernetes-graphql-gateway/listener/flags"
+	"github.com/openmfp/kubernetes-graphql-gateway/listener/kcp"
 	// +kubebuilder:scaffold:imports
 )
 

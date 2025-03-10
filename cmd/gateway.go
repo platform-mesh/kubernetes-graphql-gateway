@@ -14,8 +14,8 @@ import (
 
 	"github.com/openmfp/golang-commons/logger"
 
-	appCfg "github.com/openmfp/crd-gql-gateway/gateway/config"
-	"github.com/openmfp/crd-gql-gateway/gateway/manager"
+	appCfg "github.com/openmfp/kubernetes-graphql-gateway/gateway/config"
+	"github.com/openmfp/kubernetes-graphql-gateway/gateway/manager"
 )
 
 var gatewayCmd = &cobra.Command{

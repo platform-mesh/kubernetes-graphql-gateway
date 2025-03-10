@@ -8,7 +8,7 @@ import (
 	"github.com/graphql-go/handler"
 	"github.com/spf13/cobra"
 
-	"github.com/openmfp/crd-gql-gateway/deprecated"
+	"github.com/openmfp/kubernetes-graphql-gateway/deprecated"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	controllerruntime "sigs.k8s.io/controller-runtime"

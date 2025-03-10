@@ -1,6 +1,6 @@
 package main
 
-import "github.com/openmfp/crd-gql-gateway/cmd"
+import "github.com/openmfp/kubernetes-graphql-gateway/cmd"
 
 func main() {
 	cmd.Execute()

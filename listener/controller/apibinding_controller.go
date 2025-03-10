@@ -8,10 +8,10 @@ import (
 
 	"io/fs"
 
-	"github.com/openmfp/crd-gql-gateway/listener/apischema"
-	"github.com/openmfp/crd-gql-gateway/listener/clusterpath"
-	"github.com/openmfp/crd-gql-gateway/listener/discoveryclient"
-	"github.com/openmfp/crd-gql-gateway/listener/workspacefile"
+	"github.com/openmfp/kubernetes-graphql-gateway/listener/apischema"
+	"github.com/openmfp/kubernetes-graphql-gateway/listener/clusterpath"
+	"github.com/openmfp/kubernetes-graphql-gateway/listener/discoveryclient"
+	"github.com/openmfp/kubernetes-graphql-gateway/listener/workspacefile"
 
 	kcpapis "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
 

@@ -1,4 +1,4 @@
-module github.com/openmfp/crd-gql-gateway
+module github.com/openmfp/kubernetes-graphql-gateway
 
 go 1.23.2
 

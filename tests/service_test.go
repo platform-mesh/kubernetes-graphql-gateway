@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/openmfp/crd-gql-gateway/tests/graphql"
+	"github.com/openmfp/kubernetes-graphql-gateway/tests/graphql"
 	"github.com/stretchr/testify/require"
 )
 

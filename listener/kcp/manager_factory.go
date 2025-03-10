@@ -3,7 +3,7 @@ package kcp
 import (
 	"fmt"
 
-	"github.com/openmfp/crd-gql-gateway/listener/flags"
+	"github.com/openmfp/kubernetes-graphql-gateway/listener/flags"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	kcpctrl "sigs.k8s.io/controller-runtime/pkg/kcp"

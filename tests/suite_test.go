@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	appConfig "github.com/openmfp/crd-gql-gateway/gateway/config"
-	"github.com/openmfp/crd-gql-gateway/gateway/manager"
 	"github.com/openmfp/golang-commons/logger"
+	appConfig "github.com/openmfp/kubernetes-graphql-gateway/gateway/config"
+	"github.com/openmfp/kubernetes-graphql-gateway/gateway/manager"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"k8s.io/client-go/rest"

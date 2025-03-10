@@ -2,10 +2,10 @@ package gateway
 
 import (
 	"github.com/graphql-go/graphql"
-	"github.com/openmfp/crd-gql-gateway/gateway/manager"
-	"github.com/openmfp/crd-gql-gateway/gateway/resolver"
-	"github.com/openmfp/crd-gql-gateway/gateway/schema"
 	"github.com/openmfp/golang-commons/logger"
+	"github.com/openmfp/kubernetes-graphql-gateway/gateway/manager"
+	"github.com/openmfp/kubernetes-graphql-gateway/gateway/resolver"
+	"github.com/openmfp/kubernetes-graphql-gateway/gateway/schema"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"k8s.io/client-go/rest"

@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/graphql-go/graphql"
-	"github.com/openmfp/crd-gql-gateway/gateway/resolver/mocks"
 	"github.com/openmfp/golang-commons/logger"
+	"github.com/openmfp/kubernetes-graphql-gateway/gateway/resolver/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"

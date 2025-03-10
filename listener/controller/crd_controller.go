@@ -5,8 +5,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/openmfp/crd-gql-gateway/listener/apischema"
-	"github.com/openmfp/crd-gql-gateway/listener/workspacefile"
+	"github.com/openmfp/kubernetes-graphql-gateway/listener/apischema"
+	"github.com/openmfp/kubernetes-graphql-gateway/listener/workspacefile"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"

@@ -12,9 +12,9 @@ import (
 	"github.com/graphql-go/graphql"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	"github.com/openmfp/crd-gql-gateway/common"
-	"github.com/openmfp/crd-gql-gateway/gateway/resolver"
 	"github.com/openmfp/golang-commons/logger"
+	"github.com/openmfp/kubernetes-graphql-gateway/common"
+	"github.com/openmfp/kubernetes-graphql-gateway/gateway/resolver"
 )
 
 type Provider interface {
