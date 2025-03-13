@@ -3,9 +3,9 @@ version: '3'
 dotenv: ['.taskenv', '.secret/.env', '{{.HOME}}/.env' ]
 vars:
   LOCAL_BIN: bin
-  ENVTEST_K8S_VERSION: "1.29.0"
-  ENVTEST_VERSION: release-0.17
-  MOCKERY_VERSION: v2.52.3
+  ENVTEST_K8S_VERSION: "1.30.0" # to get latest version run $(pwd)/bin/setup-envtest list
+  ENVTEST_VERSION: "release-0.20" # https://github.com/kubernetes-sigs/controller-runtime/releases
+  MOCKERY_VERSION: v2.52.3 # https://github.com/vektra/mockery/releases
 tasks:
   ## Setup
   setup:mockery:
@@ -15,7 +15,7 @@ tasks:
   setup:envtest:
     internal: true
     cmds:
-      - test -s {{.LOCAL_BIN}}/setup-envtest|| GOBIN=$(pwd)/{{.LOCAL_BIN}} go install sigs.k8s.io/controller-runtime/tools/setup-envtest@{{.ENVTEST_VERSION}}
+      - test -s {{.LOCAL_BIN}}/setup-envtest || GOBIN=$(pwd)/{{.LOCAL_BIN}} go install sigs.k8s.io/controller-runtime/tools/setup-envtest@{{.ENVTEST_VERSION}}
   setup:golangci-lint:
     internal: true
     cmds:
@@ -30,9 +30,6 @@ tasks:
     deps: [ setup:mockery ]
     cmds:
       - "{{.LOCAL_BIN}}/mockery"
-  build:
-    cmds:
-      - go build ./...
   docker:
     cmds:
       - docker build -t ghcr.io/openmfp/kubernetes-graphql-gateway .
@@ -59,11 +56,12 @@ tasks:
         vars:
           ADDITIONAL_COMMAND_ARGS: -coverprofile=./cover.out -covermode=atomic -coverpkg=./...
   cover:
-    deps: [setup:envtest]
+    deps: [setup:envtest, setup:go-test-coverage]
     cmds:
       - task: envtest
         vars:
           ADDITIONAL_COMMAND_ARGS: -coverprofile=./cover.out -covermode=atomic -coverpkg=./...
+      - "{{.LOCAL_BIN}}/go-test-coverage --profile cover.out --config ./.testcoverage.yml"
   validate:
     cmds:
       - task: mockery

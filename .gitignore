@@ -1,16 +1,11 @@
-# If you prefer the allow list template instead of the deny list, see community template:
-# https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
-#
 # Binaries for programs and plugins
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
-.vscode
-.idea
-.secret
-.env
+bin/*
+Dockerfile.cross
 bin
 
 # Test binary, built with `go test -c`
@@ -20,14 +15,29 @@ bin
 *.out
 coverage.html
 
-# Dependency directories (remove the comment below to include it)
-# vendor/
+# Kubernetes Generated files - skip generated files, except for vendored files
+!vendor/**/zz_generated.*
+
+# editor and IDE paraphernalia
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# MacOS
+**/.DS_Store
+
+# KCP local files
+**/.kcp/
+.kcp
+
+# Secrets and environment files
+.secret
+.env
 
 # Go workspace file
 go.work
 
 # binary files
 main
-
-# kcp
-.kcp

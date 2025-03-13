@@ -16,14 +16,16 @@ import (
 	"github.com/graphql-go/graphql"
 	"github.com/graphql-go/handler"
 	"github.com/kcp-dev/logicalcluster/v3"
-	"github.com/openmfp/golang-commons/logger"
-	appConfig "github.com/openmfp/kubernetes-graphql-gateway/gateway/config"
-	"github.com/openmfp/kubernetes-graphql-gateway/gateway/resolver"
-	"github.com/openmfp/kubernetes-graphql-gateway/gateway/schema"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/kcp"
 	"sigs.k8s.io/controller-runtime/pkg/kontext"
+
+	"github.com/openmfp/golang-commons/logger"
+
+	appConfig "github.com/openmfp/kubernetes-graphql-gateway/common/config"
+	"github.com/openmfp/kubernetes-graphql-gateway/gateway/resolver"
+	"github.com/openmfp/kubernetes-graphql-gateway/gateway/schema"
 )
 
 type Provider interface {
@@ -37,7 +39,7 @@ type FileWatcher interface {
 }
 
 type Service struct {
-	appCfg   appConfig.Config
+	appCfg   *appConfig.Config
 	handlers map[string]*graphqlHandler
 	log      *logger.Logger
 	mu       sync.RWMutex
@@ -51,7 +53,7 @@ type graphqlHandler struct {
 	handler http.Handler
 }
 
-func NewManager(log *logger.Logger, cfg *rest.Config, appCfg appConfig.Config) (*Service, error) {
+func NewManager(log *logger.Logger, cfg *rest.Config, appCfg *appConfig.Config) (*Service, error) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return nil, err

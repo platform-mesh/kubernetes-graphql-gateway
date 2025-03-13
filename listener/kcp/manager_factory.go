@@ -3,16 +3,17 @@ package kcp
 import (
 	"fmt"
 
-	"github.com/openmfp/kubernetes-graphql-gateway/listener/flags"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	kcpctrl "sigs.k8s.io/controller-runtime/pkg/kcp"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+
+	"github.com/openmfp/kubernetes-graphql-gateway/common/config"
 )
 
 type NewManagerFunc func(cfg *rest.Config, opts ctrl.Options) (manager.Manager, error)
 
-func ManagerFactory(opFlags *flags.Flags) NewManagerFunc {
+func ManagerFactory(opFlags *config.Config) NewManagerFunc {
 	if opFlags.EnableKcp {
 		return NewKcpManager
 	}

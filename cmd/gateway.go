@@ -14,7 +14,7 @@ import (
 
 	"github.com/openmfp/golang-commons/logger"
 
-	appCfg "github.com/openmfp/kubernetes-graphql-gateway/gateway/config"
+	appConfig "github.com/openmfp/kubernetes-graphql-gateway/common/config"
 	"github.com/openmfp/kubernetes-graphql-gateway/gateway/manager"
 )
 
@@ -25,7 +25,7 @@ var gatewayCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		start := time.Now()
 
-		appCfg, err := appCfg.NewFromEnv()
+		appCfg, err := appConfig.NewFromEnv()
 		if err != nil {
 			log.Fatal().Err(err).Msg("Error getting app restCfg, exiting")
 		}

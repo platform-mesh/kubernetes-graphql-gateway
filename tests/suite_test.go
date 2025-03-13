@@ -7,13 +7,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openmfp/golang-commons/logger"
-	appConfig "github.com/openmfp/kubernetes-graphql-gateway/gateway/config"
-	"github.com/openmfp/kubernetes-graphql-gateway/gateway/manager"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
+
+	"github.com/openmfp/golang-commons/logger"
+
+	appCfg "github.com/openmfp/kubernetes-graphql-gateway/common/config"
+	"github.com/openmfp/kubernetes-graphql-gateway/gateway/manager"
 )
 
 type CommonTestSuite struct {
@@ -21,7 +23,7 @@ type CommonTestSuite struct {
 	testEnv *envtest.Environment
 	log     *logger.Logger
 	cfg     *rest.Config
-	appCfg  appConfig.Config
+	appCfg  *appCfg.Config
 	manager manager.Provider
 	server  *httptest.Server
 }
