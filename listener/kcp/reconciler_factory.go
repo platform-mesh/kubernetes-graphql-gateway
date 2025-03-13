@@ -30,26 +30,45 @@ type CustomReconciler interface {
 type ReconcilerOpts struct {
 	*rest.Config
 	*runtime.Scheme
+	client.Client
 	OpenAPIDefinitionsPath string
 }
 
-type NewReconcilerFunc func(opts ReconcilerOpts) (CustomReconciler, error)
+type newDiscoveryFactoryFunc func(cfg *rest.Config) (*discoveryclient.Factory, error)
 
-func ReconcilerFactory(opFlags *config.Config) NewReconcilerFunc {
-	if opFlags.EnableKcp {
-		return NewKcpReconciler
-	}
-	return NewReconciler
+type preReconcileFunc func(cr *apischema.CRDResolver, io *workspacefile.IOHandler) error
+
+type newDiscoveryIFFunc func(cfg *rest.Config) (discovery.DiscoveryInterface, error)
+
+func discoveryCltFactory(cfg *rest.Config) (discovery.DiscoveryInterface, error) {
+	return discovery.NewDiscoveryClientForConfig(cfg)
 }
 
-func NewReconciler(opts ReconcilerOpts) (CustomReconciler, error) {
-	clt, err := client.New(opts.Config, client.Options{
-		Scheme: opts.Scheme,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create client: %w", err)
+type ReconcilerFactory struct {
+	IsKCPEnabled bool
+	newDiscoveryIFFunc
+	preReconcileFunc
+	newDiscoveryFactoryFunc
+}
+
+func NewReconcilerFactory(opFlags *config.Config) *ReconcilerFactory {
+	return &ReconcilerFactory{
+		IsKCPEnabled:            opFlags.EnableKcp,
+		newDiscoveryIFFunc:      discoveryCltFactory,
+		preReconcileFunc:        preReconcile,
+		newDiscoveryFactoryFunc: discoveryclient.NewFactory,
 	}
-	dc, err := discovery.NewDiscoveryClientForConfig(opts.Config)
+}
+
+func (f *ReconcilerFactory) NewReconciler(opts ReconcilerOpts) (CustomReconciler, error) {
+	if !f.IsKCPEnabled {
+		return f.newStdReconciler(opts)
+	}
+	return f.newKcpReconciler(opts)
+}
+
+func (f *ReconcilerFactory) newStdReconciler(opts ReconcilerOpts) (CustomReconciler, error) {
+	dc, err := f.newDiscoveryIFFunc(opts.Config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create discovery client: %w", err)
 	}
@@ -65,15 +84,16 @@ func NewReconciler(opts ReconcilerOpts) (CustomReconciler, error) {
 	}
 
 	schemaResolver := &apischema.CRDResolver{
-		DiscoveryClient: dc,
-		RESTMapper:      rm,
+		DiscoveryInterface: dc,
+		RESTMapper:         rm,
 	}
 
-	if err := preReconcile(schemaResolver, ioHandler); err != nil {
+	if err := f.preReconcileFunc(schemaResolver, ioHandler); err != nil {
 		return nil, fmt.Errorf("failed to generate OpenAPI Schema for cluster: %w", err)
 	}
 
-	return controller.NewCRDReconciler(kubernetesClusterName, clt, schemaResolver, ioHandler), nil
+	return controller.NewCRDReconciler(kubernetesClusterName, opts.Client, schemaResolver, ioHandler), nil
+
 }
 
 func restMapperFromConfig(cfg *rest.Config) (meta.RESTMapper, error) {
@@ -90,7 +110,7 @@ func restMapperFromConfig(cfg *rest.Config) (meta.RESTMapper, error) {
 
 func preReconcile(
 	cr *apischema.CRDResolver,
-	io workspacefile.IOHandler,
+	io *workspacefile.IOHandler,
 ) error {
 	JSON, err := cr.Resolve()
 	if err != nil {
@@ -102,26 +122,24 @@ func preReconcile(
 	return nil
 }
 
-func NewKcpReconciler(opts ReconcilerOpts) (CustomReconciler, error) {
-	virtualWorkspaceCfg, err := virtualWorkspaceConfigFromCfg(opts.Config, opts.Scheme)
-	if err != nil {
-		return nil, fmt.Errorf("unable to get virtual workspace config: %w", err)
-	}
+func (f *ReconcilerFactory) newKcpReconciler(opts ReconcilerOpts) (CustomReconciler, error) {
 	ioHandler, err := workspacefile.NewIOHandler(opts.OpenAPIDefinitionsPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create IO Handler: %w", err)
 	}
-
-	df, err := discoveryclient.NewFactory(virtualWorkspaceCfg)
+	pr, err := clusterpath.NewResolver(opts.Config, opts.Scheme)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create cluster path resolver: %w", err)
+	}
+	virtualWorkspaceCfg, err := virtualWorkspaceConfigFromCfg(opts.Config, opts.Client)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get virtual workspace config: %w", err)
+	}
+	df, err := f.newDiscoveryFactoryFunc(virtualWorkspaceCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Discovery client factory: %w", err)
 	}
-
 	return controller.NewAPIBindingReconciler(
-		ioHandler, df, apischema.NewResolver(), &clusterpath.Resolver{
-			Scheme:       opts.Scheme,
-			Config:       opts.Config,
-			ResolverFunc: clusterpath.Resolve,
-		},
+		ioHandler, df, apischema.NewResolver(), pr,
 	), nil
 }

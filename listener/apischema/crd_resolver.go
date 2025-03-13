@@ -29,12 +29,12 @@ type GroupKindVersions struct {
 }
 
 type CRDResolver struct {
-	*discovery.DiscoveryClient
+	discovery.DiscoveryInterface
 	meta.RESTMapper
 }
 
 func (cr *CRDResolver) Resolve() ([]byte, error) {
-	return resolveSchema(cr.DiscoveryClient, cr.RESTMapper)
+	return resolveSchema(cr.DiscoveryInterface, cr.RESTMapper)
 }
 
 func (cr *CRDResolver) ResolveApiSchema(crd *apiextensionsv1.CustomResourceDefinition) ([]byte, error) {
