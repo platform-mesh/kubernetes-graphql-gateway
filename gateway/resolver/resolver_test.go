@@ -1,26 +1,28 @@
-package resolver
+package resolver_test
 
 import (
 	"context"
-	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"testing"
 
 	"github.com/graphql-go/graphql"
 	"github.com/openmfp/golang-commons/logger"
-	"github.com/openmfp/kubernetes-graphql-gateway/gateway/resolver/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/openmfp/kubernetes-graphql-gateway/gateway/resolver"
+	"github.com/openmfp/kubernetes-graphql-gateway/gateway/resolver/mocks"
 )
 
-func getResolver(runtimeClientMock client.WithWatch) (*Service, error) {
+func getResolver(runtimeClientMock client.WithWatch) (*resolver.Service, error) {
 	log, err := logger.New(logger.DefaultConfig())
 
-	return New(log, runtimeClientMock), err
+	return resolver.New(log, runtimeClientMock), err
 }
 
 func TestListItems(t *testing.T) {
@@ -34,8 +36,8 @@ func TestListItems(t *testing.T) {
 		{
 			name: "listItems_OK",
 			args: map[string]interface{}{
-				NamespaceArg:     "test-namespace",
-				LabelSelectorArg: "key=value",
+				resolver.NamespaceArg:     "test-namespace",
+				resolver.LabelSelectorArg: "key=value",
 			},
 			mockSetup: func(runtimeClientMock *mocks.MockWithWatch) {
 				runtimeClientMock.EXPECT().
@@ -68,7 +70,7 @@ func TestListItems(t *testing.T) {
 		{
 			name: "invalidLabelSelector_ERROR",
 			args: map[string]interface{}{
-				LabelSelectorArg: ",,",
+				resolver.LabelSelectorArg: ",,",
 			},
 			expectedItems: nil,
 			expectError:   true,
@@ -115,8 +117,8 @@ func TestGetItem(t *testing.T) {
 		{
 			name: "getItem_OK",
 			args: map[string]interface{}{
-				NameArg:      "test-object",
-				NamespaceArg: "test-namespace",
+				resolver.NameArg:      "test-object",
+				resolver.NamespaceArg: "test-namespace",
 			},
 			mockSetup: func(runtimeClientMock *mocks.MockWithWatch) {
 				runtimeClientMock.EXPECT().
@@ -140,8 +142,8 @@ func TestGetItem(t *testing.T) {
 		{
 			name: "getItem_ERROR",
 			args: map[string]interface{}{
-				NameArg:      "test-object",
-				NamespaceArg: "test-namespace",
+				resolver.NameArg:      "test-object",
+				resolver.NamespaceArg: "test-namespace",
 			},
 			mockSetup: func(runtimeClientMock *mocks.MockWithWatch) {
 				runtimeClientMock.EXPECT().
@@ -153,14 +155,14 @@ func TestGetItem(t *testing.T) {
 		{
 			name: "missingNameArg_ERROR",
 			args: map[string]interface{}{
-				NamespaceArg: "test-namespace",
+				resolver.NamespaceArg: "test-namespace",
 			},
 			expectError: true,
 		},
 		{
 			name: "missingNamespaceArg_ERROR",
 			args: map[string]interface{}{
-				NameArg: "test-object",
+				resolver.NameArg: "test-object",
 			},
 			expectError: true,
 		},
@@ -206,8 +208,8 @@ func TestCreateItem(t *testing.T) {
 		{
 			name: "create_item_OK",
 			args: map[string]interface{}{
-				NameArg:      "test-object",
-				NamespaceArg: "test-namespace",
+				resolver.NameArg:      "test-object",
+				resolver.NamespaceArg: "test-namespace",
 				"object": map[string]interface{}{
 					"metadata": map[string]interface{}{
 						"name": "test-object",
@@ -231,8 +233,8 @@ func TestCreateItem(t *testing.T) {
 		{
 			name: "create_item_ERROR",
 			args: map[string]interface{}{
-				NameArg:      "test-object",
-				NamespaceArg: "test-namespace",
+				resolver.NameArg:      "test-object",
+				resolver.NamespaceArg: "test-namespace",
 				"object": map[string]interface{}{
 					"metadata": map[string]interface{}{
 						"name": "test-object",
@@ -249,8 +251,8 @@ func TestCreateItem(t *testing.T) {
 		{
 			name: "missing_metadata_name_ERROR",
 			args: map[string]interface{}{
-				NamespaceArg: "test-namespace",
-				"object":     map[string]interface{}{},
+				resolver.NamespaceArg: "test-namespace",
+				"object":              map[string]interface{}{},
 			},
 			expectError: true,
 		},
@@ -296,8 +298,8 @@ func TestUpdateItem(t *testing.T) {
 		{
 			name: "update_item_OK",
 			args: map[string]interface{}{
-				NameArg:      "test-object",
-				NamespaceArg: "test-namespace",
+				resolver.NameArg:      "test-object",
+				resolver.NamespaceArg: "test-namespace",
 				"object": map[string]interface{}{
 					"metadata": map[string]interface{}{
 						"name": "test-object",
@@ -330,16 +332,16 @@ func TestUpdateItem(t *testing.T) {
 		{
 			name: "missing_metadata_name_ERROR",
 			args: map[string]interface{}{
-				NamespaceArg: "test-namespace",
-				"object":     map[string]interface{}{},
+				resolver.NamespaceArg: "test-namespace",
+				"object":              map[string]interface{}{},
 			},
 			expectError: true,
 		},
 		{
 			name: "get_existing_object_ERROR",
 			args: map[string]interface{}{
-				NameArg:      "test-object",
-				NamespaceArg: "test-namespace",
+				resolver.NameArg:      "test-object",
+				resolver.NamespaceArg: "test-namespace",
 				"object": map[string]interface{}{
 					"metadata": map[string]interface{}{
 						"name": "test-object",
@@ -356,8 +358,8 @@ func TestUpdateItem(t *testing.T) {
 		{
 			name: "patch_object_ERROR",
 			args: map[string]interface{}{
-				NameArg:      "test-object",
-				NamespaceArg: "test-namespace",
+				resolver.NameArg:      "test-object",
+				resolver.NamespaceArg: "test-namespace",
 				"object": map[string]interface{}{
 					"metadata": map[string]interface{}{
 						"name": "test-object",
@@ -416,8 +418,8 @@ func TestDeleteItem(t *testing.T) {
 		{
 			name: "delete_item_OK",
 			args: map[string]interface{}{
-				NameArg:      "test-object",
-				NamespaceArg: "test-namespace",
+				resolver.NameArg:      "test-object",
+				resolver.NamespaceArg: "test-namespace",
 			},
 			mockSetup: func(runtimeClientMock *mocks.MockWithWatch) {
 				runtimeClientMock.EXPECT().
@@ -428,22 +430,22 @@ func TestDeleteItem(t *testing.T) {
 		{
 			name: "missing_name_argument_ERROR",
 			args: map[string]interface{}{
-				NamespaceArg: "test-namespace",
+				resolver.NamespaceArg: "test-namespace",
 			},
 			expectError: true,
 		},
 		{
 			name: "missing_namespace_argument_ERROR",
 			args: map[string]interface{}{
-				NameArg: "test-object",
+				resolver.NameArg: "test-object",
 			},
 			expectError: true,
 		},
 		{
 			name: "delete_object_ERROR",
 			args: map[string]interface{}{
-				NameArg:      "test-object",
-				NamespaceArg: "test-namespace",
+				resolver.NameArg:      "test-object",
+				resolver.NamespaceArg: "test-namespace",
 			},
 			mockSetup: func(runtimeClientMock *mocks.MockWithWatch) {
 				runtimeClientMock.EXPECT().
@@ -479,59 +481,6 @@ func TestDeleteItem(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, true, result)
 			}
-		})
-	}
-}
-
-func TestSanitizeGroupName(t *testing.T) {
-	r := &Service{
-		groupNames: make(map[string]string),
-	}
-
-	tests := []struct {
-		name     string
-		input    string
-		expected string
-	}{
-		{"empty_string", "", "core"},
-		{"valid_group_name", "validName", "validName"},
-		{"hyphen_to_underscore", "group-name", "group_name"},
-		{"special_char_to_underscore", "group@name", "group_name"},
-		{"invalid_start_with_prepend", "!invalidStart", "_invalidStart"},
-		{"leading_underscore", "_leadingUnderscore", "_leadingUnderscore"},
-		{"start_with_number", "123startWithNumber", "_123startWithNumber"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := r.SanitizeGroupName(tt.input)
-			assert.Equal(t, tt.expected, result)
-			assert.Equal(t, tt.input, r.groupNames[result], "The original group name should be stored correctly")
-		})
-	}
-}
-
-func TestGetOriginalGroupName(t *testing.T) {
-	r := &Service{
-		groupNames: map[string]string{
-			"group1": "originalGroup1",
-			"group2": "originalGroup2",
-		},
-	}
-
-	tests := []struct {
-		name     string
-		input    string
-		expected string
-	}{
-		{"existing_group", "group1", "originalGroup1"},
-		{"non_existing_group", "group3", "group3"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := r.getOriginalGroupName(tt.input)
-			assert.Equal(t, tt.expected, result)
 		})
 	}
 }

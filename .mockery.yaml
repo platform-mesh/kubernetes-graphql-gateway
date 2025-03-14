@@ -8,3 +8,10 @@ packages:
       outpkg: mocks
     interfaces:
       WithWatch:
+  net/http:
+    config:
+      dir: gateway/manager/mocks
+      outpkg: mocks
+    interfaces:
+      RoundTripper:
+

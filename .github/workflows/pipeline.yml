@@ -19,7 +19,8 @@ jobs:
       useTask: true
       useLocalCoverageConfig: true
       imageTagName: ghcr.io/openmfp/kubernetes-graphql-gateway
-      coverageThreasholdFile: 0
-      coverageThresholdPackage: 0
-      coverageThreasholdTotal: 49
+      coverageThreasholdFile: 49
+      coverageThresholdPackage: 65
+      coverageThreasholdTotal: 62
+
 

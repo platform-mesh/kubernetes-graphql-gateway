@@ -1,20 +1,20 @@
-package graphql
+package gateway_test
 
-type PodData struct {
-	Metadata Metadata `json:"metadata"`
-	Spec     PodSpec  `json:"spec"`
+type podData struct {
+	Metadata metadata `json:"metadata"`
+	Spec     podSpec  `json:"spec"`
 }
 
-type PodSpec struct {
-	Containers []Container `json:"containers"`
+type podSpec struct {
+	Containers []container `json:"containers"`
 }
 
-type Container struct {
+type container struct {
 	Name  string `json:"name"`
 	Image string `json:"image"`
 }
 
-func CreatePodMutation() string {
+func createPodMutation() string {
 	return `
     mutation {
       core {
@@ -48,7 +48,7 @@ func CreatePodMutation() string {
     `
 }
 
-func GetPodQuery() string {
+func getPodQuery() string {
 	return `
     query {
       core {
@@ -69,7 +69,7 @@ func GetPodQuery() string {
     `
 }
 
-func DeletePodMutation() string {
+func deletePodMutation() string {
 	return `
     mutation {
       core {

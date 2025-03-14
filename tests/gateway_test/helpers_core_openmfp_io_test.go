@@ -1,18 +1,22 @@
-package graphql
+package gateway_test
 
-// AccountData represents the Account resource with its metadata and specification.
-type AccountData struct {
-	Metadata Metadata    `json:"metadata"`
-	Spec     AccountSpec `json:"spec"`
+type coreOpenmfpIo struct {
+	Account       *account `json:"Account,omitempty"`
+	CreateAccount *account `json:"createAccount,omitempty"`
+	DeleteAccount *bool    `json:"deleteAccount,omitempty"`
 }
 
-// AccountSpec defines the desired state of the Account.
-type AccountSpec struct {
+type account struct {
+	Metadata metadata    `json:"metadata"`
+	Spec     accountSpec `json:"spec"`
+}
+
+type accountSpec struct {
 	Type        string `json:"type"`
 	DisplayName string `json:"displayName"`
 }
 
-func CreateAccountMutation() string {
+func createAccountMutation() string {
 	return `
 mutation {
   core_openmfp_io {
@@ -41,7 +45,7 @@ mutation {
     `
 }
 
-func GetAccountQuery() string {
+func getAccountQuery() string {
 	return `
         query {
 			core_openmfp_io {
@@ -59,7 +63,7 @@ func GetAccountQuery() string {
     `
 }
 
-func DeleteAccountMutation() string {
+func deleteAccountMutation() string {
 	return `
 		mutation {
 		  core_openmfp_io {
