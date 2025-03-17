@@ -2,9 +2,11 @@ package resolver
 
 import (
 	"fmt"
-	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"reflect"
+	"slices"
 	"strings"
+
+	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
 	"github.com/graphql-go/graphql/language/ast"
 	"k8s.io/apimachinery/pkg/watch"
@@ -167,6 +169,12 @@ func (r *Service) runWatch(
 					for _, item := range previousObjects {
 						items = append(items, item.DeepCopy().Object)
 					}
+
+					slices.SortFunc(items, func(i, j map[string]any) int {
+						nameA, _, _ := unstructured.NestedString(i, "metadata", "name")
+						nameB, _, _ := unstructured.NestedString(j, "metadata", "name")
+						return strings.Compare(nameA, nameB)
+					})
 
 					select {
 					case <-ctx.Done():
