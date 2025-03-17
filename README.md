@@ -240,7 +240,7 @@ The release is performed automatically through a GitHub Actions Workflow. The re
 
 ## Requirements
 
-Please refer https://github.com/openmfp/kubernetes-graphql-gateway?tab=readme-ov-file#usage for the requirements.
+Please refer [README.md#usage](README.md#usage) for the requirements.
 
 ## Security / Disclosure
 
