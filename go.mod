@@ -32,7 +32,7 @@ require (
 	k8s.io/apiextensions-apiserver v0.32.3
 	k8s.io/apimachinery v0.32.3
 	k8s.io/client-go v0.32.3
-	k8s.io/kube-openapi v0.0.0-20250318142150-58bc1449e42a
+	k8s.io/kube-openapi v0.0.0-20250318181150-9d41124bde80
 	sigs.k8s.io/controller-runtime v0.20.3
 )
 
