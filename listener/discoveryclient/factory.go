@@ -11,6 +11,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 )
 
+var (
+	ErrNilConfig           = errors.New("config cannot be nil")
+	ErrGetClusterConfig    = errors.New("failed to get rest config for cluster")
+	ErrParseHostURL        = errors.New("failed to parse rest config's Host URL")
+	ErrCreateHTTPClient    = errors.New("failed to create http client")
+	ErrCreateDynamicMapper = errors.New("failed to create dynamic REST mapper")
+)
+
 type NewDiscoveryIFFunc func(cfg *rest.Config) (discovery.DiscoveryInterface, error)
 
 func discoveryCltFactory(cfg *rest.Config) (discovery.DiscoveryInterface, error) {
@@ -24,7 +32,7 @@ type Factory struct {
 
 func NewFactory(cfg *rest.Config) (*Factory, error) {
 	if cfg == nil {
-		return nil, errors.New("config should not be nil")
+		return nil, ErrNilConfig
 	}
 	return &Factory{
 		Config:             cfg,
@@ -35,7 +43,7 @@ func NewFactory(cfg *rest.Config) (*Factory, error) {
 func (f *Factory) ClientForCluster(name string) (discovery.DiscoveryInterface, error) {
 	clusterCfg, err := configForCluster(name, f.Config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get rest config for cluster: %w", err)
+		return nil, errors.Join(ErrGetClusterConfig, err)
 	}
 	return f.NewDiscoveryIFFunc(clusterCfg)
 }
@@ -43,20 +51,24 @@ func (f *Factory) ClientForCluster(name string) (discovery.DiscoveryInterface, e
 func (f *Factory) RestMapperForCluster(name string) (meta.RESTMapper, error) {
 	clusterCfg, err := configForCluster(name, f.Config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get rest config for cluster: %w", err)
+		return nil, errors.Join(ErrGetClusterConfig, err)
 	}
 	httpClt, err := rest.HTTPClientFor(clusterCfg)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create http client: %w", err)
+		return nil, errors.Join(ErrCreateHTTPClient, err)
 	}
-	return apiutil.NewDynamicRESTMapper(clusterCfg, httpClt)
+	mapper, err := apiutil.NewDynamicRESTMapper(clusterCfg, httpClt)
+	if err != nil {
+		return nil, errors.Join(ErrCreateDynamicMapper, err)
+	}
+	return mapper, nil
 }
 
 func configForCluster(name string, cfg *rest.Config) (*rest.Config, error) {
 	clusterCfg := rest.CopyConfig(cfg)
 	clusterCfgURL, err := url.Parse(clusterCfg.Host)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse rest config's Host URL: %w", err)
+		return nil, errors.Join(ErrParseHostURL, err)
 	}
 	clusterCfgURL.Path = fmt.Sprintf("/clusters/%s", name)
 	clusterCfg.Host = clusterCfgURL.String()

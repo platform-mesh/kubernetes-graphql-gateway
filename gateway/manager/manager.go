@@ -39,7 +39,7 @@ type FileWatcher interface {
 }
 
 type Service struct {
-	appCfg   *appConfig.Config
+	appCfg   appConfig.Config
 	handlers map[string]*graphqlHandler
 	log      *logger.Logger
 	mu       sync.RWMutex
@@ -53,7 +53,7 @@ type graphqlHandler struct {
 	handler http.Handler
 }
 
-func NewManager(log *logger.Logger, cfg *rest.Config, appCfg *appConfig.Config) (*Service, error) {
+func NewManager(log *logger.Logger, cfg *rest.Config, appCfg appConfig.Config) (*Service, error) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return nil, err

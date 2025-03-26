@@ -3,7 +3,6 @@ package apischema
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"slices"
 	"strings"
 
@@ -18,9 +17,13 @@ import (
 )
 
 var (
-	ErrInvalidPath     = errors.New("path doesn't contain the / separator")
-	ErrNotPreferred    = errors.New("path ApiGroup does not belong to the server preferred APIs")
-	ErrGVKNotPreferred = errors.New("failed to find CRD GVK in API preferred resources")
+	ErrInvalidPath              = errors.New("path doesn't contain the / separator")
+	ErrNotPreferred             = errors.New("path ApiGroup does not belong to the server preferred APIs")
+	ErrGVKNotPreferred          = errors.New("failed to find CRD GVK in API preferred resources")
+	ErrGetServerPreferred       = errors.New("failed to get server preferred resources")
+	ErrFilterPreferredResources = errors.New("failed to filter server preferred resources")
+	ErrGetSchemaForPath         = errors.New("failed to get schema for path")
+	ErrUnmarshalSchemaForPath   = errors.New("failed to unmarshal schema for path")
 )
 
 type GroupKindVersions struct {
@@ -42,12 +45,12 @@ func (cr *CRDResolver) ResolveApiSchema(crd *apiextensionsv1.CustomResourceDefin
 
 	apiResLists, err := cr.ServerPreferredResources()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get server preferred resources: %w", err)
+		return nil, errors.Join(ErrGetServerPreferred, err)
 	}
 
 	preferredApiGroups, err := errorIfCRDNotInPreferredApiGroups(gkv, apiResLists)
 	if err != nil {
-		return nil, fmt.Errorf("failed to filter server preferred resources: %w", err)
+		return nil, errors.Join(ErrFilterPreferredResources, err)
 	}
 
 	return NewSchemaBuilder(cr.OpenAPIV3(), preferredApiGroups).
@@ -114,12 +117,12 @@ func getSchemaForPath(preferredApiGroups []string, path string, gv openapi.Group
 
 	b, err := gv.Schema(discovery.AcceptV1)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get schema for path %s :%w", path, err)
+		return nil, errors.Join(ErrGetSchemaForPath, err)
 	}
 
 	resp := &schemaResponse{}
 	if err := json.Unmarshal(b, resp); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal schema for path %s :%w", path, err)
+		return nil, errors.Join(ErrUnmarshalSchemaForPath, err)
 	}
 	return resp.Components.Schemas, nil
 }
@@ -127,7 +130,7 @@ func getSchemaForPath(preferredApiGroups []string, path string, gv openapi.Group
 func resolveSchema(dc discovery.DiscoveryInterface, rm meta.RESTMapper) ([]byte, error) {
 	apiResList, err := dc.ServerPreferredResources()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get server preferred resources: %w", err)
+		return nil, errors.Join(ErrGetServerPreferred, err)
 	}
 
 	var preferredApiGroups []string

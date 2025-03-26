@@ -13,8 +13,12 @@ import (
 )
 
 var (
-	errNilConfig = errors.New("config should not be nil")
-	errNilScheme = errors.New("scheme should not be nil")
+	ErrNilConfig             = errors.New("config cannot be nil")
+	ErrNilScheme             = errors.New("scheme should not be nil")
+	ErrGetClusterConfig      = errors.New("failed to get cluster config")
+	ErrGetLogicalCluster     = errors.New("failed to get logicalcluster resource")
+	ErrMissingPathAnnotation = errors.New("failed to get cluster path from kcp.io/path annotation")
+	ErrParseHostURL          = errors.New("failed to parse rest config's Host URL")
 )
 
 type clientFactory func(config *rest.Config, options client.Options) (client.Client, error)
@@ -27,10 +31,10 @@ type Resolver struct {
 
 func NewResolver(cfg *rest.Config, scheme *runtime.Scheme) (*Resolver, error) {
 	if cfg == nil {
-		return nil, errNilConfig
+		return nil, ErrNilConfig
 	}
 	if scheme == nil {
-		return nil, errNilScheme
+		return nil, ErrNilScheme
 	}
 	return &Resolver{
 		Scheme:        scheme,
@@ -42,7 +46,7 @@ func NewResolver(cfg *rest.Config, scheme *runtime.Scheme) (*Resolver, error) {
 func (rf *Resolver) ClientForCluster(name string) (client.Client, error) {
 	clusterConfig, err := getClusterConfig(name, rf.Config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get cluster config: %w", err)
+		return nil, errors.Join(ErrGetClusterConfig, err)
 	}
 	return rf.clientFactory(clusterConfig, client.Options{Scheme: rf.Scheme})
 }
@@ -53,23 +57,23 @@ func PathForCluster(name string, clt client.Client) (string, error) {
 	}
 	lc := &kcpcore.LogicalCluster{}
 	if err := clt.Get(context.TODO(), client.ObjectKey{Name: "cluster"}, lc); err != nil {
-		return "", fmt.Errorf("failed to get logicalcluster resource: %w", err)
+		return "", errors.Join(ErrGetLogicalCluster, err)
 	}
 	path, ok := lc.GetAnnotations()["kcp.io/path"]
 	if !ok {
-		return "", errors.New("failed to get cluster path from kcp.io/path annotation")
+		return "", ErrMissingPathAnnotation
 	}
 	return path, nil
 }
 
 func getClusterConfig(name string, cfg *rest.Config) (*rest.Config, error) {
 	if cfg == nil {
-		return nil, errors.New("config should not be nil")
+		return nil, ErrNilConfig
 	}
 	clusterCfg := rest.CopyConfig(cfg)
 	clusterCfgURL, err := url.Parse(clusterCfg.Host)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse rest config's Host URL: %w", err)
+		return nil, errors.Join(ErrParseHostURL, err)
 	}
 	clusterCfgURL.Path = fmt.Sprintf("/clusters/%s", name)
 	clusterCfg.Host = clusterCfgURL.String()

@@ -2,6 +2,7 @@ package apischema
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"maps"
@@ -19,6 +20,17 @@ import (
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
+var (
+	ErrGetOpenAPIPaths      = errors.New("failed to get OpenAPI paths")
+	ErrGetCRDGVK            = errors.New("failed to get CRD GVK")
+	ErrParseGroupVersion    = errors.New("failed to parse groupVersion")
+	ErrMarshalOpenAPISchema = errors.New("failed to marshal openAPI v3 runtimeSchema")
+	ErrConvertOpenAPISchema = errors.New("failed to convert openAPI v3 runtimeSchema to v2")
+	ErrCRDNoVersions        = errors.New("CRD has no versions defined")
+	ErrMarshalGVK           = errors.New("failed to marshal GVK extension")
+	ErrUnmarshalGVK         = errors.New("failed to unmarshal GVK extension")
+)
+
 // SchemaBuilder helps construct GraphQL field config arguments
 type SchemaBuilder struct {
 	schemas map[string]*spec.Schema
@@ -32,7 +44,7 @@ func NewSchemaBuilder(oc openapi.Client, preferredApiGroups []string) *SchemaBui
 
 	apiv3Paths, err := oc.Paths()
 	if err != nil {
-		b.err = multierror.Append(b.err, fmt.Errorf("failed to get OpenAPI paths: %w", err))
+		b.err = multierror.Append(b.err, errors.Join(ErrGetOpenAPIPaths, err))
 		return b
 	}
 
@@ -66,14 +78,14 @@ func (b *SchemaBuilder) WithScope(rm meta.RESTMapper) *SchemaBuilder {
 		if gvksVal, ok = schema.VendorExtensible.Extensions[common.GVKExtensionKey]; !ok {
 			continue
 		}
-		b, err := json.Marshal(gvksVal)
+		jsonBytes, err := json.Marshal(gvksVal)
 		if err != nil {
-			//TODO: debug log?
+			b.err = multierror.Append(b.err, errors.Join(ErrMarshalGVK, err))
 			continue
 		}
 		gvks := make([]*GroupVersionKind, 0, 1)
-		if err := json.Unmarshal(b, &gvks); err != nil {
-			//TODO: debug log?
+		if err := json.Unmarshal(jsonBytes, &gvks); err != nil {
+			b.err = multierror.Append(b.err, errors.Join(ErrUnmarshalGVK, err))
 			continue
 		}
 
@@ -111,7 +123,7 @@ func (b *SchemaBuilder) WithCRDCategories(crd *apiextensionsv1.CustomResourceDef
 	}
 	gvk, err := getCRDGroupVersionKind(crd.Spec)
 	if err != nil {
-		b.err = multierror.Append(b.err, fmt.Errorf("failed to get CRD GVK: %w", err))
+		b.err = multierror.Append(b.err, errors.Join(ErrGetCRDGVK, err))
 		return b
 	}
 
@@ -134,7 +146,7 @@ func (b *SchemaBuilder) WithApiResourceCategories(list []*metav1.APIResourceList
 
 			gv, err := runtimeSchema.ParseGroupVersion(apiResourceList.GroupVersion)
 			if err != nil {
-				b.err = multierror.Append(b.err, fmt.Errorf("failed to parse groupVersion: %w", err))
+				b.err = multierror.Append(b.err, errors.Join(ErrParseGroupVersion, err))
 				continue
 			}
 			gvk := metav1.GroupVersionKind{
@@ -162,12 +174,12 @@ func (b *SchemaBuilder) Complete() ([]byte, error) {
 		},
 	})
 	if err != nil {
-		b.err = multierror.Append(b.err, fmt.Errorf("failed to marshal openAPI v3 runtimeSchema: %w", err))
+		b.err = multierror.Append(b.err, errors.Join(ErrMarshalOpenAPISchema, err))
 		return nil, b.err
 	}
 	v2JSON, err := ConvertJSON(v3JSON)
 	if err != nil {
-		b.err = multierror.Append(b.err, fmt.Errorf("failed to convert openAPI v3 runtimeSchema to v2: %w", err))
+		b.err = multierror.Append(b.err, errors.Join(ErrConvertOpenAPISchema, err))
 		return nil, b.err
 	}
 
@@ -185,7 +197,7 @@ func getOpenAPISchemaKey(gvk metav1.GroupVersionKind) string {
 
 func getCRDGroupVersionKind(spec apiextensionsv1.CustomResourceDefinitionSpec) (*metav1.GroupVersionKind, error) {
 	if len(spec.Versions) == 0 {
-		return nil, fmt.Errorf("CRD has no versions defined")
+		return nil, ErrCRDNoVersions
 	}
 
 	// Use the first stored version as the preferred one

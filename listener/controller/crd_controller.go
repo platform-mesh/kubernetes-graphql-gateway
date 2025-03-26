@@ -3,7 +3,7 @@ package controller
 import (
 	"bytes"
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/openmfp/kubernetes-graphql-gateway/listener/apischema"
 	"github.com/openmfp/kubernetes-graphql-gateway/listener/workspacefile"
@@ -13,6 +13,13 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+)
+
+var (
+	ErrReadJSON         = errors.New("failed to read JSON from filesystem")
+	ErrResolveSchema    = errors.New("failed to resolve server JSON schema")
+	ErrWriteJSON        = errors.New("failed to write JSON to filesystem")
+	ErrGetReconciledObj = errors.New("failed to get reconciled object")
 )
 
 // CRDReconciler reconciles a CustomResourceDefinition object
@@ -37,7 +44,6 @@ func NewCRDReconciler(name string,
 }
 
 func (r *CRDReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-
 	logger := log.FromContext(ctx).WithValues("cluster", r.ClusterName).WithName(req.Name)
 	logger.Info("starting reconciliation...")
 
@@ -49,7 +55,7 @@ func (r *CRDReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	}
 	if client.IgnoreNotFound(err) != nil {
 		logger.Error(err, "failed to get reconciled object")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, errors.Join(ErrGetReconciledObj, err)
 	}
 
 	return ctrl.Result{}, r.updateAPISchemaWith(crd)
@@ -66,15 +72,15 @@ func (r *CRDReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func (r *CRDReconciler) updateAPISchema() error {
 	savedJSON, err := r.io.Read(r.ClusterName)
 	if err != nil {
-		return fmt.Errorf("failed to read JSON from filesystem: %w", err)
+		return errors.Join(ErrReadJSON, err)
 	}
 	actualJSON, err := r.Resolve()
 	if err != nil {
-		return fmt.Errorf("failed to resolve server JSON schema: %w", err)
+		return errors.Join(ErrResolveSchema, err)
 	}
 	if !bytes.Equal(actualJSON, savedJSON) {
 		if err := r.io.Write(actualJSON, r.ClusterName); err != nil {
-			return fmt.Errorf("failed to write JSON to filesystem: %w", err)
+			return errors.Join(ErrWriteJSON, err)
 		}
 	}
 	return nil
@@ -83,15 +89,15 @@ func (r *CRDReconciler) updateAPISchema() error {
 func (r *CRDReconciler) updateAPISchemaWith(crd *apiextensionsv1.CustomResourceDefinition) error {
 	savedJSON, err := r.io.Read(r.ClusterName)
 	if err != nil {
-		return fmt.Errorf("failed to read JSON from filesystem: %w", err)
+		return errors.Join(ErrReadJSON, err)
 	}
 	actualJSON, err := r.ResolveApiSchema(crd)
 	if err != nil {
-		return fmt.Errorf("failed to resolve server JSON schema: %w", err)
+		return errors.Join(ErrResolveSchema, err)
 	}
 	if !bytes.Equal(actualJSON, savedJSON) {
 		if err := r.io.Write(actualJSON, r.ClusterName); err != nil {
-			return fmt.Errorf("failed to write JSON to filesystem: %w", err)
+			return errors.Join(ErrWriteJSON, err)
 		}
 	}
 	return nil

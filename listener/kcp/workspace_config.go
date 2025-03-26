@@ -3,38 +3,49 @@ package kcp
 import (
 	"context"
 	"errors"
-	"fmt"
-	"net/url"
 	"time"
 
 	kcpapis "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
-	kcptenancy "github.com/kcp-dev/kcp/sdk/apis/tenancy/v1alpha1"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/openmfp/kubernetes-graphql-gateway/common/config"
 )
 
-func virtualWorkspaceConfigFromCfg(cfg *rest.Config, clt client.Client) (*rest.Config, error) {
-	cfgURL, err := url.Parse(cfg.Host)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse config Host: %w", err)
+var (
+	ErrTimeoutFetchingAPIExport = errors.New("timeout fetching APIExport")
+	ErrFailedToGetAPIExport     = errors.New("failed to get APIExport")
+	ErrNoVirtualURLsFound       = errors.New("no virtual URLs found for APIExport")
+	ErrEmptyVirtualWorkspaceURL = errors.New("empty URL in virtual workspace for APIExport")
+)
+
+func virtualWorkspaceConfigFromCfg(ctx context.Context, appCfg config.Config, restCfg *rest.Config, clt client.Client) (*rest.Config, error) {
+	timeOutDuration := 10 * time.Second
+	ctx, cancelFn := context.WithTimeout(ctx, timeOutDuration)
+	defer cancelFn()
+
+	var apiExport kcpapis.APIExport
+	key := client.ObjectKey{
+		Namespace: appCfg.ApiExportWorkspace,
+		Name:      appCfg.ApiExportName,
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	tenancyAPIExport := &kcpapis.APIExport{}
-	if err := clt.Get(ctx, client.ObjectKey{Name: kcptenancy.SchemeGroupVersion.Group}, tenancyAPIExport); err != nil {
-		return nil, fmt.Errorf("failed to get tenancy APIExport: %w", err)
+	if err := clt.Get(ctx, key, &apiExport); err != nil {
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return nil, errors.Join(ErrTimeoutFetchingAPIExport, err)
+		}
+		return nil, errors.Join(ErrFailedToGetAPIExport, err)
 	}
-	virtualWorkspaces := tenancyAPIExport.Status.VirtualWorkspaces // nolint: staticcheck
-	if len(virtualWorkspaces) == 0 {
-		err := errors.New("empty virtual workspace list")
-		return nil, fmt.Errorf("failed to get at least one virtual workspace: %w", err)
+
+	if len(apiExport.Status.VirtualWorkspaces) == 0 { // nolint: staticcheck
+		return nil, ErrNoVirtualURLsFound
 	}
-	vwCFGURL, err := url.Parse(virtualWorkspaces[0].URL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse virtual workspace config URL: %w", err)
+
+	virtualWorkspaceURL := apiExport.Status.VirtualWorkspaces[0].URL // nolint: staticcheck
+	if virtualWorkspaceURL == "" {
+		return nil, ErrEmptyVirtualWorkspaceURL
 	}
-	cfgURL.Path = vwCFGURL.Path
-	virtualWorkspaceCfg := rest.CopyConfig(cfg)
-	virtualWorkspaceCfg.Host = cfgURL.String()
-	return virtualWorkspaceCfg, nil
+
+	restCfg.Host = virtualWorkspaceURL
+
+	return restCfg, nil
 }

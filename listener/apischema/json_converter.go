@@ -4,8 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"strings"
+)
+
+var (
+	ErrFailedToValidateConvertedJson = errors.New("failed to validate converted JSON")
+	ErrUnmarshalJSON                 = errors.New("failed to unmarshal JSON")
+	ErrEncodeJSON                    = errors.New("failed to encode JSON")
 )
 
 type v3Wrapper struct {
@@ -23,13 +28,13 @@ type v2RootWrapper struct {
 func ConvertJSON(v3JSON []byte) ([]byte, error) {
 	data := &v3RootWrapper{}
 	if err := json.Unmarshal(v3JSON, data); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal JSON: %w", err)
+		return nil, errors.Join(ErrUnmarshalJSON, err)
 	}
 
 	v2JSON := parseJSON(data.Components.Schemas)
 	v2, ok := v2JSON.(map[string]any)
 	if !ok {
-		return nil, errors.New("failed to validate converted JSON")
+		return nil, ErrFailedToValidateConvertedJson
 	}
 	buf := &bytes.Buffer{}
 	e := json.NewEncoder(buf)
@@ -37,11 +42,13 @@ func ConvertJSON(v3JSON []byte) ([]byte, error) {
 	encErr := e.Encode(&v2RootWrapper{
 		Definitions: v2,
 	})
-	return buf.Bytes(), encErr
+	if encErr != nil {
+		return nil, errors.Join(ErrEncodeJSON, encErr)
+	}
+	return buf.Bytes(), nil
 }
 
 func parseJSON(data any) any {
-
 	v, ok := data.(map[string]any)
 	if !ok {
 		return data

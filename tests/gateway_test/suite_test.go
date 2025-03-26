@@ -67,7 +67,7 @@ func (suite *CommonTestSuite) SetupTest() {
 
 	suite.schema = *g.GetSchema()
 
-	suite.manager, err = manager.NewManager(suite.log, suite.restCfg, &suite.appCfg)
+	suite.manager, err = manager.NewManager(suite.log, suite.restCfg, suite.appCfg)
 	require.NoError(suite.T(), err)
 
 	suite.server = httptest.NewServer(suite.manager)

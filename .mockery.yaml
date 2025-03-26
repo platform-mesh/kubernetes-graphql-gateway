@@ -2,6 +2,12 @@ issue-845-fix: true
 resolve-type-alias: false
 with-expecter: true
 packages:
+  k8s.io/client-go/discovery:
+    config:
+      dir: listener/kcp/mocks
+      outpkg: mocks
+    interfaces:
+      DiscoveryInterface:
   sigs.k8s.io/controller-runtime/pkg/client:
     config:
       dir: gateway/resolver/mocks

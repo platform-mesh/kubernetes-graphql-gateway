@@ -20,6 +20,7 @@ func TestNewIOHandler(t *testing.T) {
 	}{
 		"valid_directory":        {schemasDir: tempDir, expectErr: false},
 		"non_existent_directory": {schemasDir: path.Join(tempDir, "non-existent"), expectErr: false},
+		"invalid_directory":      {schemasDir: "/dev/null/schemas", expectErr: true},
 	}
 
 	for name, tc := range tests {

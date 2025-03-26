@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"crypto/tls"
+	"github.com/openmfp/kubernetes-graphql-gateway/listener/discoveryclient"
+	"k8s.io/client-go/discovery"
 	"os"
 
 	kcpapis "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
@@ -36,7 +38,7 @@ var (
 	setupLog             = ctrl.Log.WithName("setup")
 	webhookServer        webhook.Server
 	metricsServerOptions metricsserver.Options
-	appCfg               *config.Config
+	appCfg               config.Config
 )
 
 var listenCmd = &cobra.Command{
@@ -87,7 +89,8 @@ var listenCmd = &cobra.Command{
 		}
 	},
 	Run: func(cmd *cobra.Command, args []string) {
-		cfg := ctrl.GetConfigOrDie()
+		ctx := ctrl.SetupSignalHandler()
+		restCfg := ctrl.GetConfigOrDie()
 
 		mgrOpts := ctrl.Options{
 			Scheme:                 scheme,
@@ -98,7 +101,7 @@ var listenCmd = &cobra.Command{
 			LeaderElectionID:       "72231e1f.openmfp.io",
 		}
 
-		clt, err := client.New(cfg, client.Options{
+		clt, err := client.New(restCfg, client.Options{
 			Scheme: scheme,
 		})
 		if err != nil {
@@ -106,24 +109,36 @@ var listenCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		mf := &kcp.ManagerFactory{
-			IsKCPEnabled: appCfg.EnableKcp,
-		}
+		mf := kcp.NewManagerFactory(appCfg)
 
-		mgr, err := mf.NewManager(cfg, mgrOpts, clt)
+		mgr, err := mf.NewManager(ctx, restCfg, mgrOpts, clt)
 		if err != nil {
 			setupLog.Error(err, "unable to start manager")
+			os.Exit(1)
+		}
+
+		discoveryInterface, err := discovery.NewDiscoveryClientForConfig(restCfg)
+		if err != nil {
+			setupLog.Error(err, "failed to create discovery client")
 			os.Exit(1)
 		}
 
 		reconcilerOpts := kcp.ReconcilerOpts{
 			Scheme:                 scheme,
 			Client:                 clt,
-			Config:                 cfg,
+			Config:                 restCfg,
 			OpenAPIDefinitionsPath: appCfg.OpenApiDefinitionsPath,
 		}
 
-		reconciler, err := kcp.NewReconcilerFactory(appCfg).NewReconciler(reconcilerOpts)
+		reconciler, err := kcp.NewReconciler(
+			ctx,
+			appCfg,
+			reconcilerOpts,
+			discoveryInterface,
+			kcp.PreReconcile,
+			discoveryclient.NewFactory,
+		)
+
 		if err != nil {
 			setupLog.Error(err, "unable to instantiate reconciler")
 			os.Exit(1)
@@ -144,8 +159,7 @@ var listenCmd = &cobra.Command{
 		}
 
 		setupLog.Info("starting manager")
-		signalHandler := ctrl.SetupSignalHandler()
-		if err := mgr.Start(signalHandler); err != nil {
+		if err := mgr.Start(ctx); err != nil {
 			setupLog.Error(err, "problem running manager")
 			os.Exit(1)
 		}
