@@ -190,7 +190,7 @@ func (s *Service) createHandler(schema *graphql.Schema) *graphqlHandler {
 
 func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
-	if (*r).Method == "OPTIONS" && s.appCfg.Cors.Enabled {
+	if s.appCfg.Cors.Enabled {
 		allowedOrigins := strings.Join(s.appCfg.Cors.AllowedOrigins, ",")
 		allowedHeaders := strings.Join(s.appCfg.Cors.AllowedHeaders, ",")
 		w.Header().Set("Access-Control-Allow-Origin", allowedOrigins)
@@ -198,8 +198,11 @@ func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// setting cors allowed methods is not needed for this service,
 		// as all graphql methods are part of the cors safelisted methods
 		// https://fetch.spec.whatwg.org/#cors-safelisted-method
-		w.WriteHeader(http.StatusOK)
-		return
+
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
 	}
 
 	workspace, err := s.parsePath(r.URL.Path)
