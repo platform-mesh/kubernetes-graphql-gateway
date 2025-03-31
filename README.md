@@ -206,7 +206,7 @@ curl \
   -H "Accept: text/event-stream" \
   -H "Content-Type: application/json" \
   -H "Authorization: 7f41d4ea-6809-4714-b345-f9281981b2dd" \
-  -d '{"query": "subscription { core_openmfp_io_account(name: \"root-account\", namespace: \"default\") { spec { displayName }}}"}' \
+  -d '{"query": "subscription { core_openmfp_org_account(name: \"root-account\") { spec { displayName }}}"}' \
   http://localhost:8080/root/graphql
 ```
 Fields that will be listened are defined in the graphql query within the `{}` brackets.
@@ -219,7 +219,7 @@ curl \
   -H "Accept: text/event-stream" \
   -H "Content-Type: application/json" \
   -H "Authorization: 7f41d4ea-6809-4714-b345-f9281981b2dd" \
-  -d '{"query": "subscription { core_openmfp_io_account(name: \"root-account\", namespace: \"default\", subscribeToAll: true) { metadata { name } }}"}' \
+  -d '{"query": "subscription { core_openmfp_org_account(name: \"root-account\", subscribeToAll: true) { metadata { name } }}"}' \
   http://localhost:8080/root/graphql
 ```
 P.S. Note, that only fields specified in `{}` brackets will be returned.
@@ -230,7 +230,7 @@ curl \
   -H "Accept: text/event-stream" \
   -H "Content-Type: application/json" \
   -H "Authorization: 7f41d4ea-6809-4714-b345-f9281981b2dd" \
-  -d '{"query": "subscription { core_openmfp_io_accounts(namespace: \"default\") { spec { displayName }}}"}' \
+  -d '{"query": "subscription { core_openmfp_org_accounts { spec { displayName }}}"}' \
   http://localhost:8080/root/graphql
 ```
 

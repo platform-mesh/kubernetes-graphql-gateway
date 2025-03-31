@@ -23,7 +23,7 @@ func (g *Gateway) AddTypeByCategoryQuery(rootQueryFields graphql.Fields) {
 	rootQueryFields[typeByCategory] = &graphql.Field{
 		Type: graphql.NewNonNull(graphql.NewList(graphql.NewNonNull(resourceType))),
 		Args: resolver.NewFieldConfigArguments().
-			WithNameArg().
+			WithName().
 			Complete(),
 		Resolve: g.resolver.TypeByCategory(g.typeByCategory),
 	}

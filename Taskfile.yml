@@ -16,6 +16,12 @@ tasks:
     internal: true
     cmds:
       - test -s {{.LOCAL_BIN}}/setup-envtest || GOBIN=$(pwd)/{{.LOCAL_BIN}} go install sigs.k8s.io/controller-runtime/tools/setup-envtest@{{.ENVTEST_VERSION}}
+  update:crd:
+    desc: "Download the latest CRD from OpenMFP"
+    cmds:
+      - mkdir -p tests/gateway_test/testdata/crd
+      - curl -sSLo tests/gateway_test/testdata/crd/core.openmfp.org_accounts.yaml https://raw.githubusercontent.com/openmfp/account-operator/main/config/crd/core.openmfp.org_accounts.yaml
+      - echo "CRD updated successfully."
   setup:golangci-lint:
     internal: true
     cmds:
@@ -50,24 +56,30 @@ tasks:
     cmds:
       - go test ./... {{.ADDITIONAL_COMMAND_ARGS}}
   test:
-    deps: [setup:envtest]
+    deps: [setup:envtest, update:crd]
     cmds:
       - task: envtest
         vars:
           ADDITIONAL_COMMAND_ARGS: -coverprofile=./cover.out -covermode=atomic -coverpkg=./...
   cover:
-    deps: [setup:envtest, setup:go-test-coverage]
+    deps: [ setup:envtest, setup:go-test-coverage ]
     cmds:
       - task: envtest
         vars:
           ADDITIONAL_COMMAND_ARGS: -coverprofile=./cover.out -covermode=atomic -coverpkg=./...
       - "{{.LOCAL_BIN}}/go-test-coverage --profile cover.out --config ./.testcoverage.yml"
+  cover-html:
+    desc: "Generate and open HTML coverage report"
+    deps: [cover]
+    cmds:
+      - go tool cover -html=cover.out -o coverage.html
+      - open coverage.html || xdg-open coverage.html || start coverage.html
   validate:
     cmds:
       - task: mockery
       - task: lint
       - task: test
-        
+
   # start uses deprecated gateway
   start:
     cmds:

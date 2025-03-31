@@ -38,6 +38,7 @@ func TestListItems(t *testing.T) {
 			args: map[string]interface{}{
 				resolver.NamespaceArg:     "test-namespace",
 				resolver.LabelSelectorArg: "key=value",
+				resolver.SortByArg:        "metadata.name",
 			},
 			mockSetup: func(runtimeClientMock *mocks.MockWithWatch) {
 				runtimeClientMock.EXPECT().
@@ -192,6 +193,77 @@ func TestGetItem(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				require.Equal(t, tt.expectedObj, result)
+			}
+		})
+	}
+}
+
+func TestGetItemAsYAML(t *testing.T) {
+	tests := []struct {
+		name         string
+		args         map[string]interface{}
+		mockSetup    func(runtimeClientMock *mocks.MockWithWatch)
+		expectedYAML string
+		expectError  bool
+	}{
+		{
+			name: "getItemAsYAML_OK",
+			args: map[string]interface{}{
+				resolver.NameArg:      "test-object",
+				resolver.NamespaceArg: "test-namespace",
+			},
+			mockSetup: func(runtimeClientMock *mocks.MockWithWatch) {
+				runtimeClientMock.EXPECT().
+					Get(
+						mock.Anything,
+						client.ObjectKey{Namespace: "test-namespace", Name: "test-object"},
+						mock.AnythingOfType("*unstructured.Unstructured"),
+					).
+					Run(func(_ context.Context, _ client.ObjectKey, obj client.Object, _ ...client.GetOption) {
+						unstructuredObj := obj.(*unstructured.Unstructured)
+						unstructuredObj.Object = map[string]interface{}{
+							"metadata": map[string]interface{}{"name": "test-object"},
+						}
+					}).
+					Return(nil)
+			},
+			expectedYAML: "metadata:\n    name: test-object\n",
+		},
+		{
+			name: "getItemAsYAML_ERROR",
+			mockSetup: func(runtimeClientMock *mocks.MockWithWatch) {
+				runtimeClientMock.EXPECT().
+					Get(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(assert.AnError)
+			},
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			runtimeClientMock := &mocks.MockWithWatch{}
+			if tt.mockSetup != nil {
+				tt.mockSetup(runtimeClientMock)
+			}
+
+			r, err := getResolver(runtimeClientMock)
+			require.NoError(t, err)
+
+			result, err := r.GetItemAsYAML(schema.GroupVersionKind{
+				Group:   "group",
+				Version: "version",
+				Kind:    "kind",
+			}, v1.NamespaceScoped)(graphql.ResolveParams{
+				Context: context.Background(),
+				Args:    tt.args,
+			})
+
+			if tt.expectError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tt.expectedYAML, result)
 			}
 		})
 	}
@@ -532,6 +604,117 @@ func TestGetOriginalGroupName(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result := r.GetOriginalGroupName(tt.input)
 			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestCompareUnstructured(t *testing.T) {
+	tests := []struct {
+		name     string
+		a        map[string]interface{}
+		b        map[string]interface{}
+		expected int
+	}{
+		{
+			name:     "equal_strings",
+			a:        map[string]interface{}{"key": "abc"},
+			b:        map[string]interface{}{"key": "abc"},
+			expected: 0,
+		},
+		{
+			name:     "different_strings",
+			a:        map[string]interface{}{"key": "abc"},
+			b:        map[string]interface{}{"key": "xyz"},
+			expected: -1,
+		},
+		{
+			name:     "equal_int64",
+			a:        map[string]interface{}{"key": int64(42)},
+			b:        map[string]interface{}{"key": int64(42)},
+			expected: 0,
+		},
+		{
+			name:     "different_int64",
+			a:        map[string]interface{}{"key": int64(10)},
+			b:        map[string]interface{}{"key": int64(20)},
+			expected: -1,
+		},
+		{
+			name:     "equal_int32",
+			a:        map[string]interface{}{"key": int32(42)},
+			b:        map[string]interface{}{"key": int32(42)},
+			expected: 0,
+		},
+		{
+			name:     "different_int32",
+			a:        map[string]interface{}{"key": int32(10)},
+			b:        map[string]interface{}{"key": int32(20)},
+			expected: -1,
+		},
+		{
+			name:     "int32_vs_int64",
+			a:        map[string]interface{}{"key": int32(10)},
+			b:        map[string]interface{}{"key": int64(20)},
+			expected: -1,
+		},
+		{
+			name:     "equal_float64",
+			a:        map[string]interface{}{"key": float64(3.14)},
+			b:        map[string]interface{}{"key": float64(3.14)},
+			expected: 0,
+		},
+		{
+			name:     "different_float64",
+			a:        map[string]interface{}{"key": float64(1.5)},
+			b:        map[string]interface{}{"key": float64(2.5)},
+			expected: -1,
+		},
+		{
+			name:     "equal_float32",
+			a:        map[string]interface{}{"key": float32(3.14)},
+			b:        map[string]interface{}{"key": float32(3.14)},
+			expected: 0,
+		},
+		{
+			name:     "different_float32",
+			a:        map[string]interface{}{"key": float32(1.5)},
+			b:        map[string]interface{}{"key": float32(2.5)},
+			expected: -1,
+		},
+		{
+			name:     "float32_vs_float64",
+			a:        map[string]interface{}{"key": float32(1.5)},
+			b:        map[string]interface{}{"key": float64(2.5)},
+			expected: -1,
+		},
+		{
+			name:     "equal_bool",
+			a:        map[string]interface{}{"key": true},
+			b:        map[string]interface{}{"key": true},
+			expected: 0,
+		},
+		{
+			name:     "different_bool",
+			a:        map[string]interface{}{"key": true},
+			b:        map[string]interface{}{"key": false},
+			expected: -1,
+		},
+		{
+			name:     "missing_field",
+			a:        map[string]interface{}{},
+			b:        map[string]interface{}{"key": "abc"},
+			expected: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := unstructured.Unstructured{Object: tt.a}
+			b := unstructured.Unstructured{Object: tt.b}
+			got := resolver.CompareUnstructured(a, b, "key")
+			if got != tt.expected {
+				t.Errorf("compareUnstructured() = %d, want %d", got, tt.expected)
+			}
 		})
 	}
 }

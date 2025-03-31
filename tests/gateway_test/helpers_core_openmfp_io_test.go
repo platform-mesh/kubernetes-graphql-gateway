@@ -1,9 +1,10 @@
 package gateway_test
 
-type coreOpenmfpIo struct {
-	Account       *account `json:"Account,omitempty"`
-	CreateAccount *account `json:"createAccount,omitempty"`
-	DeleteAccount *bool    `json:"deleteAccount,omitempty"`
+type coreOpenmfpOrg struct {
+	Account       *account   `json:"Account,omitempty"`
+	Accounts      []*account `json:"Accounts,omitempty"`
+	CreateAccount *account   `json:"createAccount,omitempty"`
+	DeleteAccount *bool      `json:"deleteAccount,omitempty"`
 }
 
 type account struct {
@@ -19,9 +20,8 @@ type accountSpec struct {
 func createAccountMutation() string {
 	return `
 mutation {
-  core_openmfp_io {
+  core_openmfp_org {
     createAccount(
-      namespace: "default", 
       object:  {
         metadata: {
           name: "test-account"
@@ -48,8 +48,8 @@ mutation {
 func getAccountQuery() string {
 	return `
         query {
-			core_openmfp_io {
-			Account(namespace: "default", name: "test-account") {
+			core_openmfp_org {
+			Account(name: "test-account") {
 			  metadata {
 				name
 			  }
@@ -63,12 +63,57 @@ func getAccountQuery() string {
     `
 }
 
+func listAccountsQuery(sortByDisplayName bool) string {
+	if sortByDisplayName {
+		return `query {
+			core_openmfp_org {
+			Accounts(sortBy: "spec.displayName") {
+			  metadata {
+				name
+			  }
+			  spec {
+				type,
+				displayName
+			  }}}}`
+	}
+
+	return `query {
+			core_openmfp_org {
+			Accounts {
+			  metadata {
+				name
+			  }
+			  spec {
+				type,
+				displayName
+			  }}}}`
+}
+
 func deleteAccountMutation() string {
 	return `
 		mutation {
-		  core_openmfp_io {
-			deleteAccount(namespace: "default", name: "test-account")
+		  core_openmfp_org {
+			deleteAccount(name: "test-account")
 		  }
 		}
     `
+}
+
+func SubscribeAccounts(sortByDisplayName bool) string {
+	if sortByDisplayName {
+		return `subscription {
+				core_openmfp_org_accounts(sortBy: "spec.displayName") {
+					metadata { name }
+					spec { displayName }
+				}
+			}
+		`
+	}
+	return `subscription {
+			core_openmfp_org_accounts {
+				metadata { name }
+				spec { displayName }
+			}
+		}
+	`
 }

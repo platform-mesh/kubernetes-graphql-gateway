@@ -8,6 +8,8 @@ import (
 	"gopkg.in/yaml.v3"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"regexp"
+	"sort"
+	"strings"
 
 	"github.com/graphql-go/graphql"
 	"go.opentelemetry.io/otel"
@@ -109,6 +111,21 @@ func (r *Service) ListItems(gvk schema.GroupVersionKind, scope v1.ResourceScope)
 			return nil, err
 		}
 
+		sortBy, err := getStringArg(p.Args, SortByArg, false)
+		if err != nil {
+			return nil, err
+		}
+
+		err = validateSortBy(list.Items, sortBy)
+		if err != nil {
+			log.Error().Err(err).Str(SortByArg, sortBy).Msg("Invalid sortBy field path")
+			return nil, err
+		}
+
+		sort.Slice(list.Items, func(i, j int) bool {
+			return compareUnstructured(list.Items[i], list.Items[j], sortBy) < 0
+		})
+
 		items := make([]map[string]any, len(list.Items))
 		for i, item := range list.Items {
 			items[i] = item.Object
@@ -183,7 +200,7 @@ func (r *Service) GetItemAsYAML(gvk schema.GroupVersionKind, scope v1.ResourceSc
 		}
 
 		var returnYaml bytes.Buffer
-		if err := yaml.NewEncoder(&returnYaml).Encode(out); err != nil {
+		if err = yaml.NewEncoder(&returnYaml).Encode(out); err != nil {
 			return "", err
 		}
 
@@ -350,4 +367,64 @@ func (r *Service) getOriginalGroupName(groupName string) string {
 	}
 
 	return groupName
+}
+
+func compareUnstructured(a, b unstructured.Unstructured, fieldPath string) int {
+	segments := strings.Split(fieldPath, ".")
+
+	aVal, foundA, errA := unstructured.NestedFieldNoCopy(a.Object, segments...)
+	bVal, foundB, errB := unstructured.NestedFieldNoCopy(b.Object, segments...)
+	if errA != nil || errB != nil || !foundA || !foundB {
+		return 0 // fallback if fields are missing or inaccessible
+	}
+
+	switch av := aVal.(type) {
+	case string:
+		if bv, ok := bVal.(string); ok {
+			return strings.Compare(av, bv)
+		}
+	case int64:
+		if bv, ok := bVal.(int64); ok {
+			return compareNumbers(av, bv)
+		}
+	case int32:
+		if bv, ok := bVal.(int32); ok {
+			return compareNumbers(int64(av), int64(bv))
+		} else if bv, ok := bVal.(int64); ok {
+			return compareNumbers(int64(av), bv)
+		}
+	case float64:
+		if bv, ok := bVal.(float64); ok {
+			return compareNumbers(av, bv)
+		}
+	case float32:
+		if bv, ok := bVal.(float32); ok {
+			return compareNumbers(float64(av), float64(bv))
+		} else if bv, ok := bVal.(float64); ok {
+			return compareNumbers(float64(av), bv)
+		}
+	case bool:
+		if bv, ok := bVal.(bool); ok {
+			switch {
+			case av && !bv:
+				return -1
+			case !av && bv:
+				return 1
+			default:
+				return 0
+			}
+		}
+	}
+	return 0 // unhandled or non-comparable types
+}
+
+func compareNumbers[T int64 | float64](a, b T) int {
+	switch {
+	case a < b:
+		return -1
+	case a > b:
+		return 1
+	default:
+		return 0
+	}
 }

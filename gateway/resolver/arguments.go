@@ -2,7 +2,9 @@ package resolver
 
 import (
 	"errors"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"maps"
+	"strings"
 
 	"github.com/graphql-go/graphql"
 	"github.com/rs/zerolog/log"
@@ -15,6 +17,7 @@ const (
 	NamespaceArg      = "namespace"
 	ObjectArg         = "object"
 	SubscribeToAllArg = "subscribeToAll"
+	SortByArg         = "sortBy"
 )
 
 // FieldConfigArgumentsBuilder helps construct GraphQL field config arguments
@@ -29,7 +32,7 @@ func NewFieldConfigArguments() *FieldConfigArgumentsBuilder {
 	}
 }
 
-func (b *FieldConfigArgumentsBuilder) WithNameArg() *FieldConfigArgumentsBuilder {
+func (b *FieldConfigArgumentsBuilder) WithName() *FieldConfigArgumentsBuilder {
 	b.arguments[NameArg] = &graphql.ArgumentConfig{
 		Type:        graphql.NewNonNull(graphql.String),
 		Description: "The name of the object",
@@ -37,7 +40,7 @@ func (b *FieldConfigArgumentsBuilder) WithNameArg() *FieldConfigArgumentsBuilder
 	return b
 }
 
-func (b *FieldConfigArgumentsBuilder) WithNamespaceArg() *FieldConfigArgumentsBuilder {
+func (b *FieldConfigArgumentsBuilder) WithNamespace() *FieldConfigArgumentsBuilder {
 	b.arguments[NamespaceArg] = &graphql.ArgumentConfig{
 		Type:        graphql.String,
 		Description: "The namespace in which to search for the objects",
@@ -46,7 +49,7 @@ func (b *FieldConfigArgumentsBuilder) WithNamespaceArg() *FieldConfigArgumentsBu
 	return b
 }
 
-func (b *FieldConfigArgumentsBuilder) WithLabelSelectorArg() *FieldConfigArgumentsBuilder {
+func (b *FieldConfigArgumentsBuilder) WithLabelSelector() *FieldConfigArgumentsBuilder {
 	b.arguments[LabelSelectorArg] = &graphql.ArgumentConfig{
 		Type:        graphql.String,
 		Description: "A label selector to filter the objects by",
@@ -54,7 +57,7 @@ func (b *FieldConfigArgumentsBuilder) WithLabelSelectorArg() *FieldConfigArgumen
 	return b
 }
 
-func (b *FieldConfigArgumentsBuilder) WithObjectArg(resourceInputType *graphql.InputObject) *FieldConfigArgumentsBuilder {
+func (b *FieldConfigArgumentsBuilder) WithObject(resourceInputType *graphql.InputObject) *FieldConfigArgumentsBuilder {
 	b.arguments[ObjectArg] = &graphql.ArgumentConfig{
 		Type:        graphql.NewNonNull(resourceInputType),
 		Description: "The object to create or update",
@@ -62,11 +65,20 @@ func (b *FieldConfigArgumentsBuilder) WithObjectArg(resourceInputType *graphql.I
 	return b
 }
 
-func (b *FieldConfigArgumentsBuilder) WithSubscribeToAllArg() *FieldConfigArgumentsBuilder {
+func (b *FieldConfigArgumentsBuilder) WithSubscribeToAll() *FieldConfigArgumentsBuilder {
 	b.arguments[SubscribeToAllArg] = &graphql.ArgumentConfig{
 		Type:         graphql.Boolean,
 		DefaultValue: false,
 		Description:  "If true, events will be emitted on every field change",
+	}
+	return b
+}
+
+func (b *FieldConfigArgumentsBuilder) WithSortBy() *FieldConfigArgumentsBuilder {
+	b.arguments[SortByArg] = &graphql.ArgumentConfig{
+		Type:         graphql.String,
+		Description:  "The field to sort the results by",
+		DefaultValue: "metadata.name",
 	}
 	return b
 }
@@ -128,4 +140,23 @@ func getBoolArg(args map[string]interface{}, key string, required bool) (bool, e
 
 func isResourceNamespaceScoped(resourceScope apiextensionsv1.ResourceScope) bool {
 	return resourceScope == apiextensionsv1.NamespaceScoped
+}
+
+func validateSortBy(items []unstructured.Unstructured, fieldPath string) error {
+	if len(items) == 0 {
+		return nil // No items to validate against, assume valid
+	}
+
+	sample := items[0]
+	segments := strings.Split(fieldPath, ".")
+
+	_, found, err := unstructured.NestedFieldNoCopy(sample.Object, segments...)
+	if !found {
+		return errors.New("specified sortBy field does not exist")
+	}
+	if err != nil {
+		return errors.Join(errors.New("error accessing specified sortBy field"), err)
+	}
+
+	return nil
 }

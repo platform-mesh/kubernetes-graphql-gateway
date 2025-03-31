@@ -94,7 +94,7 @@ func (suite *CommonTestSuite) TestSchemaSubscribe() {
 			c := graphql.Subscribe(graphql.Params{
 				Context:       ctx,
 				RequestString: tt.subscribeQuery,
-				Schema:        suite.schema,
+				Schema:        suite.graphqlSchema,
 			})
 
 			wg := sync.WaitGroup{}

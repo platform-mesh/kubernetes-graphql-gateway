@@ -195,16 +195,18 @@ func (g *Gateway) processSingleResource(
 		Fields: inputFields,
 	})
 
-	listArgsBuilder := resolver.NewFieldConfigArguments().WithLabelSelectorArg()
+	listArgsBuilder := resolver.NewFieldConfigArguments().
+		WithLabelSelector().
+		WithSortBy()
 
-	itemArgsBuilder := resolver.NewFieldConfigArguments().WithNameArg()
+	itemArgsBuilder := resolver.NewFieldConfigArguments().WithName()
 
-	creationMutationArgsBuilder := resolver.NewFieldConfigArguments().WithObjectArg(resourceInputType)
+	creationMutationArgsBuilder := resolver.NewFieldConfigArguments().WithObject(resourceInputType)
 
 	if resourceScope == apiextensionsv1.NamespaceScoped {
-		listArgsBuilder.WithNamespaceArg()
-		itemArgsBuilder.WithNamespaceArg()
-		creationMutationArgsBuilder.WithNamespaceArg()
+		listArgsBuilder.WithNamespace()
+		itemArgsBuilder.WithNamespace()
+		creationMutationArgsBuilder.WithNamespace()
 	}
 
 	listArgs := listArgsBuilder.Complete()
@@ -238,7 +240,7 @@ func (g *Gateway) processSingleResource(
 
 	mutationGroupType.AddFieldConfig("update"+singular, &graphql.Field{
 		Type:    resourceType,
-		Args:    creationMutationArgsBuilder.WithNameArg().Complete(),
+		Args:    creationMutationArgsBuilder.WithName().Complete(),
 		Resolve: g.resolver.UpdateItem(*gvk, resourceScope),
 	})
 
@@ -252,7 +254,7 @@ func (g *Gateway) processSingleResource(
 	rootSubscriptionFields[subscriptionSingular] = &graphql.Field{
 		Type: resourceType,
 		Args: itemArgsBuilder.
-			WithSubscribeToAllArg().
+			WithSubscribeToAll().
 			Complete(),
 		Resolve:     g.resolver.CommonResolver(),
 		Subscribe:   g.resolver.SubscribeItem(*gvk, resourceScope),
@@ -263,7 +265,7 @@ func (g *Gateway) processSingleResource(
 	rootSubscriptionFields[subscriptionPlural] = &graphql.Field{
 		Type: graphql.NewList(resourceType),
 		Args: listArgsBuilder.
-			WithSubscribeToAllArg().
+			WithSubscribeToAll().
 			Complete(),
 		Resolve:     g.resolver.CommonResolver(),
 		Subscribe:   g.resolver.SubscribeItems(*gvk, resourceScope),

@@ -29,7 +29,7 @@ func (suite *CommonTestSuite) TestCreateGetAndDeleteAccount() {
 	require.Equal(suite.T(), http.StatusOK, statusCode, "Expected status code 200")
 	require.Nil(suite.T(), getResp.Errors, "GraphQL errors: %v", getResp.Errors)
 
-	accountData := getResp.Data.CoreOpenmfpIO.Account
+	accountData := getResp.Data.CoreOpenmfpOrg.Account
 	require.Equal(suite.T(), "test-account", accountData.Metadata.Name)
 	require.Equal(suite.T(), "test-account-display-name", accountData.Spec.DisplayName)
 	require.Equal(suite.T(), "account", accountData.Spec.Type)

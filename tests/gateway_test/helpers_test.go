@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const sleepTime = 2000 * time.Millisecond
+const sleepTime = 500 * time.Millisecond
 
 type core struct {
 	Pod       *podData `json:"Pod,omitempty"`
@@ -29,7 +29,7 @@ type GraphQLResponse struct {
 
 type graphQLData struct {
 	Core                   *core                   `json:"core,omitempty"`
-	CoreOpenmfpIO          *coreOpenmfpIo          `json:"core_openmfp_io,omitempty"`
+	CoreOpenmfpOrg         *coreOpenmfpOrg         `json:"core_openmfp_org,omitempty"`
 	RbacAuthorizationK8sIo *RbacAuthorizationK8sIo `json:"rbac_authorization_k8s_io,omitempty"`
 }
 

@@ -1,0 +1,1 @@
+kubernetes spec is generated from the cluster where istioctl is installed
