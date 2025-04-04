@@ -9,7 +9,7 @@ replace sigs.k8s.io/controller-runtime => github.com/kcp-dev/controller-runtime 
 replace github.com/graphql-go/handler => github.com/vertex451/handler v0.0.0-20250124125145-ed328e3cf42a
 
 require (
-	github.com/fsnotify/fsnotify v1.8.0
+	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-openapi/spec v0.21.0
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/google/gnostic-models v0.6.9
