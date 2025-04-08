@@ -3,7 +3,6 @@ package kcp
 import (
 	"context"
 	"errors"
-	"fmt"
 	kcptenancy "github.com/kcp-dev/kcp/sdk/apis/tenancy/v1alpha1"
 	"github.com/openmfp/golang-commons/logger"
 	"net/url"
@@ -55,7 +54,7 @@ func virtualWorkspaceConfigFromCfg(
 			return nil, errors.Join(ErrFailedToGetAPIExport, err)
 		}
 
-		log.Warn().Msg(fmt.Sprintf("failed to find %s ApiExport, listener will not watch ApiBinding changes in realtime", appCfg.ApiExportName))
+		log.Warn().Str("apiexport", appCfg.ApiExportName).Msg("failed to find ApiExport, listener will not watch ApiBinding changes in realtime")
 	}
 
 	if len(apiExport.Status.VirtualWorkspaces) == 0 { // nolint: staticcheck
@@ -88,11 +87,21 @@ func combineBaseURLAndPath(baseURLStr, pathURLStr string) (string, error) {
 		return "", errors.Join(ErrInvalidURL, err)
 	}
 
+	if pathURLStr == "" {
+		return baseURL.String() + "/", nil
+	}
+
 	path := pathURL.Path
 
 	if !strings.HasPrefix(path, "/") {
 		path = "/" + path
 	}
 
-	return baseURL.ResolveReference(&url.URL{Path: path}).String(), nil
+	finalURL := url.URL{
+		Scheme: baseURL.Scheme,
+		Host:   baseURL.Host,
+		Path:   path,
+	}
+
+	return finalURL.String(), nil
 }
