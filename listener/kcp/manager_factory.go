@@ -3,7 +3,7 @@ package kcp
 import (
 	"context"
 	"errors"
-
+	"github.com/openmfp/golang-commons/logger"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -15,10 +15,12 @@ import (
 
 type ManagerFactory struct {
 	appConfig config.Config
+	log       *logger.Logger
 }
 
-func NewManagerFactory(appCfg config.Config) *ManagerFactory {
+func NewManagerFactory(log *logger.Logger, appCfg config.Config) *ManagerFactory {
 	return &ManagerFactory{
+		log:       log,
 		appConfig: appCfg,
 	}
 }
@@ -28,7 +30,7 @@ func (f *ManagerFactory) NewManager(ctx context.Context, restCfg *rest.Config, o
 		return ctrl.NewManager(restCfg, opts)
 	}
 
-	virtualWorkspaceCfg, err := virtualWorkspaceConfigFromCfg(ctx, f.appConfig, restCfg, clt)
+	virtualWorkspaceCfg, err := virtualWorkspaceConfigFromCfg(ctx, f.log, f.appConfig, restCfg, clt)
 	if err != nil {
 		return nil, errors.Join(ErrGetVWConfig, err)
 	}

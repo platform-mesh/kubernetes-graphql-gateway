@@ -3,6 +3,7 @@ package kcp
 import (
 	"context"
 	"errors"
+	"github.com/openmfp/golang-commons/logger"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -50,6 +51,7 @@ type ReconcilerOpts struct {
 
 func NewReconciler(
 	ctx context.Context,
+	log *logger.Logger,
 	appCfg config.Config,
 	opts ReconcilerOpts,
 	discoveryInterface discovery.DiscoveryInterface,
@@ -60,7 +62,7 @@ func NewReconciler(
 		return newStandardReconciler(opts, discoveryInterface, preReconcileFunc)
 	}
 
-	return newKcpReconciler(ctx, appCfg, opts, discoverFactory)
+	return newKcpReconciler(ctx, log, appCfg, opts, discoverFactory)
 }
 
 func newStandardReconciler(
@@ -120,6 +122,7 @@ func PreReconcile(
 
 func newKcpReconciler(
 	ctx context.Context,
+	log *logger.Logger,
 	appCfg config.Config,
 	opts ReconcilerOpts,
 	newDiscoveryFactoryFunc func(cfg *rest.Config) (*discoveryclient.Factory, error),
@@ -134,7 +137,7 @@ func newKcpReconciler(
 		return nil, errors.Join(ErrCreatePathResolver, err)
 	}
 
-	virtualWorkspaceCfg, err := virtualWorkspaceConfigFromCfg(ctx, appCfg, opts.Config, opts.Client)
+	virtualWorkspaceCfg, err := virtualWorkspaceConfigFromCfg(ctx, log, appCfg, opts.Config, opts.Client)
 	if err != nil {
 		return nil, errors.Join(ErrGetVWConfig, err)
 	}

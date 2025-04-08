@@ -91,6 +91,11 @@ var listenCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := ctrl.SetupSignalHandler()
 		restCfg := ctrl.GetConfigOrDie()
+		log, err := setupLogger(appCfg.LogLevel)
+		if err != nil {
+			setupLog.Error(err, "unable to setup logger")
+			os.Exit(1)
+		}
 
 		mgrOpts := ctrl.Options{
 			Scheme:                 scheme,
@@ -109,7 +114,7 @@ var listenCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		mf := kcp.NewManagerFactory(appCfg)
+		mf := kcp.NewManagerFactory(log, appCfg)
 
 		mgr, err := mf.NewManager(ctx, restCfg, mgrOpts, clt)
 		if err != nil {
@@ -132,6 +137,7 @@ var listenCmd = &cobra.Command{
 
 		reconciler, err := kcp.NewReconciler(
 			ctx,
+			log,
 			appCfg,
 			reconcilerOpts,
 			discoveryInterface,

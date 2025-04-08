@@ -3,9 +3,11 @@ package kcp
 import (
 	"context"
 	"errors"
+	"github.com/openmfp/golang-commons/logger"
 	"github.com/openmfp/kubernetes-graphql-gateway/common/config"
 	"github.com/openmfp/kubernetes-graphql-gateway/listener/clusterpath"
 	"github.com/openmfp/kubernetes-graphql-gateway/listener/kcp/mocks"
+	"github.com/stretchr/testify/require"
 	"path"
 	"testing"
 
@@ -71,6 +73,9 @@ func TestNewReconciler(t *testing.T) {
 		},
 	}
 
+	log, err := logger.New(logger.DefaultConfig())
+	require.NoError(t, err)
+
 	for name, tc := range tests {
 		scheme := runtime.NewScheme()
 		assert.NoError(t, kcpapis.AddToScheme(scheme))
@@ -96,6 +101,7 @@ func TestNewReconciler(t *testing.T) {
 
 			reconciler, err := NewReconciler(
 				context.Background(),
+				log,
 				appCfg,
 				ReconcilerOpts{
 					Config:                 tc.cfg,

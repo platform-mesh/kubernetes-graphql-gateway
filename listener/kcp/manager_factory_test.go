@@ -2,7 +2,9 @@ package kcp
 
 import (
 	"context"
+	"github.com/openmfp/golang-commons/logger"
 	"github.com/openmfp/kubernetes-graphql-gateway/common/config"
+	"github.com/stretchr/testify/require"
 	"testing"
 
 	kcpapis "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
@@ -24,6 +26,9 @@ func TestNewManager(t *testing.T) {
 		"successful_KCP_manager_creation": {isKCPEnabled: true, expectErr: false},
 		"successful_manager_creation":     {isKCPEnabled: false, expectErr: false},
 	}
+
+	log, err := logger.New(logger.DefaultConfig())
+	require.NoError(t, err)
 
 	for name, tc := range tests {
 		scheme := runtime.NewScheme()
@@ -47,11 +52,11 @@ func TestNewManager(t *testing.T) {
 				},
 			}...).Build()
 
-			f := NewManagerFactory(appCfg)
+			f := NewManagerFactory(log, appCfg)
 
 			mgr, err := f.NewManager(
 				context.Background(),
-				&rest.Config{},
+				&rest.Config{Host: validAPIServerHost},
 				ctrl.Options{Scheme: scheme},
 				fakeClient,
 			)
