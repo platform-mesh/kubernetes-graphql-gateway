@@ -22,5 +22,6 @@ jobs:
       coverageThreasholdFile: 49
       coverageThresholdPackage: 63
       coverageThreasholdTotal: 81
+      repoVersionUpdate: openmfp/helm-charts
 
 
