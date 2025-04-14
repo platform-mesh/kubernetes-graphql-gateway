@@ -252,7 +252,7 @@ func (g *Gateway) processSingleResource(
 
 	subscriptionSingular := strings.ToLower(fmt.Sprintf("%s_%s", gvk.Group, singular))
 	rootSubscriptionFields[subscriptionSingular] = &graphql.Field{
-		Type: resourceType,
+		Type: addErrorFieldToGraphqlObject(resourceType),
 		Args: itemArgsBuilder.
 			WithSubscribeToAll().
 			Complete(),
@@ -263,7 +263,7 @@ func (g *Gateway) processSingleResource(
 
 	subscriptionPlural := strings.ToLower(fmt.Sprintf("%s_%s", gvk.Group, plural))
 	rootSubscriptionFields[subscriptionPlural] = &graphql.Field{
-		Type: graphql.NewList(resourceType),
+		Type: graphql.NewList(addErrorFieldToGraphqlObject(resourceType)),
 		Args: listArgsBuilder.
 			WithSubscribeToAll().
 			Complete(),
@@ -573,4 +573,11 @@ func sanitizeFieldName(name string) string {
 	}
 
 	return name
+}
+
+func addErrorFieldToGraphqlObject(obj *graphql.Object) *graphql.Object {
+	obj.AddFieldConfig("error", &graphql.Field{
+		Type: graphql.String,
+	})
+	return obj
 }

@@ -49,17 +49,17 @@ func (r *Service) runWatch(
 
 	gvk.Group = r.getOriginalGroupName(gvk.Group)
 
-	var err error
-
 	labelSelector, err := getStringArg(p.Args, LabelSelectorArg, false)
 	if err != nil {
 		r.log.Error().Err(err).Msg("Failed to get label selector argument")
+		resultChannel <- errorResult("Failed to get label selector: " + err.Error())
 		return
 	}
 
 	subscribeToAll, err := getBoolArg(p.Args, SubscribeToAllArg, false)
 	if err != nil {
 		r.log.Error().Err(err).Msg("Failed to get subscribeToAll argument")
+		resultChannel <- errorResult("Failed to get subscribeToAll: " + err.Error())
 		return
 	}
 
@@ -78,6 +78,7 @@ func (r *Service) runWatch(
 		namespace, err = getStringArg(p.Args, NamespaceArg, isNamespaceRequired)
 		if err != nil {
 			r.log.Error().Err(err).Msg("Failed to get namespace argument")
+			resultChannel <- errorResult("Failed to get namespace: " + err.Error())
 			return
 		}
 		if namespace != "" {
@@ -89,6 +90,7 @@ func (r *Service) runWatch(
 		selector, err := labels.Parse(labelSelector)
 		if err != nil {
 			r.log.Error().Err(err).Str("labelSelector", labelSelector).Msg("Invalid label selector")
+			resultChannel <- errorResult("Invalid label selector: " + err.Error())
 			return
 		}
 		opts = append(opts, client.MatchingLabelsSelector{Selector: selector})
@@ -99,6 +101,7 @@ func (r *Service) runWatch(
 		name, err = getStringArg(p.Args, NameArg, true)
 		if err != nil {
 			r.log.Error().Err(err).Msg("Failed to get name argument")
+			resultChannel <- errorResult("Failed to get name: " + err.Error())
 			return
 		}
 		opts = append(opts, client.MatchingFields{"metadata.name": name})
@@ -107,12 +110,14 @@ func (r *Service) runWatch(
 	sortBy, err := getStringArg(p.Args, SortByArg, false)
 	if err != nil {
 		r.log.Error().Err(err).Msg("Failed to get sortBy argument")
+		resultChannel <- errorResult("Failed to get sortBy: " + err.Error())
 		return
 	}
 
 	watcher, err := r.runtimeClient.Watch(ctx, list, opts...)
 	if err != nil {
 		r.log.Error().Err(err).Str("gvk", gvk.String()).Msg("Failed to start watch")
+		resultChannel <- errorResult("Failed to start watch: " + err.Error())
 		return
 	}
 	defer watcher.Stop()
@@ -143,6 +148,7 @@ func (r *Service) runWatch(
 					changed, err := determineFieldChanged(oldObj, obj, fieldsToWatch)
 					if err != nil {
 						r.log.Error().Err(err).Msg("Failed to determine field changes")
+						resultChannel <- errorResult("Failed to determine field changes: " + err.Error())
 						return
 					}
 					sendUpdate = changed
@@ -173,6 +179,7 @@ func (r *Service) runWatch(
 					err := validateSortBy(items, sortBy)
 					if err != nil {
 						r.log.Error().Err(err).Str(SortByArg, sortBy).Msg("Invalid sortBy field path")
+						resultChannel <- errorResult("Invalid sortBy field path: " + err.Error())
 						return
 					}
 
@@ -295,4 +302,10 @@ func getFieldValue(obj *unstructured.Unstructured, fieldPath string) (interface{
 	}
 
 	return current, true, nil
+}
+
+func errorResult(msg string) map[string]interface{} {
+	return map[string]interface{}{
+		"error": msg,
+	}
 }

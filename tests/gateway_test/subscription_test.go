@@ -80,6 +80,12 @@ func (suite *CommonTestSuite) TestSchemaSubscribe() {
 			},
 			expectedEvents: 65,
 		},
+		{
+			testName:       "incorrect_subscription_query",
+			subscribeQuery: `subscription: {"non_existent_field": "test"}`,
+			expectedEvents: 1,
+			expectError:    true,
+		},
 	}
 
 	for _, tt := range tests {
