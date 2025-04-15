@@ -55,8 +55,8 @@ func NewReconciler(
 	appCfg config.Config,
 	opts ReconcilerOpts,
 	discoveryInterface discovery.DiscoveryInterface,
-	preReconcileFunc func(cr *apischema.CRDResolver, io *workspacefile.IOHandler) error,
-	discoverFactory func(cfg *rest.Config) (*discoveryclient.Factory, error),
+	preReconcileFunc func(cr *apischema.CRDResolver, io workspacefile.IOHandler) error,
+	discoverFactory func(cfg *rest.Config) (*discoveryclient.FactoryProvider, error),
 ) (CustomReconciler, error) {
 	if !appCfg.EnableKcp {
 		return newStandardReconciler(opts, discoveryInterface, preReconcileFunc)
@@ -68,7 +68,7 @@ func NewReconciler(
 func newStandardReconciler(
 	opts ReconcilerOpts,
 	discoveryInterface discovery.DiscoveryInterface,
-	preReconcileFunc func(cr *apischema.CRDResolver, io *workspacefile.IOHandler) error,
+	preReconcileFunc func(cr *apischema.CRDResolver, io workspacefile.IOHandler) error,
 ) (CustomReconciler, error) {
 	ioHandler, err := workspacefile.NewIOHandler(opts.OpenAPIDefinitionsPath)
 	if err != nil {
@@ -107,7 +107,7 @@ func restMapperFromConfig(cfg *rest.Config) (meta.RESTMapper, error) {
 
 func PreReconcile(
 	cr *apischema.CRDResolver,
-	io *workspacefile.IOHandler,
+	io workspacefile.IOHandler,
 ) error {
 	JSON, err := cr.Resolve()
 	if err != nil {
@@ -125,7 +125,7 @@ func newKcpReconciler(
 	log *logger.Logger,
 	appCfg config.Config,
 	opts ReconcilerOpts,
-	newDiscoveryFactoryFunc func(cfg *rest.Config) (*discoveryclient.Factory, error),
+	newDiscoveryFactoryFunc func(cfg *rest.Config) (*discoveryclient.FactoryProvider, error),
 ) (CustomReconciler, error) {
 	ioHandler, err := workspacefile.NewIOHandler(opts.OpenAPIDefinitionsPath)
 	if err != nil {

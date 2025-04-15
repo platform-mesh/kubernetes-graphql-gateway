@@ -110,11 +110,11 @@ func TestNewReconciler(t *testing.T) {
 					OpenAPIDefinitionsPath: tc.definitionsPath,
 				},
 				&mocks.MockDiscoveryInterface{},
-				func(cr *apischema.CRDResolver, io *workspacefile.IOHandler) error {
+				func(cr *apischema.CRDResolver, io workspacefile.IOHandler) error {
 					return nil
 				},
-				func(cfg *rest.Config) (*discoveryclient.Factory, error) {
-					return &discoveryclient.Factory{
+				func(cfg *rest.Config) (*discoveryclient.FactoryProvider, error) {
+					return &discoveryclient.FactoryProvider{
 						Config: cfg,
 					}, nil
 				})

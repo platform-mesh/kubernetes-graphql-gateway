@@ -22,13 +22,13 @@ type Resolver interface {
 	Resolve(dc discovery.DiscoveryInterface, rm meta.RESTMapper) ([]byte, error)
 }
 
-type resolverImpl struct {
+type ResolverProvider struct {
 }
 
-func NewResolver() *resolverImpl {
-	return &resolverImpl{}
+func NewResolver() *ResolverProvider {
+	return &ResolverProvider{}
 }
 
-func (r *resolverImpl) Resolve(dc discovery.DiscoveryInterface, rm meta.RESTMapper) ([]byte, error) {
+func (r *ResolverProvider) Resolve(dc discovery.DiscoveryInterface, rm meta.RESTMapper) ([]byte, error) {
 	return resolveSchema(dc, rm)
 }

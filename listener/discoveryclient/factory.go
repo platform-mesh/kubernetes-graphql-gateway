@@ -19,28 +19,33 @@ var (
 	ErrCreateDynamicMapper = errors.New("failed to create dynamic REST mapper")
 )
 
+type Factory interface {
+	ClientForCluster(name string) (discovery.DiscoveryInterface, error)
+	RestMapperForCluster(name string) (meta.RESTMapper, error)
+}
+
 type NewDiscoveryIFFunc func(cfg *rest.Config) (discovery.DiscoveryInterface, error)
 
 func discoveryCltFactory(cfg *rest.Config) (discovery.DiscoveryInterface, error) {
 	return discovery.NewDiscoveryClientForConfig(cfg)
 }
 
-type Factory struct {
+type FactoryProvider struct {
 	*rest.Config
 	NewDiscoveryIFFunc
 }
 
-func NewFactory(cfg *rest.Config) (*Factory, error) {
+func NewFactory(cfg *rest.Config) (*FactoryProvider, error) {
 	if cfg == nil {
 		return nil, ErrNilConfig
 	}
-	return &Factory{
+	return &FactoryProvider{
 		Config:             cfg,
 		NewDiscoveryIFFunc: discoveryCltFactory,
 	}, nil
 }
 
-func (f *Factory) ClientForCluster(name string) (discovery.DiscoveryInterface, error) {
+func (f *FactoryProvider) ClientForCluster(name string) (discovery.DiscoveryInterface, error) {
 	clusterCfg, err := configForCluster(name, f.Config)
 	if err != nil {
 		return nil, errors.Join(ErrGetClusterConfig, err)
@@ -48,7 +53,7 @@ func (f *Factory) ClientForCluster(name string) (discovery.DiscoveryInterface, e
 	return f.NewDiscoveryIFFunc(clusterCfg)
 }
 
-func (f *Factory) RestMapperForCluster(name string) (meta.RESTMapper, error) {
+func (f *FactoryProvider) RestMapperForCluster(name string) (meta.RESTMapper, error) {
 	clusterCfg, err := configForCluster(name, f.Config)
 	if err != nil {
 		return nil, errors.Join(ErrGetClusterConfig, err)

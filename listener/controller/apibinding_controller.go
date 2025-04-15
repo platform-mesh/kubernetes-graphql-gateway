@@ -21,23 +21,23 @@ import (
 
 // APIBindingReconciler reconciles an APIBinding object
 type APIBindingReconciler struct {
-	io *workspacefile.IOHandler
-	df *discoveryclient.Factory
-	sc apischema.Resolver
-	pr *clusterpath.Resolver
+	ioHandler           workspacefile.IOHandler
+	discoveryFactory    discoveryclient.Factory
+	apiSchemaResolver   apischema.Resolver
+	clusterPathResolver clusterpath.Resolver
 }
 
 func NewAPIBindingReconciler(
-	io *workspacefile.IOHandler,
-	df *discoveryclient.Factory,
-	sc apischema.Resolver,
-	pr *clusterpath.Resolver,
+	ioHandler workspacefile.IOHandler,
+	discoveryFactory discoveryclient.Factory,
+	apiSchemaResolver apischema.Resolver,
+	clusterPathResolver clusterpath.Resolver,
 ) *APIBindingReconciler {
 	return &APIBindingReconciler{
-		io: io,
-		df: df,
-		sc: sc,
-		pr: pr,
+		ioHandler:           ioHandler,
+		discoveryFactory:    discoveryFactory,
+		apiSchemaResolver:   apiSchemaResolver,
+		clusterPathResolver: clusterPathResolver,
 	}
 }
 
@@ -48,13 +48,23 @@ func (r *APIBindingReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	logger := log.FromContext(ctx)
-	clusterClt, err := r.pr.ClientForCluster(req.ClusterName)
+	clusterClt, err := r.clusterPathResolver.ClientForCluster(req.ClusterName)
 	if err != nil {
 		logger.Error(err, "failed to get cluster client", "cluster", req.ClusterName)
 		return ctrl.Result{}, err
 	}
 	clusterPath, err := clusterpath.PathForCluster(req.ClusterName, clusterClt)
 	if err != nil {
+		if errors.Is(err, clusterpath.ErrClusterIsDeleted) {
+			logger.Info("cluster is deleted, triggering cleanup")
+			if err = r.ioHandler.Delete(clusterPath); err != nil {
+				logger.Error(err, "failed to delete workspace file after cluster deletion")
+				return ctrl.Result{}, err
+			}
+
+			return ctrl.Result{}, nil
+		}
+
 		logger.Error(err, "failed to get cluster path", "cluster", req.ClusterName)
 		return ctrl.Result{}, err
 	}
@@ -62,26 +72,26 @@ func (r *APIBindingReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	logger = logger.WithValues("cluster", clusterPath)
 	logger.Info("starting reconciliation...")
 
-	dc, err := r.df.ClientForCluster(clusterPath)
+	dc, err := r.discoveryFactory.ClientForCluster(clusterPath)
 	if err != nil {
 		logger.Error(err, "failed to create discovery client for cluster")
 		return ctrl.Result{}, err
 	}
 
-	rm, err := r.df.RestMapperForCluster(clusterPath)
+	rm, err := r.discoveryFactory.RestMapperForCluster(clusterPath)
 	if err != nil {
 		logger.Error(err, "failed to create rest mapper for cluster")
 		return ctrl.Result{}, err
 	}
 
-	savedJSON, err := r.io.Read(clusterPath)
+	savedJSON, err := r.ioHandler.Read(clusterPath)
 	if errors.Is(err, fs.ErrNotExist) {
-		actualJSON, err1 := r.sc.Resolve(dc, rm)
+		actualJSON, err1 := r.apiSchemaResolver.Resolve(dc, rm)
 		if err1 != nil {
 			logger.Error(err1, "failed to resolve server JSON schema")
 			return ctrl.Result{}, err1
 		}
-		if err := r.io.Write(actualJSON, clusterPath); err != nil {
+		if err := r.ioHandler.Write(actualJSON, clusterPath); err != nil {
 			logger.Error(err, "failed to write JSON to filesystem")
 			return ctrl.Result{}, err
 		}
@@ -93,13 +103,13 @@ func (r *APIBindingReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, err
 	}
 
-	actualJSON, err := r.sc.Resolve(dc, rm)
+	actualJSON, err := r.apiSchemaResolver.Resolve(dc, rm)
 	if err != nil {
 		logger.Error(err, "failed to resolve server JSON schema")
 		return ctrl.Result{}, err
 	}
 	if !bytes.Equal(actualJSON, savedJSON) {
-		if err := r.io.Write(actualJSON, clusterPath); err != nil {
+		if err := r.ioHandler.Write(actualJSON, clusterPath); err != nil {
 			logger.Error(err, "failed to write JSON to filesystem")
 			return ctrl.Result{}, err
 		}

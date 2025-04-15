@@ -24,7 +24,7 @@ func TestResolver(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			resolver := &Resolver{
+			resolver := &ResolverProvider{
 				Scheme: runtime.NewScheme(),
 				Config: tc.baseConfig,
 				clientFactory: func(config *rest.Config, options client.Options) (client.Client, error) {

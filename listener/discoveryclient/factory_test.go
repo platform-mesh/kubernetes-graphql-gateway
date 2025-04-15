@@ -46,7 +46,7 @@ func TestClientForCluster(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			factory := &Factory{
+			factory := &FactoryProvider{
 				Config:             tc.restCfg,
 				NewDiscoveryIFFunc: fakeClientFactory,
 			}
@@ -73,7 +73,7 @@ func TestRestMapperForCluster(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			factory := &Factory{
+			factory := &FactoryProvider{
 				Config:             tc.restCfg,
 				NewDiscoveryIFFunc: fakeClientFactory,
 			}

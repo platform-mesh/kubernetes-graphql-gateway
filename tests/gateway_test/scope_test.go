@@ -31,7 +31,7 @@ func (suite *CommonTestSuite) TestCrudClusterRole() {
 	require.Equal(suite.T(), http.StatusOK, statusCode, "Expected status code 200")
 	require.Nil(suite.T(), getResp.Errors, "GraphQL errors: %v", getResp.Errors)
 
-	data := getResp.Data.RbacAuthorizationK8sIo.ClusterRole
+	data := getResp.Data.RbacAuthorizationK8sIO.ClusterRole
 	require.Equal(suite.T(), "test-cluster-role", data.Metadata.Name)
 
 	// Delete ClusterRole

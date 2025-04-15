@@ -8,12 +8,15 @@ packages:
       outpkg: mocks
     interfaces:
       DiscoveryInterface:
+
   sigs.k8s.io/controller-runtime/pkg/client:
     config:
       dir: gateway/resolver/mocks
       outpkg: mocks
     interfaces:
       WithWatch:
+      Client:
+
   net/http:
     config:
       dir: gateway/manager/mocks
@@ -21,3 +24,30 @@ packages:
     interfaces:
       RoundTripper:
 
+  github.com/openmfp/kubernetes-graphql-gateway/listener/workspacefile:
+    config:
+      dir: listener/workspacefile/mocks
+      outpkg: mocks
+    interfaces:
+      IOHandler:
+
+  github.com/openmfp/kubernetes-graphql-gateway/listener/discoveryclient:
+    config:
+      dir: listener/discoveryclient/mocks
+      outpkg: mocks
+    interfaces:
+      Factory:
+
+  github.com/openmfp/kubernetes-graphql-gateway/listener/apischema:
+    config:
+      dir: listener/apischema/mocks
+      outpkg: mocks
+    interfaces:
+      Resolver:
+
+  github.com/openmfp/kubernetes-graphql-gateway/listener/clusterpath:
+    config:
+      dir: listener/clusterpath/mocks
+      outpkg: mocks
+    interfaces:
+      Resolver:

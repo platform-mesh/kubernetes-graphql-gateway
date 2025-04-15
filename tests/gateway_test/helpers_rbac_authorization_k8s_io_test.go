@@ -1,6 +1,6 @@
 package gateway_test
 
-type RbacAuthorizationK8sIo struct {
+type RbacAuthorizationK8sIO struct {
 	ClusterRole *ClusterRole `json:"ClusterRole,omitempty"`
 }
 
