@@ -14,9 +14,8 @@ This page shows you how to get started to use the GraphQL Gateway for Kubernetes
 git clone git@github.com:openmfp/kubernetes-graphql-gateway.git && cd kubernetes-graphql-gateway
 ```  
 
-## Running the API Listener
 
-1. Setup the environment:
+## Setup the environment:
 ```shell
 # this will disable authorization
 export LOCAL_DEVELOPMENT=true 
@@ -25,7 +24,10 @@ export ENABLE_KCP=false
 # you must point to the config of the cluster you want to run against
 export KUBECONFIG=YOUR_KUBECONFIG_PATH
 ```
-2. In the same shell, run the listener:
+## Running the Listener
+
+Make sure you have done steps from the [setup section](#setup-the-environment).
+
 ```shell
 task listener
 ```
@@ -33,7 +35,9 @@ This will create a directory `./bin/definitions` and start watching the cluster 
 In that directory a file will be created for each workspace in KCP or a standard Kubernetes cluster.
 The file will contain the API definitions for the resources in that workspace.
 
-## Running the GraphQL Gateway
+## Running the Gateway
+
+Make sure you have done steps from the [setup section](#setup-the-environment).
 
 In the root directory of the `kubernetes-graphql-gateway` repository, open a new shell and run the Graphql gateway as follows:
 ```shell
