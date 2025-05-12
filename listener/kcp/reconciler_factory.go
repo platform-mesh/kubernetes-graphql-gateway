@@ -3,7 +3,6 @@ package kcp
 import (
 	"context"
 	"errors"
-	"github.com/openmfp/golang-commons/logger"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -49,20 +48,15 @@ type ReconcilerOpts struct {
 	OpenAPIDefinitionsPath string
 }
 
-func NewReconciler(
-	ctx context.Context,
-	log *logger.Logger,
-	appCfg config.Config,
-	opts ReconcilerOpts,
+func NewReconciler(appCfg config.Config, opts ReconcilerOpts, restcfg *rest.Config,
 	discoveryInterface discovery.DiscoveryInterface,
 	preReconcileFunc func(cr *apischema.CRDResolver, io workspacefile.IOHandler) error,
-	discoverFactory func(cfg *rest.Config) (*discoveryclient.FactoryProvider, error),
-) (CustomReconciler, error) {
+	discoverFactory func(cfg *rest.Config) (*discoveryclient.FactoryProvider, error)) (CustomReconciler, error) {
 	if !appCfg.EnableKcp {
 		return newStandardReconciler(opts, discoveryInterface, preReconcileFunc)
 	}
 
-	return newKcpReconciler(ctx, log, appCfg, opts, discoverFactory)
+	return newKcpReconciler(opts, restcfg, discoverFactory)
 }
 
 func newStandardReconciler(
@@ -120,13 +114,7 @@ func PreReconcile(
 	return nil
 }
 
-func newKcpReconciler(
-	ctx context.Context,
-	log *logger.Logger,
-	appCfg config.Config,
-	opts ReconcilerOpts,
-	newDiscoveryFactoryFunc func(cfg *rest.Config) (*discoveryclient.FactoryProvider, error),
-) (CustomReconciler, error) {
+func newKcpReconciler(opts ReconcilerOpts, restcfg *rest.Config, newDiscoveryFactoryFunc func(cfg *rest.Config) (*discoveryclient.FactoryProvider, error)) (CustomReconciler, error) {
 	ioHandler, err := workspacefile.NewIOHandler(opts.OpenAPIDefinitionsPath)
 	if err != nil {
 		return nil, errors.Join(ErrCreateIOHandler, err)
@@ -137,12 +125,7 @@ func newKcpReconciler(
 		return nil, errors.Join(ErrCreatePathResolver, err)
 	}
 
-	virtualWorkspaceCfg, err := virtualWorkspaceConfigFromCfg(ctx, log, appCfg, opts.Config, opts.Client)
-	if err != nil {
-		return nil, errors.Join(ErrGetVWConfig, err)
-	}
-
-	df, err := newDiscoveryFactoryFunc(virtualWorkspaceCfg)
+	df, err := newDiscoveryFactoryFunc(restcfg)
 	if err != nil {
 		return nil, errors.Join(ErrCreateDiscoveryClient, err)
 	}

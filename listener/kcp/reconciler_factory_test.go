@@ -1,15 +1,13 @@
 package kcp
 
 import (
-	"context"
 	"errors"
-	"github.com/openmfp/golang-commons/logger"
+	"path"
+	"testing"
+
 	"github.com/openmfp/kubernetes-graphql-gateway/common/config"
 	"github.com/openmfp/kubernetes-graphql-gateway/listener/clusterpath"
 	"github.com/openmfp/kubernetes-graphql-gateway/listener/kcp/mocks"
-	"github.com/stretchr/testify/require"
-	"path"
-	"testing"
 
 	kcpapis "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
 	"github.com/stretchr/testify/assert"
@@ -73,9 +71,6 @@ func TestNewReconciler(t *testing.T) {
 		},
 	}
 
-	log, err := logger.New(logger.DefaultConfig())
-	require.NoError(t, err)
-
 	for name, tc := range tests {
 		scheme := runtime.NewScheme()
 		assert.NoError(t, kcpapis.AddToScheme(scheme))
@@ -99,25 +94,18 @@ func TestNewReconciler(t *testing.T) {
 				},
 			}...).Build()
 
-			reconciler, err := NewReconciler(
-				context.Background(),
-				log,
-				appCfg,
-				ReconcilerOpts{
-					Config:                 tc.cfg,
-					Scheme:                 scheme,
-					Client:                 fakeClient,
-					OpenAPIDefinitionsPath: tc.definitionsPath,
-				},
-				&mocks.MockDiscoveryInterface{},
-				func(cr *apischema.CRDResolver, io workspacefile.IOHandler) error {
-					return nil
-				},
-				func(cfg *rest.Config) (*discoveryclient.FactoryProvider, error) {
-					return &discoveryclient.FactoryProvider{
-						Config: cfg,
-					}, nil
-				})
+			reconciler, err := NewReconciler(appCfg, ReconcilerOpts{
+				Config:                 tc.cfg,
+				Scheme:                 scheme,
+				Client:                 fakeClient,
+				OpenAPIDefinitionsPath: tc.definitionsPath,
+			}, tc.cfg, &mocks.MockDiscoveryInterface{}, func(cr *apischema.CRDResolver, io workspacefile.IOHandler) error {
+				return nil
+			}, func(cfg *rest.Config) (*discoveryclient.FactoryProvider, error) {
+				return &discoveryclient.FactoryProvider{
+					Config: cfg,
+				}, nil
+			})
 
 			if tc.err != nil {
 				assert.EqualError(t, err, tc.err.Error())
