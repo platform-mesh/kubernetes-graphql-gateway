@@ -2,7 +2,7 @@ package kcp
 
 import (
 	"context"
-	"errors"
+
 	"github.com/openmfp/golang-commons/logger"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -30,10 +30,5 @@ func (f *ManagerFactory) NewManager(ctx context.Context, restCfg *rest.Config, o
 		return ctrl.NewManager(restCfg, opts)
 	}
 
-	virtualWorkspaceCfg, err := virtualWorkspaceConfigFromCfg(ctx, f.log, f.appConfig, restCfg, clt)
-	if err != nil {
-		return nil, errors.Join(ErrGetVWConfig, err)
-	}
-
-	return kcpctrl.NewClusterAwareManager(virtualWorkspaceCfg, opts)
+	return kcpctrl.NewClusterAwareManager(restCfg, opts)
 }
