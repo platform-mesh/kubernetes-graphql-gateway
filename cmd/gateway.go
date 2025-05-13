@@ -68,12 +68,6 @@ var gatewayCmd = &cobra.Command{
 	},
 }
 
-func init() {
-	// Assuming rootCmd is defined in another file within the cmd package
-	// Add startCmd as a subcommand to rootCmd
-	rootCmd.AddCommand(startCmd)
-}
-
 // setupLogger initializes the logger with the given log level
 func setupLogger(logLevel string) (*logger.Logger, error) {
 	loggerCfg := logger.DefaultConfig()
