@@ -32,7 +32,7 @@ var (
 	ErrResolveSchema         = errors.New("failed to resolve server JSON schema")
 	ErrWriteJSON             = errors.New("failed to write JSON to filesystem")
 	ErrCreatePathResolver    = errors.New("failed to create cluster path resolver")
-	ErrGetVWConfig           = errors.New("unable to get virtual workspace config")
+	ErrGetVWConfig           = errors.New("unable to get virtual workspace config, check if your kcp cluster is running")
 	ErrCreateHTTPClient      = errors.New("failed to create http client")
 )
 

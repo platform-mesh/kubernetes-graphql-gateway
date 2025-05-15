@@ -64,6 +64,7 @@ func (suite *CommonTestSuite) SetupTest() {
 	require.NoError(suite.T(), err)
 
 	suite.appCfg.LocalDevelopment = true
+	suite.appCfg.Gateway.Cors.Enabled = true
 
 	suite.log, err = logger.New(logger.DefaultConfig())
 	require.NoError(suite.T(), err)

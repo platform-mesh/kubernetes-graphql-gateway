@@ -2,6 +2,7 @@ package resolver
 
 import (
 	"fmt"
+	"github.com/openmfp/golang-commons/sentry"
 	"reflect"
 	"sort"
 	"strings"
@@ -16,6 +17,10 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+var (
+	ErrFailedToCastEventObjectToUnstructured = fmt.Errorf("failed to cast event object to unstructured")
 )
 
 func (r *Service) SubscribeItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
@@ -117,7 +122,11 @@ func (r *Service) runWatch(
 	watcher, err := r.runtimeClient.Watch(ctx, list, opts...)
 	if err != nil {
 		r.log.Error().Err(err).Str("gvk", gvk.String()).Msg("Failed to start watch")
+
+		sentry.CaptureError(err, sentry.Tags{"namespace": namespace}, sentry.Extras{"gvk": gvk.String()})
+
 		resultChannel <- errorResult("Failed to start watch: " + err.Error())
+
 		return
 	}
 	defer watcher.Stop()
@@ -131,6 +140,11 @@ func (r *Service) runWatch(
 			}
 			obj, ok := event.Object.(*unstructured.Unstructured)
 			if !ok {
+				err = ErrFailedToCastEventObjectToUnstructured
+				r.log.Error().Err(err)
+
+				sentry.CaptureError(err, sentry.Tags{"namespace": namespace})
+
 				continue
 			}
 			key := obj.GetNamespace() + "/" + obj.GetName()
@@ -145,9 +159,13 @@ func (r *Service) runWatch(
 				if subscribeToAll {
 					sendUpdate = true
 				} else {
-					changed, err := determineFieldChanged(oldObj, obj, fieldsToWatch)
+					var changed bool
+					changed, err = determineFieldChanged(oldObj, obj, fieldsToWatch)
 					if err != nil {
 						r.log.Error().Err(err).Msg("Failed to determine field changes")
+
+						sentry.CaptureError(err, sentry.Tags{"namespace": namespace})
+
 						resultChannel <- errorResult("Failed to determine field changes: " + err.Error())
 						return
 					}
@@ -176,7 +194,7 @@ func (r *Service) runWatch(
 						items = append(items, *item.DeepCopy())
 					}
 
-					err := validateSortBy(items, sortBy)
+					err = validateSortBy(items, sortBy)
 					if err != nil {
 						r.log.Error().Err(err).Str(SortByArg, sortBy).Msg("Invalid sortBy field path")
 						resultChannel <- errorResult("Invalid sortBy field path: " + err.Error())

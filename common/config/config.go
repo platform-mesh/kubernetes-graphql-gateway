@@ -1,50 +1,29 @@
 package config
 
-import (
-	"github.com/vrischmann/envconfig"
-)
-
 type Config struct {
-	Listener
-	Gateway
+	OpenApiDefinitionsPath string `mapstructure:"openapi-definitions-path"`
+	EnableKcp              bool   `mapstructure:"enable-kcp"`
+	LocalDevelopment       bool   `mapstructure:"local-development"`
 
-	OpenApiDefinitionsPath string `envconfig:"default=./bin/definitions"`
-	EnableKcp              bool   `envconfig:"default=true,optional"`
-	LocalDevelopment       bool   `envconfig:"default=false,optional"`
-}
+	Listener struct {
+		// Listener fields will be added here
+	} `mapstructure:",squash"`
 
-type Gateway struct {
-	Port              string `envconfig:"default=8080,optional"`
-	LogLevel          string `envconfig:"default=INFO,optional"`
-	UserNameClaim     string `envconfig:"default=email,optional"`
-	ShouldImpersonate bool   `envconfig:"default=true,optional"`
+	Gateway struct {
+		Port              string `mapstructure:"gateway-port"`
+		UsernameClaim     string `mapstructure:"gateway-username-claim"`
+		ShouldImpersonate bool   `mapstructure:"gateway-should-impersonate"`
 
-	HandlerCfg struct {
-		Pretty     bool `envconfig:"default=true,optional"`
-		Playground bool `envconfig:"default=true,optional"`
-		GraphiQL   bool `envconfig:"default=true,optional"`
-	}
+		HandlerCfg struct {
+			Pretty     bool `mapstructure:"gateway-handler-pretty"`
+			Playground bool `mapstructure:"gateway-handler-playground"`
+			GraphiQL   bool `mapstructure:"gateway-handler-graphiql"`
+		} `mapstructure:",squash"`
 
-	Cors struct {
-		Enabled        bool     `envconfig:"default=false,optional"`
-		AllowedOrigins []string `envconfig:"default=*,optional"`
-		AllowedHeaders []string `envconfig:"default=*,optional"`
-	}
-}
-
-type Listener struct {
-	MetricsAddr          string `envconfig:"default=0,optional"`
-	EnableLeaderElection bool   `envconfig:"default=false,optional"`
-	ProbeAddr            string `envconfig:"default=:8081,optional"`
-	SecureMetrics        bool   `envconfig:"default=true,optional"`
-	EnableHTTP2          bool   `envconfig:"default=false,optional"`
-	ApiExportWorkspace   string `envconfig:"default=:root,optional"`
-	ApiExportName        string `envconfig:"default=kubernetes.graphql.gateway,optional"`
-}
-
-// NewFromEnv creates a Gateway from environment values
-func NewFromEnv() (Config, error) {
-	cfg := Config{}
-	err := envconfig.Init(&cfg)
-	return cfg, err
+		Cors struct {
+			Enabled        bool     `mapstructure:"gateway-cors-enabled"`
+			AllowedOrigins []string `mapstructure:"gateway-cors-allowed-origins"`
+			AllowedHeaders []string `mapstructure:"gateway-cors-allowed-headers"`
+		} `mapstructure:",squash"`
+	} `mapstructure:",squash"`
 }

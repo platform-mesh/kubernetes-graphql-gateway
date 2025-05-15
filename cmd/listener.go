@@ -4,20 +4,14 @@ import (
 	"crypto/tls"
 	"os"
 
-	"k8s.io/client-go/discovery"
-
-	"github.com/openmfp/kubernetes-graphql-gateway/listener/discoveryclient"
-
 	kcpapis "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
 	kcpcore "github.com/kcp-dev/kcp/sdk/apis/core/v1alpha1"
 	kcptenancy "github.com/kcp-dev/kcp/sdk/apis/tenancy/v1alpha1"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-
 	"github.com/spf13/cobra"
-
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-
+	"k8s.io/client-go/discovery"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -27,20 +21,15 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	"github.com/openmfp/kubernetes-graphql-gateway/common/config"
+	"github.com/openmfp/kubernetes-graphql-gateway/listener/discoveryclient"
 	"github.com/openmfp/kubernetes-graphql-gateway/listener/kcp"
 )
-
-func init() {
-	rootCmd.AddCommand(listenCmd)
-}
 
 var (
 	scheme               = runtime.NewScheme()
 	setupLog             = ctrl.Log.WithName("setup")
 	webhookServer        webhook.Server
 	metricsServerOptions metricsserver.Options
-	appCfg               config.Config
 )
 
 var listenCmd = &cobra.Command{
@@ -48,7 +37,6 @@ var listenCmd = &cobra.Command{
 	Example: "KUBECONFIG=<path to kubeconfig file> go run . listener",
 	PreRun: func(cmd *cobra.Command, args []string) {
 		utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-
 		utilruntime.Must(kcpapis.AddToScheme(scheme))
 		utilruntime.Must(kcpcore.AddToScheme(scheme))
 		utilruntime.Must(kcptenancy.AddToScheme(scheme))
@@ -59,20 +47,13 @@ var listenCmd = &cobra.Command{
 		}
 		ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-		var err error
-		appCfg, err = config.NewFromEnv()
-		if err != nil {
-			setupLog.Error(err, "failed to get operator flags from env, exiting...")
-			os.Exit(1)
-		}
-
 		disableHTTP2 := func(c *tls.Config) {
 			setupLog.Info("disabling http/2")
 			c.NextProtos = []string{"http/1.1"}
 		}
 
 		var tlsOpts []func(*tls.Config)
-		if !appCfg.EnableHTTP2 {
+		if !defaultCfg.EnableHTTP2 {
 			tlsOpts = []func(c *tls.Config){disableHTTP2}
 		}
 
@@ -81,19 +62,19 @@ var listenCmd = &cobra.Command{
 		})
 
 		metricsServerOptions = metricsserver.Options{
-			BindAddress:   appCfg.MetricsAddr,
-			SecureServing: appCfg.SecureMetrics,
+			BindAddress:   defaultCfg.Metrics.BindAddress,
+			SecureServing: defaultCfg.Metrics.Secure,
 			TLSOpts:       tlsOpts,
 		}
 
-		if appCfg.SecureMetrics {
+		if defaultCfg.Metrics.Secure {
 			metricsServerOptions.FilterProvider = filters.WithAuthenticationAndAuthorization
 		}
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := ctrl.SetupSignalHandler()
 		restCfg := ctrl.GetConfigOrDie()
-		log, err := setupLogger(appCfg.LogLevel)
+		log, err := setupLogger(defaultCfg.Log.Level)
 		if err != nil {
 			setupLog.Error(err, "unable to setup logger")
 			os.Exit(1)
@@ -103,8 +84,8 @@ var listenCmd = &cobra.Command{
 			Scheme:                 scheme,
 			Metrics:                metricsServerOptions,
 			WebhookServer:          webhookServer,
-			HealthProbeBindAddress: appCfg.ProbeAddr,
-			LeaderElection:         appCfg.EnableLeaderElection,
+			HealthProbeBindAddress: defaultCfg.HealthProbeBindAddress,
+			LeaderElection:         defaultCfg.LeaderElection.Enabled,
 			LeaderElectionID:       "72231e1f.openmfp.io",
 		}
 

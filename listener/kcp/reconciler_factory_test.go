@@ -11,10 +11,8 @@ import (
 
 	kcpapis "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
 	"github.com/stretchr/testify/assert"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/openmfp/kubernetes-graphql-gateway/listener/apischema"
@@ -76,23 +74,11 @@ func TestNewReconciler(t *testing.T) {
 		assert.NoError(t, kcpapis.AddToScheme(scheme))
 
 		t.Run(name, func(t *testing.T) {
-			appCfg, err := config.NewFromEnv()
-			assert.NoError(t, err)
-			appCfg.EnableKcp = tc.isKCPEnabled
+			appCfg := config.Config{
+				EnableKcp: tc.isKCPEnabled,
+			}
 
-			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects([]client.Object{
-				&kcpapis.APIExport{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: appCfg.ApiExportWorkspace,
-						Name:      appCfg.ApiExportName,
-					},
-					Status: kcpapis.APIExportStatus{
-						VirtualWorkspaces: []kcpapis.VirtualWorkspace{
-							{URL: validAPIServerHost},
-						},
-					},
-				},
-			}...).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 
 			reconciler, err := NewReconciler(appCfg, ReconcilerOpts{
 				Config:                 tc.cfg,

@@ -3,7 +3,9 @@ package manager
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"github.com/openmfp/golang-commons/sentry"
 	"net/http"
 	"net/url"
 	"os"
@@ -26,6 +28,11 @@ import (
 	appConfig "github.com/openmfp/kubernetes-graphql-gateway/common/config"
 	"github.com/openmfp/kubernetes-graphql-gateway/gateway/resolver"
 	"github.com/openmfp/kubernetes-graphql-gateway/gateway/schema"
+)
+
+var (
+	ErrUnknownFileEvent = errors.New("unknown file event")
+	ErrNoHandlerFound   = errors.New("no handler found for workspace")
 )
 
 type Provider interface {
@@ -67,7 +74,7 @@ func NewManager(log *logger.Logger, cfg *rest.Config, appCfg appConfig.Config) (
 	cfg.Host = fmt.Sprintf("%s://%s", u.Scheme, u.Host)
 
 	cfg.Wrap(func(rt http.RoundTripper) http.RoundTripper {
-		return NewRoundTripper(log, rt, appCfg.UserNameClaim, appCfg.ShouldImpersonate)
+		return NewRoundTripper(log, rt, appCfg.Gateway.UsernameClaim, appCfg.Gateway.ShouldImpersonate)
 	})
 
 	runtimeClient, err := kcp.NewClusterAwareClientWithWatch(cfg, client.Options{})
@@ -117,6 +124,7 @@ func (s *Service) Start() {
 					return
 				}
 				s.log.Error().Err(err).Msg("Error watching files")
+				sentry.CaptureError(err, nil)
 			}
 		}
 	}()
@@ -136,14 +144,18 @@ func (s *Service) handleEvent(event fsnotify.Event) {
 	case fsnotify.Remove:
 		s.OnFileDeleted(filename)
 	default:
-		s.log.Info().Str("file", filename).Msg("Unknown file event")
+		err := ErrUnknownFileEvent
+		s.log.Error().Err(err).Str("filename", filename).Msg("Unknown file event")
+		sentry.CaptureError(sentry.SentryError(err), nil, sentry.Extras{"filename": filename, "event": event.String()})
 	}
 }
 
 func (s *Service) OnFileChanged(filename string) {
 	schema, err := s.loadSchemaFromFile(filename)
 	if err != nil {
-		s.log.Error().Err(err).Str("file", filename).Msg("Error loading schema from file")
+		s.log.Error().Err(err).Str("filename", filename).Msg("failed to process the file's change")
+		sentry.CaptureError(err, sentry.Tags{"filename": filename})
+
 		return
 	}
 
@@ -151,7 +163,7 @@ func (s *Service) OnFileChanged(filename string) {
 	s.handlers[filename] = s.createHandler(schema)
 	s.mu.Unlock()
 
-	s.log.Info().Str("endpoint", fmt.Sprintf("http://localhost:%s/%s/graphql", s.appCfg.Port, filename)).Msg("Registered endpoint")
+	s.log.Info().Str("endpoint", fmt.Sprintf("http://localhost:%s/%s/graphql", s.appCfg.Gateway.Port, filename)).Msg("Registered endpoint")
 }
 
 func (s *Service) OnFileDeleted(filename string) {
@@ -178,9 +190,9 @@ func (s *Service) loadSchemaFromFile(filename string) (*graphql.Schema, error) {
 func (s *Service) createHandler(schema *graphql.Schema) *graphqlHandler {
 	h := handler.New(&handler.Config{
 		Schema:     schema,
-		Pretty:     s.appCfg.HandlerCfg.Pretty,
-		Playground: s.appCfg.HandlerCfg.Playground,
-		GraphiQL:   s.appCfg.HandlerCfg.GraphiQL,
+		Pretty:     s.appCfg.Gateway.HandlerCfg.Pretty,
+		Playground: s.appCfg.Gateway.HandlerCfg.Playground,
+		GraphiQL:   s.appCfg.Gateway.HandlerCfg.GraphiQL,
 	})
 	return &graphqlHandler{
 		schema:  schema,
@@ -190,9 +202,9 @@ func (s *Service) createHandler(schema *graphql.Schema) *graphqlHandler {
 
 func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
-	if s.appCfg.Cors.Enabled {
-		allowedOrigins := strings.Join(s.appCfg.Cors.AllowedOrigins, ",")
-		allowedHeaders := strings.Join(s.appCfg.Cors.AllowedHeaders, ",")
+	if s.appCfg.Gateway.Cors.Enabled {
+		allowedOrigins := strings.Join(s.appCfg.Gateway.Cors.AllowedOrigins, ",")
+		allowedHeaders := strings.Join(s.appCfg.Gateway.Cors.AllowedHeaders, ",")
 		w.Header().Set("Access-Control-Allow-Origin", allowedOrigins)
 		w.Header().Set("Access-Control-Allow-Headers", allowedHeaders)
 		// setting cors allowed methods is not needed for this service,
@@ -217,7 +229,8 @@ func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.mu.RUnlock()
 
 	if !ok {
-		s.log.Info().Str("workspace", workspace).Msg("no handler found for workspace")
+		s.log.Error().Err(ErrNoHandlerFound).Str("workspace", workspace)
+		sentry.CaptureError(ErrNoHandlerFound, sentry.Tags{"workspace": workspace})
 		http.NotFound(w, r)
 		return
 	}

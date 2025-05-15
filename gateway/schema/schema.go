@@ -151,7 +151,7 @@ func (g *Gateway) processSingleResource(
 ) {
 	gvk, err := g.getGroupVersionKind(resourceKey)
 	if err != nil {
-		g.log.Error().Err(err).Msg("Error parsing group version kind")
+		g.log.Debug().Err(err).Msg("Failed to get group version kind")
 		return
 	}
 

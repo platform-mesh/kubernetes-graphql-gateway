@@ -1,20 +1,20 @@
 package cmd
 
 import (
+	"context"
+	"errors"
 	"fmt"
-	"net/http"
-	"time"
-
-	"github.com/rs/zerolog/log"
-
+	openmfpcontext "github.com/openmfp/golang-commons/context"
+	"github.com/openmfp/golang-commons/sentry"
 	"github.com/spf13/cobra"
+	"net/http"
 	ctrl "sigs.k8s.io/controller-runtime"
 	restCfg "sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"time"
 
 	"github.com/openmfp/golang-commons/logger"
 
-	appConfig "github.com/openmfp/kubernetes-graphql-gateway/common/config"
 	"github.com/openmfp/kubernetes-graphql-gateway/gateway/manager"
 )
 
@@ -22,20 +22,28 @@ var gatewayCmd = &cobra.Command{
 	Use:     "gateway",
 	Short:   "Run the GQL Gateway",
 	Example: "go run main.go gateway",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		start := time.Now()
-
-		appCfg, err := appConfig.NewFromEnv()
-		if err != nil {
-			log.Fatal().Err(err).Msg("Error getting app restCfg, exiting")
-		}
-
-		log, err := setupLogger(appCfg.LogLevel)
+	RunE: func(_ *cobra.Command, _ []string) error {
+		log, err := setupLogger(defaultCfg.Log.Level)
 		if err != nil {
 			return fmt.Errorf("failed to setup logger: %w", err)
 		}
 
 		log.Info().Str("LogLevel", log.GetLevel().String()).Msg("Starting server...")
+
+		ctx, _, shutdown := openmfpcontext.StartContext(log, appCfg, 1*time.Second)
+		defer shutdown()
+
+		if defaultCfg.Sentry.Dsn != "" {
+			err := sentry.Start(ctx,
+				defaultCfg.Sentry.Dsn, defaultCfg.Environment, defaultCfg.Region,
+				defaultCfg.Image.Name, defaultCfg.Image.Tag,
+			)
+			if err != nil {
+				log.Fatal().Err(err).Msg("Sentry init failed")
+			}
+
+			defer openmfpcontext.Recover(log)
+		}
 
 		ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
 
@@ -55,15 +63,34 @@ var gatewayCmd = &cobra.Command{
 		// Set up HTTP handler
 		http.Handle("/", managerInstance)
 
-		// Start HTTP server
-		err = http.ListenAndServe(fmt.Sprintf(":%s", appCfg.Port), nil)
-		if err != nil {
-			log.Error().Err(err).Msg("Error starting server")
-			return fmt.Errorf("failed to start server: %w", err)
+		// Start HTTP server with context
+		server := &http.Server{
+			Addr:    fmt.Sprintf(":%s", appCfg.Gateway.Port),
+			Handler: nil,
 		}
 
-		log.Info().Float64("elapsed_seconds", time.Since(start).Seconds()).Msg("Setup completed")
+		// Start the HTTP server in a goroutine so that we can listen for shutdown signals
+		go func() {
+			err := server.ListenAndServe()
+			if err != nil && !errors.Is(err, http.ErrServerClosed) {
+				log.Error().Err(err).Msg("Error starting HTTP server")
+			}
+		}()
 
+		// Wait for shutdown signal via the context
+		<-ctx.Done()
+
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), defaultCfg.ShutdownTimeout) // ctx is closed, we need a new one
+		defer cancel()
+		log.Info().Msg("Shutting down HTTP server...")
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			log.Fatal().Err(err).Msg("HTTP server shutdown failed")
+		}
+
+		// Call the shutdown cleanup
+		shutdown()
+
+		log.Info().Msg("Server shut down successfully")
 		return nil
 	},
 }
