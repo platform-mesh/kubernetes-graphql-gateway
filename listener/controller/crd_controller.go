@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/openmfp/golang-commons/logger"
 	"github.com/openmfp/kubernetes-graphql-gateway/listener/apischema"
 	"github.com/openmfp/kubernetes-graphql-gateway/listener/workspacefile"
 
@@ -12,7 +13,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var (
@@ -27,34 +27,37 @@ type CRDReconciler struct {
 	ClusterName string
 	client.Client
 	*apischema.CRDResolver
-	io workspacefile.IOHandler
+	io  workspacefile.IOHandler
+	log *logger.Logger
 }
 
 func NewCRDReconciler(name string,
 	clt client.Client,
 	cr *apischema.CRDResolver,
 	io workspacefile.IOHandler,
+	log *logger.Logger,
 ) *CRDReconciler {
 	return &CRDReconciler{
 		ClusterName: name,
 		Client:      clt,
 		CRDResolver: cr,
 		io:          io,
+		log:         log,
 	}
 }
 
 func (r *CRDReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := log.FromContext(ctx).WithValues("cluster", r.ClusterName).WithName(req.Name)
-	logger.Info("starting reconciliation...")
+	logger := r.log.With().Str("cluster", r.ClusterName).Str("name", req.Name).Logger()
+	logger.Info().Msg("starting reconciliation...")
 
 	crd := &apiextensionsv1.CustomResourceDefinition{}
 	err := r.Client.Get(ctx, req.NamespacedName, crd)
 	if apierrors.IsNotFound(err) {
-		logger.Info("resource not found, updating schema...")
+		logger.Info().Msg("resource not found, updating schema...")
 		return ctrl.Result{}, r.updateAPISchema()
 	}
 	if client.IgnoreNotFound(err) != nil {
-		logger.Error(err, "failed to get reconciled object")
+		logger.Error().Err(err).Msg("failed to get reconciled object")
 		return ctrl.Result{}, errors.Join(ErrGetReconciledObj, err)
 	}
 
