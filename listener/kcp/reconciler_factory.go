@@ -59,7 +59,7 @@ func NewReconciler(appCfg config.Config, opts ReconcilerOpts, restcfg *rest.Conf
 		return newStandardReconciler(opts, discoveryInterface, preReconcileFunc, log)
 	}
 
-	return newKcpReconciler(opts, restcfg, discoverFactory)
+	return newKcpReconciler(opts, restcfg, discoverFactory, log)
 }
 
 func newStandardReconciler(
@@ -118,7 +118,7 @@ func PreReconcile(
 	return nil
 }
 
-func newKcpReconciler(opts ReconcilerOpts, restcfg *rest.Config, newDiscoveryFactoryFunc func(cfg *rest.Config) (*discoveryclient.FactoryProvider, error)) (CustomReconciler, error) {
+func newKcpReconciler(opts ReconcilerOpts, restcfg *rest.Config, newDiscoveryFactoryFunc func(cfg *rest.Config) (*discoveryclient.FactoryProvider, error), log *logger.Logger) (CustomReconciler, error) {
 	ioHandler, err := workspacefile.NewIOHandler(opts.OpenAPIDefinitionsPath)
 	if err != nil {
 		return nil, errors.Join(ErrCreateIOHandler, err)
@@ -134,8 +134,7 @@ func newKcpReconciler(opts ReconcilerOpts, restcfg *rest.Config, newDiscoveryFac
 		return nil, errors.Join(ErrCreateDiscoveryClient, err)
 	}
 
-	// TODO: pass logger here as well if needed by APIBindingReconciler?
 	return controller.NewAPIBindingReconciler(
-		ioHandler, df, apischema.NewResolver(), pr /* log */, nil,
+		ioHandler, df, apischema.NewResolver(), pr, log,
 	), nil
 }

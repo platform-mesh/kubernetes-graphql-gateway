@@ -15,7 +15,7 @@ import (
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	"github.com/openmfp/golang-commons/logger"
+	"github.com/openmfp/golang-commons/logger/testlogger"
 	"github.com/openmfp/kubernetes-graphql-gateway/listener/apischema"
 	"github.com/openmfp/kubernetes-graphql-gateway/listener/discoveryclient"
 	"github.com/openmfp/kubernetes-graphql-gateway/listener/workspacefile"
@@ -81,10 +81,7 @@ func TestNewReconciler(t *testing.T) {
 
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 
-			loggerCfg := logger.DefaultConfig()
-			loggerCfg.Name = "test-reconciler"
-			log, err := logger.New(loggerCfg)
-			assert.NoError(t, err)
+			log := testlogger.New().HideLogOutput().Logger
 
 			reconciler, err := NewReconciler(appCfg, ReconcilerOpts{
 				Config:                 tc.cfg,
