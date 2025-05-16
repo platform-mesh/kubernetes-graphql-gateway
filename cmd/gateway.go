@@ -10,7 +10,9 @@ import (
 	openmfpcontext "github.com/openmfp/golang-commons/context"
 	"github.com/openmfp/golang-commons/sentry"
 	"github.com/spf13/cobra"
+	ctrl "sigs.k8s.io/controller-runtime"
 	restCfg "sigs.k8s.io/controller-runtime/pkg/client/config"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/openmfp/golang-commons/logger"
 
@@ -43,6 +45,8 @@ var gatewayCmd = &cobra.Command{
 
 			defer openmfpcontext.Recover(log)
 		}
+
+		ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
 
 		// Get Kubernetes restCfg
 		restCfg, err := restCfg.GetConfig()

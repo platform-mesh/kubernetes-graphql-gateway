@@ -16,29 +16,20 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	"github.com/openmfp/golang-commons/logger"
 	"github.com/openmfp/kubernetes-graphql-gateway/listener/discoveryclient"
 	"github.com/openmfp/kubernetes-graphql-gateway/listener/kcp"
 )
 
 var (
 	scheme               = runtime.NewScheme()
-	setupLog             *logger.Logger
 	webhookServer        webhook.Server
 	metricsServerOptions metricsserver.Options
 )
-
-func init() {
-	var err error
-	setupLog, err = setupLogger("info")
-	if err != nil {
-		panic("failed to initialize setup logger: " + err.Error())
-	}
-}
 
 var listenCmd = &cobra.Command{
 	Use:     "listener",
@@ -50,8 +41,13 @@ var listenCmd = &cobra.Command{
 		utilruntime.Must(kcptenancy.AddToScheme(scheme))
 		utilruntime.Must(apiextensionsv1.AddToScheme(scheme))
 
+		opts := zap.Options{
+			Development: true,
+		}
+		ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+
 		disableHTTP2 := func(c *tls.Config) {
-			setupLog.Info().Msg("disabling http/2")
+			log.Info().Msg("disabling http/2")
 			c.NextProtos = []string{"http/1.1"}
 		}
 
@@ -77,11 +73,6 @@ var listenCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := ctrl.SetupSignalHandler()
 		restCfg := ctrl.GetConfigOrDie()
-		log, err := setupLogger(defaultCfg.Log.Level)
-		if err != nil {
-			setupLog.Error().Err(err).Msg("unable to setup logger")
-			os.Exit(1)
-		}
 
 		mgrOpts := ctrl.Options{
 			Scheme:                 scheme,
@@ -96,7 +87,7 @@ var listenCmd = &cobra.Command{
 			Scheme: scheme,
 		})
 		if err != nil {
-			setupLog.Error().Err(err).Msg("failed to create client from config")
+			log.Error().Err(err).Msg("failed to create client from config")
 			os.Exit(1)
 		}
 
@@ -104,13 +95,13 @@ var listenCmd = &cobra.Command{
 
 		mgr, err := mf.NewManager(ctx, restCfg, mgrOpts, clt)
 		if err != nil {
-			setupLog.Error().Err(err).Msg("unable to start manager")
+			log.Error().Err(err).Msg("unable to start manager")
 			os.Exit(1)
 		}
 
 		discoveryInterface, err := discovery.NewDiscoveryClientForConfig(restCfg)
 		if err != nil {
-			setupLog.Error().Err(err).Msg("failed to create discovery client")
+			log.Error().Err(err).Msg("failed to create discovery client")
 			os.Exit(1)
 		}
 
@@ -122,29 +113,28 @@ var listenCmd = &cobra.Command{
 		}
 
 		reconciler, err := kcp.NewReconciler(appCfg, reconcilerOpts, restCfg, discoveryInterface, kcp.PreReconcile, discoveryclient.NewFactory, log)
-
 		if err != nil {
-			setupLog.Error().Err(err).Msg("unable to instantiate reconciler")
+			log.Error().Err(err).Msg("unable to instantiate reconciler")
 			os.Exit(1)
 		}
 
 		if err := reconciler.SetupWithManager(mgr); err != nil {
-			setupLog.Error().Err(err).Msg("unable to create controller")
+			log.Error().Err(err).Msg("unable to create controller")
 			os.Exit(1)
 		}
 
 		if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
-			setupLog.Error().Err(err).Msg("unable to set up health check")
+			log.Error().Err(err).Msg("unable to set up health check")
 			os.Exit(1)
 		}
 		if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
-			setupLog.Error().Err(err).Msg("unable to set up ready check")
+			log.Error().Err(err).Msg("unable to set up ready check")
 			os.Exit(1)
 		}
 
-		setupLog.Info().Msg("starting manager")
+		log.Info().Msg("starting manager")
 		if err := mgr.Start(ctx); err != nil {
-			setupLog.Error().Err(err).Msg("problem running manager")
+			log.Error().Err(err).Msg("problem running manager")
 			os.Exit(1)
 		}
 	},
