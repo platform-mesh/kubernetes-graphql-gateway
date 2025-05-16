@@ -2,6 +2,8 @@ package controller_test
 
 import (
 	"context"
+	"testing"
+
 	kcpcore "github.com/kcp-dev/kcp/sdk/apis/core/v1alpha1"
 	"github.com/openmfp/kubernetes-graphql-gateway/listener/controller"
 	"github.com/stretchr/testify/assert"
@@ -9,8 +11,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"testing"
 
+	"github.com/openmfp/golang-commons/logger"
 	controllerRuntimeMocks "github.com/openmfp/kubernetes-graphql-gateway/gateway/resolver/mocks"
 	apischemaMocks "github.com/openmfp/kubernetes-graphql-gateway/listener/apischema/mocks"
 	clusterpathMocks "github.com/openmfp/kubernetes-graphql-gateway/listener/clusterpath/mocks"
@@ -68,8 +70,12 @@ func TestAPIBindingReconciler_Reconcile(t *testing.T) {
 				tt.mockSetup(ioHandler, discoveryFactory, apiSchemaResolver, clusterPathResolver)
 			}
 
-			r := controller.NewAPIBindingReconciler(ioHandler, discoveryFactory, apiSchemaResolver, clusterPathResolver)
-			_, err := r.Reconcile(context.Background(), ctrl.Request{ClusterName: tt.clusterName})
+			loggerCfg := logger.DefaultConfig()
+			loggerCfg.Name = "test-apibinding-reconciler"
+			log, err := logger.New(loggerCfg)
+			assert.NoError(t, err)
+			r := controller.NewAPIBindingReconciler(ioHandler, discoveryFactory, apiSchemaResolver, clusterPathResolver, log)
+			_, err = r.Reconcile(context.Background(), ctrl.Request{ClusterName: tt.clusterName})
 			assert.Equal(t, tt.err, err)
 		})
 	}
