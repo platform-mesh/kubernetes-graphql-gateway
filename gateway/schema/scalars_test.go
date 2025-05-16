@@ -29,7 +29,7 @@ func TestStringMapScalar_ParseValue(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		out := schema.StringMapScalar.ParseValue(test.input)
+		out := schema.StringMapScalarForTest.ParseValue(test.input)
 		if !reflect.DeepEqual(out, test.expected) {
 			t.Errorf("ParseValue(%v) = %v; want %v", test.input, out, test.expected)
 		}
@@ -68,7 +68,7 @@ func TestStringMapScalar_ParseLiteral(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			out := schema.StringMapScalar.ParseLiteral(tt.input)
+			out := schema.StringMapScalarForTest.ParseLiteral(tt.input)
 			if !reflect.DeepEqual(out, tt.expected) {
 				t.Errorf("ParseLiteral() = %v, want %v", out, tt.expected)
 			}

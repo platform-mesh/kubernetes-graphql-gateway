@@ -11,6 +11,7 @@ replace github.com/graphql-go/handler => github.com/vertex451/handler v0.0.0-202
 require (
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-openapi/spec v0.21.0
+	github.com/gobuffalo/flect v1.0.3
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/google/gnostic-models v0.6.9
 	github.com/graphql-go/graphql v0.8.1
