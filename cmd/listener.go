@@ -3,11 +3,13 @@ package cmd
 import (
 	"crypto/tls"
 	"os"
+	"strings"
 
 	kcpapis "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
 	kcpcore "github.com/kcp-dev/kcp/sdk/apis/core/v1alpha1"
 	kcptenancy "github.com/kcp-dev/kcp/sdk/apis/tenancy/v1alpha1"
 	"github.com/spf13/cobra"
+	"go.uber.org/zap/zapcore"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -41,10 +43,20 @@ var listenCmd = &cobra.Command{
 		utilruntime.Must(kcptenancy.AddToScheme(scheme))
 		utilruntime.Must(apiextensionsv1.AddToScheme(scheme))
 
-		opts := zap.Options{
-			Development: true,
+		var zapLevel zapcore.Level
+		switch strings.ToUpper(log.GetLevel().String()) {
+		case "ERROR":
+			zapLevel = zapcore.ErrorLevel
+		case "WARN":
+			zapLevel = zapcore.WarnLevel
+		case "INFO":
+			zapLevel = zapcore.InfoLevel
+		case "DEBUG", "TRACE":
+			zapLevel = zapcore.DebugLevel
+		default:
+			zapLevel = zapcore.InfoLevel
 		}
-		ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+		ctrl.SetLogger(zap.New(zap.UseDevMode(false), zap.Level(zapLevel)))
 
 		disableHTTP2 := func(c *tls.Config) {
 			log.Info().Msg("disabling http/2")
