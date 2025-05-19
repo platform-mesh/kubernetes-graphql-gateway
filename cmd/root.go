@@ -30,13 +30,15 @@ func init() {
 		panic(err)
 	}
 
-	// Initialize logger after config is loaded
-	log, err = setupLogger(defaultCfg.Log.Level)
-	if err != nil {
-		panic("failed to initialize logger: " + err.Error())
-	}
+	cobra.OnInitialize(func() {
+		initConfig()
 
-	cobra.OnInitialize(initConfig)
+		var err error
+		log, err = setupLogger(defaultCfg.Log.Level)
+		if err != nil {
+			panic("failed to initialize logger: " + err.Error())
+		}
+	})
 
 	err = openmfpconfig.BindConfigToFlags(v, gatewayCmd, &appCfg)
 	if err != nil {
