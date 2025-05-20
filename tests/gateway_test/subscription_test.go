@@ -26,12 +26,13 @@ func (suite *CommonTestSuite) TestSchemaSubscribe() {
 		expectError    bool
 	}{
 		{
-			testName:       "subscribe_deployment_and_create_deployment_OK",
+			testName:       "subscribe_create_and_delete_deployment_OK",
 			subscribeQuery: SubscribeDeployment("my-new-deployment", false),
 			setupFunc: func(ctx context.Context) {
 				suite.createDeployment(ctx, "my-new-deployment", map[string]string{"app": "my-app"})
+				suite.deleteDeployment(ctx, "my-new-deployment")
 			},
-			expectedEvents: 1,
+			expectedEvents: 2,
 		},
 		{
 			testName:       "subscribe_to_replicas_change_OK",

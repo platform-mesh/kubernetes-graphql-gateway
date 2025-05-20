@@ -186,7 +186,12 @@ func (r *Service) runWatch(
 					select {
 					case <-ctx.Done():
 						return
-					case resultChannel <- singleObj.Object:
+					case resultChannel <- func() interface{} {
+						if singleObj == nil { // object will be nil in case it is deleted
+							return nil
+						}
+						return singleObj.Object
+					}():
 					}
 				} else {
 					items := make([]unstructured.Unstructured, 0, len(previousObjects))
