@@ -4,7 +4,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -16,14 +15,11 @@ import (
 	"github.com/openmfp/golang-commons/logger"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/zap/zapcore"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/kcp"
-	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/openmfp/account-operator/api/v1alpha1"
 	appConfig "github.com/openmfp/kubernetes-graphql-gateway/common/config"
@@ -33,21 +29,12 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	var zapLevel zapcore.Level
-	level := strings.ToUpper(os.Getenv("LOG_LEVEL"))
-	switch level {
-	case "ERROR":
-		zapLevel = zapcore.ErrorLevel
-	case "WARN":
-		zapLevel = zapcore.WarnLevel
-	case "INFO":
-		zapLevel = zapcore.InfoLevel
-	case "DEBUG", "TRACE":
-		zapLevel = zapcore.DebugLevel
-	default:
-		zapLevel = zapcore.ErrorLevel
+	logConfig := logger.DefaultConfig()
+	logConfig.Level = os.Getenv("LOG_LEVEL")
+	_, err := logger.New(logConfig)
+	if err != nil {
+		panic(err)
 	}
-	log.SetLogger(zap.New(zap.UseDevMode(false), zap.Level(zapLevel)))
 	os.Exit(m.Run())
 }
 

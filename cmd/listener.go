@@ -3,13 +3,12 @@ package cmd
 import (
 	"crypto/tls"
 	"os"
-	"strings"
 
 	kcpapis "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
 	kcpcore "github.com/kcp-dev/kcp/sdk/apis/core/v1alpha1"
 	kcptenancy "github.com/kcp-dev/kcp/sdk/apis/tenancy/v1alpha1"
+	"github.com/openmfp/golang-commons/logger"
 	"github.com/spf13/cobra"
-	"go.uber.org/zap/zapcore"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -18,7 +17,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -43,20 +41,13 @@ var listenCmd = &cobra.Command{
 		utilruntime.Must(kcptenancy.AddToScheme(scheme))
 		utilruntime.Must(apiextensionsv1.AddToScheme(scheme))
 
-		var zapLevel zapcore.Level
-		switch strings.ToUpper(log.GetLevel().String()) {
-		case "ERROR":
-			zapLevel = zapcore.ErrorLevel
-		case "WARN":
-			zapLevel = zapcore.WarnLevel
-		case "INFO":
-			zapLevel = zapcore.InfoLevel
-		case "DEBUG", "TRACE":
-			zapLevel = zapcore.DebugLevel
-		default:
-			zapLevel = zapcore.InfoLevel
+		logConfig := logger.DefaultConfig()
+		logConfig.Level = os.Getenv("LOG_LEVEL")
+		log, err := logger.New(logConfig)
+		if err != nil {
+			panic(err)
 		}
-		ctrl.SetLogger(zap.New(zap.UseDevMode(false), zap.Level(zapLevel)))
+		ctrl.SetLogger(log.ComponentLogger("controller-runtime").Logr())
 
 		disableHTTP2 := func(c *tls.Config) {
 			log.Info().Msg("disabling http/2")
