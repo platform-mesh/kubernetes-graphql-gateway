@@ -7,7 +7,6 @@ import (
 	kcpapis "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
 	kcpcore "github.com/kcp-dev/kcp/sdk/apis/core/v1alpha1"
 	kcptenancy "github.com/kcp-dev/kcp/sdk/apis/tenancy/v1alpha1"
-	"github.com/openmfp/golang-commons/logger"
 	"github.com/spf13/cobra"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -41,12 +40,6 @@ var listenCmd = &cobra.Command{
 		utilruntime.Must(kcptenancy.AddToScheme(scheme))
 		utilruntime.Must(apiextensionsv1.AddToScheme(scheme))
 
-		logConfig := logger.DefaultConfig()
-		logConfig.Level = os.Getenv("LOG_LEVEL")
-		log, err := logger.New(logConfig)
-		if err != nil {
-			panic(err)
-		}
 		ctrl.SetLogger(log.ComponentLogger("controller-runtime").Logr())
 
 		disableHTTP2 := func(c *tls.Config) {

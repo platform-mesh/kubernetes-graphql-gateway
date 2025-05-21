@@ -28,16 +28,6 @@ import (
 	"github.com/openmfp/kubernetes-graphql-gateway/gateway/schema"
 )
 
-func TestMain(m *testing.M) {
-	logConfig := logger.DefaultConfig()
-	logConfig.Level = os.Getenv("LOG_LEVEL")
-	_, err := logger.New(logConfig)
-	if err != nil {
-		panic(err)
-	}
-	os.Exit(m.Run())
-}
-
 type CommonTestSuite struct {
 	suite.Suite
 	testEnv       *envtest.Environment
