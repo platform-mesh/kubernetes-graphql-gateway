@@ -6,5 +6,5 @@ exclude:
     - common/config/config.go
     - mocks
     # the following files should be excluded from coverage later
-    - listener/apischema/*
-    - listener/controller/*
+    # - listener/apischema/*
+    # - listener/controller/*

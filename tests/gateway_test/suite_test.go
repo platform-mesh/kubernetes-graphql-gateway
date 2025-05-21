@@ -18,9 +18,11 @@ import (
 	"github.com/stretchr/testify/suite"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/rest"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/kcp"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/openmfp/account-operator/api/v1alpha1"
 	appConfig "github.com/openmfp/kubernetes-graphql-gateway/common/config"
@@ -28,6 +30,14 @@ import (
 	"github.com/openmfp/kubernetes-graphql-gateway/gateway/resolver"
 	"github.com/openmfp/kubernetes-graphql-gateway/gateway/schema"
 )
+
+// Initialize the logger for the test suite
+// This is necessary to avoid the "[controller-runtime] log.SetLogger(...) was never called" error
+// when running the tests
+func TestMain(m *testing.M) {
+	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
+	os.Exit(m.Run())
+}
 
 type CommonTestSuite struct {
 	suite.Suite
