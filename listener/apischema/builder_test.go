@@ -20,28 +20,12 @@ type fakeClient struct {
 
 type fakeErrClient struct{}
 
-type fakeRESTMapper struct {
-	isNamespaced bool
-	err          error
-}
-
 func (f *fakeClient) Paths() (map[string]openapi.GroupVersion, error) {
 	return f.paths, nil
 }
 
 func (f *fakeErrClient) Paths() (map[string]openapi.GroupVersion, error) {
 	return nil, errors.New("fail Paths")
-}
-
-func (f *fakeRESTMapper) RESTMapping(gk metav1.GroupKind, versions ...string) (*meta.RESTMapping, error) {
-	if f.err != nil {
-		return nil, f.err
-	}
-	scope := meta.RESTScopeRoot
-	if f.isNamespaced {
-		scope = meta.RESTScopeNamespace
-	}
-	return &meta.RESTMapping{Scope: scope}, nil
 }
 
 // TestGetOpenAPISchemaKey tests the getOpenAPISchemaKey function. It checks if the
