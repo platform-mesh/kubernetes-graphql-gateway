@@ -12,6 +12,20 @@ import (
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
+type fakeClient struct {
+	paths map[string]openapi.GroupVersion
+}
+
+func (f *fakeClient) Paths() (map[string]openapi.GroupVersion, error) {
+	return f.paths, nil
+}
+
+type fakeErrClient struct{}
+
+func (f *fakeErrClient) Paths() (map[string]openapi.GroupVersion, error) {
+	return nil, errors.New("fail Paths")
+}
+
 // TestGetOpenAPISchemaKey tests the getOpenAPISchemaKey function. It checks if the
 // function correctly formats the GroupVersionKind into the expected schema key format.
 func TestGetOpenAPISchemaKey(t *testing.T) {
@@ -90,20 +104,6 @@ func TestGetCRDGroupVersionKind(t *testing.T) {
 	}
 }
 
-type fakeClient struct {
-	paths map[string]openapi.GroupVersion
-}
-
-func (f *fakeClient) Paths() (map[string]openapi.GroupVersion, error) {
-	return f.paths, nil
-}
-
-type fakeErrClient struct{}
-
-func (f *fakeErrClient) Paths() (map[string]openapi.GroupVersion, error) {
-	return nil, errors.New("fail Paths")
-}
-
 // TestNewSchemaBuilder tests the NewSchemaBuilder function. It checks if the
 // SchemaBuilder is correctly initialized with the expected number of schemas
 // and the expected schema key.
@@ -155,9 +155,9 @@ func TestNewSchemaBuilder(t *testing.T) {
 	}
 }
 
-// TestWithCRDCategories_AddsExtension tests the WithCRDCategories method
+// TestWithCRDCategories tests the WithCRDCategories method
 // for the SchemaBuilder struct. It checks if the categories are correctly added to the schema's extensions.
-func TestWithCRDCategories_AddsExtension(t *testing.T) {
+func TestWithCRDCategories(t *testing.T) {
 	tests := []struct {
 		name     string
 		key      string
@@ -218,9 +218,9 @@ func TestWithCRDCategories_AddsExtension(t *testing.T) {
 	}
 }
 
-// TestWithApiResourceCategories_AddsExtension tests the WithApiResourceCategories method
+// TestWithApiResourceCategories tests the WithApiResourceCategories method
 // for the SchemaBuilder struct. It checks if the categories are correctly added to the schema's extensions.
-func TestWithApiResourceCategories_AddsExtension(t *testing.T) {
+func TestWithApiResourceCategories(t *testing.T) {
 	tests := []struct {
 		name     string
 		key      string
