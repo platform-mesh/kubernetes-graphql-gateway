@@ -7,7 +7,9 @@ import (
 
 	"github.com/openmfp/kubernetes-graphql-gateway/common"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/openapi"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
@@ -16,14 +18,30 @@ type fakeClient struct {
 	paths map[string]openapi.GroupVersion
 }
 
+type fakeErrClient struct{}
+
+type fakeRESTMapper struct {
+	isNamespaced bool
+	err          error
+}
+
 func (f *fakeClient) Paths() (map[string]openapi.GroupVersion, error) {
 	return f.paths, nil
 }
 
-type fakeErrClient struct{}
-
 func (f *fakeErrClient) Paths() (map[string]openapi.GroupVersion, error) {
 	return nil, errors.New("fail Paths")
+}
+
+func (f *fakeRESTMapper) RESTMapping(gk metav1.GroupKind, versions ...string) (*meta.RESTMapping, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	scope := meta.RESTScopeRoot
+	if f.isNamespaced {
+		scope = meta.RESTScopeNamespace
+	}
+	return &meta.RESTMapping{Scope: scope}, nil
 }
 
 // TestGetOpenAPISchemaKey tests the getOpenAPISchemaKey function. It checks if the
@@ -267,5 +285,42 @@ func TestWithApiResourceCategories(t *testing.T) {
 				t.Errorf("unexpected categories: %#v", ext)
 			}
 		})
+	}
+}
+
+// TestWithScope tests the WithScope method for the SchemaBuilder struct.
+func TestWithScope(t *testing.T) {
+	gvk := schema.GroupVersionKind{Group: "g", Version: "v1", Kind: "K"}
+
+	// Create schema with GVK extension
+	s := &spec.Schema{
+		VendorExtensible: spec.VendorExtensible{
+			Extensions: map[string]interface{}{
+				common.GVKExtensionKey: []map[string]string{
+					{"group": gvk.Group, "version": gvk.Version, "kind": gvk.Kind},
+				},
+			},
+		},
+	}
+
+	b := &SchemaBuilder{
+		schemas: map[string]*spec.Schema{
+			"g.v1.K": s,
+		},
+	}
+
+	// Create RESTMapper and mark GVK as namespaced
+	mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{gvk.GroupVersion()})
+	mapper.Add(gvk, meta.RESTScopeNamespace)
+
+	b.WithScope(mapper)
+
+	// Validate
+	scope, ok := b.schemas["g.v1.K"].VendorExtensible.Extensions[common.ScopeExtensionKey]
+	if !ok {
+		t.Fatal("expected ScopeExtensionKey to be set")
+	}
+	if scope != apiextensionsv1.NamespaceScoped {
+		t.Errorf("expected NamespaceScoped, got %v", scope)
 	}
 }
