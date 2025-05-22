@@ -1,6 +1,7 @@
 package gateway_test
 
 import (
+	"fmt"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -38,10 +39,20 @@ type CommonTestSuite struct {
 	graphqlSchema graphql.Schema
 	manager       manager.Provider
 	server        *httptest.Server
+
+	LocalDevelopment           bool
+	AuthenticateSchemaRequests bool
+
+	staticTokenFile string
+	staticToken     string
 }
 
 func TestCommonTestSuite(t *testing.T) {
 	suite.Run(t, new(CommonTestSuite))
+}
+
+func (suite *CommonTestSuite) SetupSuite() {
+	suite.LocalDevelopment = true
 }
 
 func (suite *CommonTestSuite) SetupTest() {
@@ -52,20 +63,37 @@ func (suite *CommonTestSuite) SetupTest() {
 	utilruntime.Must(corev1.AddToScheme(runtimeScheme))
 
 	var err error
+
+	// 1. Generate a static token and write it to a file
+	suite.staticToken = "test-token-123"
+	tokenFile, err := os.CreateTemp("", "static-token.csv")
+	require.NoError(suite.T(), err)
+	_, err = tokenFile.WriteString(fmt.Sprintf("%s,admin,admin,system:masters\n", suite.staticToken))
+	require.NoError(suite.T(), err)
+	require.NoError(suite.T(), tokenFile.Close())
+	suite.staticTokenFile = tokenFile.Name()
+
+	// 2. Prepare envtest.Environment and configure the API server with the token file
 	suite.testEnv = &envtest.Environment{
 		CRDDirectoryPaths: []string{
-			// this is needed for the CRD registration
 			filepath.Join("testdata", "crd"),
 		},
 	}
+	// Add the token-auth-file argument before starting the environment
+	suite.testEnv.ControlPlane.GetAPIServer().Configure().Append("token-auth-file", suite.staticTokenFile)
+
 	suite.restCfg, err = suite.testEnv.Start()
 	require.NoError(suite.T(), err)
+
+	// 3. Set BearerToken in restCfg
+	suite.restCfg.BearerToken = suite.staticToken
 
 	suite.appCfg.OpenApiDefinitionsPath, err = os.MkdirTemp("", "watchedDir")
 	require.NoError(suite.T(), err)
 
-	suite.appCfg.LocalDevelopment = true
+	suite.appCfg.LocalDevelopment = suite.LocalDevelopment
 	suite.appCfg.Gateway.Cors.Enabled = true
+	suite.appCfg.AuthenticateSchemaRequests = suite.AuthenticateSchemaRequests
 
 	suite.log, err = logger.New(logger.DefaultConfig())
 	require.NoError(suite.T(), err)
@@ -93,4 +121,7 @@ func (suite *CommonTestSuite) TearDownTest() {
 	require.NoError(suite.T(), os.RemoveAll(suite.appCfg.OpenApiDefinitionsPath))
 	require.NoError(suite.T(), suite.testEnv.Stop())
 	suite.server.Close()
+	if suite.staticTokenFile != "" {
+		os.Remove(suite.staticTokenFile)
+	}
 }

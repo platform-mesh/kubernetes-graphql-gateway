@@ -51,13 +51,14 @@ func initConfig() {
 	v.SetDefault("openapi-definitions-path", "./bin/definitions")
 	v.SetDefault("enable-kcp", true)
 	v.SetDefault("local-development", false)
+	v.SetDefault("authenticate-schema-requests", false)
 
 	// Listener
 	v.SetDefault("listener-apiexport-workspace", ":root")
 	v.SetDefault("listener-apiexport-name", "kcp.io")
 
 	// Gateway
-	v.SetDefault("gateway-port", "9080")
+	v.SetDefault("gateway-port", "8080")
 	v.SetDefault("gateway-username-claim", "email")
 	v.SetDefault("gateway-should-impersonate", true)
 	// Gateway Handler config

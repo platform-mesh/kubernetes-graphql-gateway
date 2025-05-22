@@ -1,9 +1,10 @@
 package config
 
 type Config struct {
-	OpenApiDefinitionsPath string `mapstructure:"openapi-definitions-path"`
-	EnableKcp              bool   `mapstructure:"enable-kcp"`
-	LocalDevelopment       bool   `mapstructure:"local-development"`
+	OpenApiDefinitionsPath     string `mapstructure:"openapi-definitions-path"`
+	EnableKcp                  bool   `mapstructure:"enable-kcp"`
+	LocalDevelopment           bool   `mapstructure:"local-development"`
+	AuthenticateSchemaRequests bool   `mapstructure:"authenticate-schema-requests"`
 
 	Listener struct {
 		// Listener fields will be added here
