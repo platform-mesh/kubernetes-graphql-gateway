@@ -16,12 +16,36 @@ type fakeGV struct {
 	err  error
 }
 
+type mockOpenAPIClient struct {
+	paths map[string]openapi.GroupVersion
+	err   error
+}
+
+type MockCRDResolver struct {
+	*CRDResolver
+	preferredResources []*metav1.APIResourceList
+	err                error
+	openAPIClient      *mockOpenAPIClient
+}
+
 func (f fakeGV) Schema(mime string) ([]byte, error) {
 	return f.data, f.err
 }
 
 func (f fakeGV) ServerRelativeURL() string {
 	return ""
+}
+
+func (m *mockOpenAPIClient) Paths() (map[string]openapi.GroupVersion, error) {
+	return m.paths, m.err
+}
+
+func (m *MockCRDResolver) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
+	return m.preferredResources, m.err
+}
+
+func (m *MockCRDResolver) OpenAPIV3() openapi.Client {
+	return m.openAPIClient
 }
 
 // TestGetCRDGroupKindVersions tests the getCRDGroupKindVersions function. It checks if the
@@ -222,6 +246,75 @@ func TestGetSchemaForPath(t *testing.T) {
 			}
 			if len(got) != tc.wantCount {
 				t.Errorf("schema count: got %d, want %d", len(got), tc.wantCount)
+			}
+		})
+	}
+}
+
+// TestResolveSchema tests the resolveSchema function. It checks if the function correctly
+// resolves the schema for a given path and handles various error cases.
+func TestResolveSchema(t *testing.T) {
+	tests := []struct {
+		name               string
+		preferredResources []*metav1.APIResourceList
+		err                error
+		openAPIPaths       map[string]openapi.GroupVersion
+		openAPIErr         error
+		wantErr            bool
+	}{
+		{
+			name:    "discovery error",
+			err:     ErrGetServerPreferred,
+			wantErr: true,
+		},
+		{
+			name: "successful schema resolution",
+			preferredResources: []*metav1.APIResourceList{
+				{
+					GroupVersion: "v1",
+					APIResources: []metav1.APIResource{
+						{
+							Name:       "pods",
+							Kind:       "Pod",
+							Namespaced: true,
+						},
+					},
+				},
+			},
+			openAPIPaths: map[string]openapi.GroupVersion{
+				"/api/v1": fakeGV{},
+			},
+			wantErr: false,
+		},
+		{
+			name:               "empty resources list",
+			preferredResources: []*metav1.APIResourceList{},
+			openAPIPaths: map[string]openapi.GroupVersion{
+				"/api/v1": fakeGV{},
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resolver := &MockCRDResolver{
+				CRDResolver:        &CRDResolver{},
+				preferredResources: tt.preferredResources,
+				err:                tt.err,
+				openAPIClient: &mockOpenAPIClient{
+					paths: tt.openAPIPaths,
+					err:   tt.openAPIErr,
+				},
+			}
+
+			got, err := resolveSchema(resolver, resolver)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("resolveSchema() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr && got == nil {
+				t.Error("resolveSchema() returned nil result when no error expected")
 			}
 		})
 	}
