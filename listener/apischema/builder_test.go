@@ -63,7 +63,7 @@ func TestGetCRDGroupVersionKind(t *testing.T) {
 		wantErr error
 	}{
 		{
-			name: "has versions",
+			name: "has_versions",
 			spec: apiextensionsv1.CustomResourceDefinitionSpec{
 				Group: "test.group",
 				Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
@@ -76,7 +76,7 @@ func TestGetCRDGroupVersionKind(t *testing.T) {
 			wantErr: nil,
 		},
 		{
-			name: "no versions",
+			name: "no_versions",
 			spec: apiextensionsv1.CustomResourceDefinitionSpec{
 				Group:    "empty.group",
 				Versions: []apiextensionsv1.CustomResourceDefinitionVersion{},
@@ -118,7 +118,7 @@ func TestNewSchemaBuilder(t *testing.T) {
 		wantError bool
 	}{
 		{
-			name: "populates schemas",
+			name: "populates_schemas",
 			client: &fakeClient{paths: map[string]openapi.GroupVersion{"/X/v1": fakeGV{data: func() []byte {
 				d, _ := json.Marshal(&schemaResponse{Components: schemasComponentsWrapper{Schemas: map[string]*spec.Schema{"X.v1.K": {}}}})
 				return d
@@ -127,7 +127,7 @@ func TestNewSchemaBuilder(t *testing.T) {
 			wantKey: "X.v1.K",
 		},
 		{
-			name:      "error on Paths",
+			name:      "error_on_Paths",
 			client:    &fakeErrClient{},
 			wantLen:   0,
 			wantError: true,
@@ -167,7 +167,7 @@ func TestWithCRDCategories(t *testing.T) {
 		wantCats []string
 	}{
 		{
-			name: "adds categories",
+			name: "adds_categories",
 			key:  "g.v1.K",
 			crd: &apiextensionsv1.CustomResourceDefinition{
 				Spec: apiextensionsv1.CustomResourceDefinitionSpec{
@@ -182,7 +182,7 @@ func TestWithCRDCategories(t *testing.T) {
 			wantCats: []string{"cat1", "cat2"},
 		},
 		{
-			name: "no categories",
+			name: "no_categories",
 			key:  "g.v1.K",
 			crd: &apiextensionsv1.CustomResourceDefinition{
 				Spec: apiextensionsv1.CustomResourceDefinitionSpec{
@@ -230,7 +230,7 @@ func TestWithApiResourceCategories(t *testing.T) {
 		wantCats []string
 	}{
 		{
-			name: "adds categories",
+			name: "adds_categories",
 			key:  "h.v1.P",
 			list: []*metav1.APIResourceList{{
 				GroupVersion: "h/v1",
@@ -239,7 +239,7 @@ func TestWithApiResourceCategories(t *testing.T) {
 			wantCats: []string{"A", "B"},
 		},
 		{
-			name: "no categories",
+			name: "no_categories",
 			key:  "h.v1.P",
 			list: []*metav1.APIResourceList{{
 				GroupVersion: "h/v1",

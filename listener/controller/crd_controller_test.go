@@ -52,31 +52,31 @@ func TestCRDReconciler(t *testing.T) {
 	}
 	tests := []scenario{
 		{
-			name:    "get error",
+			name:    "get_error",
 			getErr:  errors.New("get-error"),
 			readErr: nil,
 			wantErr: controller.ErrGetReconciledObj,
 		},
 		{
-			name:    "not found read error",
+			name:    "not_found_read_error",
 			getErr:  apierrors.NewNotFound(schema.GroupResource{Group: "", Resource: "crds"}, "my-crd"),
 			readErr: errors.New("read-error"),
 			wantErr: controller.ErrReadJSON,
 		},
 		{
-			name:    "not found resolve error",
+			name:    "not_found_resolve_error",
 			getErr:  apierrors.NewNotFound(schema.GroupResource{Group: "", Resource: "crds"}, "my-crd"),
 			readErr: nil,
 			wantErr: controller.ErrResolveSchema,
 		},
 		{
-			name:    "not found write error",
+			name:    "not_found_write_error",
 			getErr:  apierrors.NewNotFound(schema.GroupResource{Group: "", Resource: "crds"}, "my-crd"),
 			readErr: nil,
 			wantErr: controller.ErrWriteJSON,
 		},
 		{
-			name:    "successful update",
+			name:    "successful_update",
 			getErr:  nil,
 			readErr: nil,
 			wantErr: nil,

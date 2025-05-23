@@ -73,7 +73,7 @@ func TestResolverProvider_Resolve(t *testing.T) {
 		wantErr            bool
 	}{
 		{
-			name: "discovery error",
+			name: "discovery_error",
 			err:  ErrGetServerPreferred,
 			openAPIPaths: map[string]openapi.GroupVersion{
 				"/api/v1": &fakeGV{},
@@ -81,7 +81,7 @@ func TestResolverProvider_Resolve(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "successful resolution",
+			name: "successful_resolution",
 			preferredResources: []*metav1.APIResourceList{
 				{
 					GroupVersion: "v1",
