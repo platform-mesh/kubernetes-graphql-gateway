@@ -24,6 +24,8 @@ export ENABLE_KCP=false
 # you must point to the config of the cluster you want to run against
 export KUBECONFIG=YOUR_KUBECONFIG_PATH
 ```
+
+
 ## Running the Listener
 
 Make sure you have done steps from the [setup section](#setup-the-environment).

@@ -136,7 +136,7 @@ func (s *Service) handleAuth(w http.ResponseWriter, r *http.Request, token strin
 			return false
 		}
 
-		if s.AppCfg.AuthenticateSchemaRequests {
+		if s.AppCfg.IntrospectionAuthentication {
 			if s.isIntrospectionQuery(r) {
 				ok, err := s.validateToken(r.Context(), token)
 				if err != nil {

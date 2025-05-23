@@ -13,6 +13,10 @@ This repository contains two main components:
 - [Listener](./docs/listener.md): watches a cluster and stores its openAPI spec in a directory.
 - [Gateway](./docs/gateway.md): exposes the openAPI spec as a GraphQL endpoints.
 
+## Authorization
+
+All information about authorization can be found in the [authorization](./docs/authorization.md) section.
+
 ## Quickstart
 
 If you want to get started quickly, you can follow the [quickstart guide](./docs/quickstart.md).

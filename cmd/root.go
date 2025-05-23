@@ -51,7 +51,7 @@ func initConfig() {
 	v.SetDefault("openapi-definitions-path", "./bin/definitions")
 	v.SetDefault("enable-kcp", true)
 	v.SetDefault("local-development", false)
-	v.SetDefault("authenticate-schema-requests", false)
+	v.SetDefault("introspection-authentication", false)
 
 	// Listener
 	v.SetDefault("listener-apiexport-workspace", ":root")
