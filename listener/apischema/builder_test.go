@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/openmfp/kubernetes-graphql-gateway/common"
+	"github.com/stretchr/testify/assert"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -47,9 +48,7 @@ func TestGetOpenAPISchemaKey(t *testing.T) {
 
 	for _, tc := range tests {
 		got := getOpenAPISchemaKey(tc.gvk)
-		if got != tc.want {
-			t.Errorf("getOpenAPISchemaKey(%+v) = %q; want %q", tc.gvk, got, tc.want)
-		}
+		assert.Equal(t, tc.want, got, "getOpenAPISchemaKey(%+v) result mismatch", tc.gvk)
 	}
 }
 
@@ -90,18 +89,11 @@ func TestGetCRDGroupVersionKind(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			got, err := getCRDGroupVersionKind(tc.spec)
+			assert.Equal(t, tc.wantErr, err, "error value mismatch")
 			if tc.wantErr != nil {
-				if err != tc.wantErr {
-					t.Fatalf("expected error %v, got %v", tc.wantErr, err)
-				}
 				return
 			}
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if got == nil || *got != *tc.want {
-				t.Errorf("got %+v; want %+v", got, tc.want)
-			}
+			assert.Equal(t, tc.want, got, "result value mismatch")
 		})
 	}
 }
@@ -137,21 +129,14 @@ func TestNewSchemaBuilder(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			b := NewSchemaBuilder(tc.client, []string{"X/v1"})
 			if tc.wantError {
-				if b.err == nil {
-					t.Error("expected error, got nil")
-				}
-				if len(b.schemas) != 0 {
-					t.Errorf("expected 0 schemas on error, got %d", len(b.schemas))
-				}
+				assert.NotNil(t, b.err, "expected error, got nil")
+				assert.Equal(t, 0, len(b.schemas), "expected 0 schemas on error")
 				return
 			}
-			if len(b.schemas) != tc.wantLen {
-				t.Fatalf("expected %d schema entry, got %d", tc.wantLen, len(b.schemas))
-			}
+			assert.Equal(t, tc.wantLen, len(b.schemas), "schema count mismatch")
 			if tc.wantKey != "" {
-				if _, ok := b.schemas[tc.wantKey]; !ok {
-					t.Errorf("schema key %s not found in builder.schemas", tc.wantKey)
-				}
+				_, ok := b.schemas[tc.wantKey]
+				assert.True(t, ok, "schema key %s not found in builder.schemas", tc.wantKey)
 			}
 		})
 	}
@@ -213,9 +198,8 @@ func TestWithCRDCategories(t *testing.T) {
 				t.Fatal("expected CategoriesExtensionKey to be set")
 			}
 			cats, ok := ext.([]string)
-			if !ok || len(cats) != len(tc.wantCats) || cats[0] != tc.wantCats[0] {
-				t.Errorf("unexpected categories: %#v", ext)
-			}
+			assert.True(t, ok, "categories should be []string")
+			assert.Equal(t, tc.wantCats, cats, "categories mismatch")
 		})
 	}
 }
@@ -265,9 +249,8 @@ func TestWithApiResourceCategories(t *testing.T) {
 				t.Fatal("expected CategoriesExtensionKey to be set by WithApiResourceCategories")
 			}
 			cats, ok := ext.([]string)
-			if !ok || len(cats) != len(tc.wantCats) || cats[len(tc.wantCats)-1] != tc.wantCats[len(tc.wantCats)-1] {
-				t.Errorf("unexpected categories: %#v", ext)
-			}
+			assert.True(t, ok, "categories should be []string")
+			assert.Equal(t, tc.wantCats, cats, "categories mismatch")
 		})
 	}
 }
@@ -301,10 +284,6 @@ func TestWithScope(t *testing.T) {
 
 	// Validate
 	scope, ok := b.schemas["g.v1.K"].VendorExtensible.Extensions[common.ScopeExtensionKey]
-	if !ok {
-		t.Fatal("expected ScopeExtensionKey to be set")
-	}
-	if scope != apiextensionsv1.NamespaceScoped {
-		t.Errorf("expected NamespaceScoped, got %v", scope)
-	}
+	assert.True(t, ok, "expected ScopeExtensionKey to be set")
+	assert.Equal(t, apiextensionsv1.NamespaceScoped, scope, "scope value mismatch")
 }
