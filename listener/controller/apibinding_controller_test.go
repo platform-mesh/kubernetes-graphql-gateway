@@ -137,6 +137,27 @@ func TestAPIBindingReconciler_Reconcile(t *testing.T) {
 			},
 			err: assert.AnError,
 		},
+		{
+			name:        "successful_schema_update",
+			clusterName: "dev-cluster",
+			mockSetup: func(ioHandler *workspacefileMocks.MockIOHandler, discoverFactory *discoveryclientMocks.MockFactory, apiSchemaResolver *apischemaMocks.MockResolver, clusterPathResolver *clusterpathMocks.MockResolver) {
+				controllerRuntimeClient := &controllerRuntimeMocks.MockClient{}
+				clusterPathResolver.EXPECT().ClientForCluster("dev-cluster").Return(controllerRuntimeClient, nil)
+				controllerRuntimeClient.EXPECT().Get(mock.Anything, mock.Anything, mock.Anything).Return(nil).
+					Run(func(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) {
+						lc := obj.(*kcpcore.LogicalCluster)
+						lc.Annotations = map[string]string{
+							"kcp.io/path": "dev-cluster",
+						}
+					})
+				ioHandler.EXPECT().Read("dev-cluster").Return([]byte("{}"), nil)
+				discoverFactory.EXPECT().RestMapperForCluster("dev-cluster").Return(nil, nil)
+				discoverFactory.EXPECT().ClientForCluster("dev-cluster").Return(nil, nil)
+				apiSchemaResolver.EXPECT().Resolve(nil, nil).Return([]byte(`{"new":"schema"}`), nil)
+				ioHandler.EXPECT().Write([]byte(`{"new":"schema"}`), "dev-cluster").Return(nil)
+			},
+			err: nil,
+		},
 	}
 
 	log := testlogger.New().HideLogOutput().Logger
