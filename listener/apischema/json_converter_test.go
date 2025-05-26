@@ -48,5 +48,6 @@ func TestConvertJSON_Transforms(t *testing.T) {
 	var got, want map[string]any
 	assert.NoError(t, json.Unmarshal(out, &got), "unmarshal output")
 	assert.NoError(t, json.Unmarshal([]byte(expected), &want), "unmarshal expected")
+	assert.Equal(t, len(want), len(got), "output length mismatch")
 	assert.Equal(t, want, got, "output mismatch")
 }

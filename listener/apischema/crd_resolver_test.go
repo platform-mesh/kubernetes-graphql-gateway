@@ -61,6 +61,7 @@ func TestGetCRDGroupKindVersions(t *testing.T) {
 			gkv := getCRDGroupKindVersions(tc.spec)
 			assert.Equal(t, tc.wantG, gkv.Group, "Group mismatch")
 			assert.Equal(t, tc.wantKind, gkv.Kind, "Kind mismatch")
+			assert.Equal(t, len(tc.wantVers), len(gkv.Versions), "Versions length mismatch")
 			assert.Equal(t, tc.wantVers, gkv.Versions, "Versions mismatch")
 		})
 	}
@@ -169,7 +170,8 @@ func TestErrorIfCRDNotInPreferredApiGroups(t *testing.T) {
 				return
 			}
 			assert.NoError(t, err)
-			assert.Equal(t, tc.wantGroup, groups, "groups mismatch")
+			assert.Equal(t, len(tc.wantGroup), len(groups))
+			assert.Equal(t, tc.wantGroup, groups)
 		})
 	}
 }
