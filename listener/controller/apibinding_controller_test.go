@@ -45,8 +45,15 @@ func TestAPIBindingReconciler_Reconcile(t *testing.T) {
 				controllerRuntimeClient := &controllerRuntimeMocks.MockClient{}
 				clusterPathResolver.EXPECT().ClientForCluster("dev-cluster").Return(controllerRuntimeClient, nil)
 
-				controllerRuntimeClient.EXPECT().Get(mock.Anything, mock.Anything, mock.Anything).Return(nil).
-					Run(func(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) {
+				controllerRuntimeClient.EXPECT().
+					Get(mock.Anything, mock.Anything, mock.Anything).
+					Return(nil).
+					Run(func(
+						ctx context.Context,
+						key client.ObjectKey,
+						obj client.Object,
+						opts ...client.GetOption,
+					) {
 						lc := obj.(*kcpcore.LogicalCluster) // Get the pointer argument
 						lc.Annotations = map[string]string{
 							"kcp.io/path": "dev-cluster",
@@ -61,11 +68,23 @@ func TestAPIBindingReconciler_Reconcile(t *testing.T) {
 		{
 			name:        "workspace_delete_error",
 			clusterName: "dev-cluster",
-			mockSetup: func(ioHandler *workspacefileMocks.MockIOHandler, discoverFactory *discoveryclientMocks.MockFactory, apiSchemaResolver *apischemaMocks.MockResolver, clusterPathResolver *clusterpathMocks.MockResolver) {
+			mockSetup: func(
+				ioHandler *workspacefileMocks.MockIOHandler,
+				discoverFactory *discoveryclientMocks.MockFactory,
+				apiSchemaResolver *apischemaMocks.MockResolver,
+				clusterPathResolver *clusterpathMocks.MockResolver,
+			) {
 				controllerRuntimeClient := &controllerRuntimeMocks.MockClient{}
 				clusterPathResolver.EXPECT().ClientForCluster("dev-cluster").Return(controllerRuntimeClient, nil)
-				controllerRuntimeClient.EXPECT().Get(mock.Anything, mock.Anything, mock.Anything).Return(nil).
-					Run(func(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) {
+				controllerRuntimeClient.EXPECT().
+					Get(mock.Anything, mock.Anything, mock.Anything).
+					Return(nil).
+					Run(func(
+						ctx context.Context,
+						key client.ObjectKey,
+						obj client.Object,
+						opts ...client.GetOption,
+					) {
 						lc := obj.(*kcpcore.LogicalCluster)
 						lc.Annotations = map[string]string{
 							"kcp.io/path": "dev-cluster",
@@ -79,7 +98,12 @@ func TestAPIBindingReconciler_Reconcile(t *testing.T) {
 		{
 			name:        "missing_annotation_error",
 			clusterName: "dev-cluster",
-			mockSetup: func(ioHandler *workspacefileMocks.MockIOHandler, discoverFactory *discoveryclientMocks.MockFactory, apiSchemaResolver *apischemaMocks.MockResolver, clusterPathResolver *clusterpathMocks.MockResolver) {
+			mockSetup: func(
+				ioHandler *workspacefileMocks.MockIOHandler,
+				discoverFactory *discoveryclientMocks.MockFactory,
+				apiSchemaResolver *apischemaMocks.MockResolver,
+				clusterPathResolver *clusterpathMocks.MockResolver,
+			) {
 				controllerRuntimeClient := &controllerRuntimeMocks.MockClient{}
 				clusterPathResolver.EXPECT().ClientForCluster("dev-cluster").Return(controllerRuntimeClient, nil)
 				controllerRuntimeClient.EXPECT().Get(mock.Anything, mock.Anything, mock.Anything).Return(nil)
@@ -89,7 +113,12 @@ func TestAPIBindingReconciler_Reconcile(t *testing.T) {
 		{
 			name:        "nil_annotation_error",
 			clusterName: "dev-cluster",
-			mockSetup: func(ioHandler *workspacefileMocks.MockIOHandler, discoverFactory *discoveryclientMocks.MockFactory, apiSchemaResolver *apischemaMocks.MockResolver, clusterPathResolver *clusterpathMocks.MockResolver) {
+			mockSetup: func(
+				ioHandler *workspacefileMocks.MockIOHandler,
+				discoverFactory *discoveryclientMocks.MockFactory,
+				apiSchemaResolver *apischemaMocks.MockResolver,
+				clusterPathResolver *clusterpathMocks.MockResolver,
+			) {
 				controllerRuntimeClient := &controllerRuntimeMocks.MockClient{}
 				clusterPathResolver.EXPECT().ClientForCluster("dev-cluster").Return(controllerRuntimeClient, nil)
 				controllerRuntimeClient.EXPECT().Get(mock.Anything, mock.Anything, mock.Anything).Return(nil).
@@ -102,11 +131,23 @@ func TestAPIBindingReconciler_Reconcile(t *testing.T) {
 		{
 			name:        "empty_annotation_error",
 			clusterName: "dev-cluster",
-			mockSetup: func(ioHandler *workspacefileMocks.MockIOHandler, discoverFactory *discoveryclientMocks.MockFactory, apiSchemaResolver *apischemaMocks.MockResolver, clusterPathResolver *clusterpathMocks.MockResolver) {
+			mockSetup: func(
+				ioHandler *workspacefileMocks.MockIOHandler,
+				discoverFactory *discoveryclientMocks.MockFactory,
+				apiSchemaResolver *apischemaMocks.MockResolver,
+				clusterPathResolver *clusterpathMocks.MockResolver,
+			) {
 				controllerRuntimeClient := &controllerRuntimeMocks.MockClient{}
 				clusterPathResolver.EXPECT().ClientForCluster("dev-cluster").Return(controllerRuntimeClient, nil)
-				controllerRuntimeClient.EXPECT().Get(mock.Anything, mock.Anything, mock.Anything).Return(nil).
-					Run(func(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) {
+				controllerRuntimeClient.EXPECT().
+					Get(mock.Anything, mock.Anything, mock.Anything).
+					Return(nil).
+					Run(func(
+						ctx context.Context,
+						key client.ObjectKey,
+						obj client.Object,
+						opts ...client.GetOption,
+					) {
 						lc := obj.(*kcpcore.LogicalCluster)
 						lc.Annotations = map[string]string{
 							"kcp.io/path": "",
@@ -122,7 +163,12 @@ func TestAPIBindingReconciler_Reconcile(t *testing.T) {
 		{
 			name:        "logicalcluster_get_error",
 			clusterName: "dev-cluster",
-			mockSetup: func(ioHandler *workspacefileMocks.MockIOHandler, discoverFactory *discoveryclientMocks.MockFactory, apiSchemaResolver *apischemaMocks.MockResolver, clusterPathResolver *clusterpathMocks.MockResolver) {
+			mockSetup: func(
+				ioHandler *workspacefileMocks.MockIOHandler,
+				discoverFactory *discoveryclientMocks.MockFactory,
+				apiSchemaResolver *apischemaMocks.MockResolver,
+				clusterPathResolver *clusterpathMocks.MockResolver,
+			) {
 				controllerRuntimeClient := &controllerRuntimeMocks.MockClient{}
 				clusterPathResolver.EXPECT().ClientForCluster("dev-cluster").Return(controllerRuntimeClient, nil)
 				controllerRuntimeClient.EXPECT().Get(mock.Anything, mock.Anything, mock.Anything).Return(assert.AnError)
@@ -132,7 +178,12 @@ func TestAPIBindingReconciler_Reconcile(t *testing.T) {
 		{
 			name:        "client_for_cluster_error",
 			clusterName: "dev-cluster",
-			mockSetup: func(ioHandler *workspacefileMocks.MockIOHandler, discoverFactory *discoveryclientMocks.MockFactory, apiSchemaResolver *apischemaMocks.MockResolver, clusterPathResolver *clusterpathMocks.MockResolver) {
+			mockSetup: func(
+				ioHandler *workspacefileMocks.MockIOHandler,
+				discoverFactory *discoveryclientMocks.MockFactory,
+				apiSchemaResolver *apischemaMocks.MockResolver,
+				clusterPathResolver *clusterpathMocks.MockResolver,
+			) {
 				clusterPathResolver.EXPECT().ClientForCluster("dev-cluster").Return(nil, assert.AnError)
 			},
 			err: assert.AnError,
@@ -140,11 +191,23 @@ func TestAPIBindingReconciler_Reconcile(t *testing.T) {
 		{
 			name:        "successful_schema_update",
 			clusterName: "dev-cluster",
-			mockSetup: func(ioHandler *workspacefileMocks.MockIOHandler, discoverFactory *discoveryclientMocks.MockFactory, apiSchemaResolver *apischemaMocks.MockResolver, clusterPathResolver *clusterpathMocks.MockResolver) {
+			mockSetup: func(
+				ioHandler *workspacefileMocks.MockIOHandler,
+				discoverFactory *discoveryclientMocks.MockFactory,
+				apiSchemaResolver *apischemaMocks.MockResolver,
+				clusterPathResolver *clusterpathMocks.MockResolver,
+			) {
 				controllerRuntimeClient := &controllerRuntimeMocks.MockClient{}
 				clusterPathResolver.EXPECT().ClientForCluster("dev-cluster").Return(controllerRuntimeClient, nil)
-				controllerRuntimeClient.EXPECT().Get(mock.Anything, mock.Anything, mock.Anything).Return(nil).
-					Run(func(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) {
+				controllerRuntimeClient.EXPECT().
+					Get(mock.Anything, mock.Anything, mock.Anything).
+					Return(nil).
+					Run(func(
+						ctx context.Context,
+						key client.ObjectKey,
+						obj client.Object,
+						opts ...client.GetOption,
+					) {
 						lc := obj.(*kcpcore.LogicalCluster)
 						lc.Annotations = map[string]string{
 							"kcp.io/path": "dev-cluster",
@@ -164,15 +227,29 @@ func TestAPIBindingReconciler_Reconcile(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ioHandler := workspacefileMocks.NewMockIOHandler(t)
-			discoverFactory := discoveryclientMocks.NewMockFactory(t)
-			apiSchemaResolver := apischemaMocks.NewMockResolver(t)
-			clusterPathResolver := clusterpathMocks.NewMockResolver(t)
+			discoverFactory := discoveryclientMocks.
+				NewMockFactory(t)
+			apiSchemaResolver := apischemaMocks.
+				NewMockResolver(t)
+			clusterPathResolver := clusterpathMocks.
+				NewMockResolver(t)
 
 			if tt.mockSetup != nil {
-				tt.mockSetup(ioHandler, discoverFactory, apiSchemaResolver, clusterPathResolver)
+				tt.mockSetup(
+					ioHandler,
+					discoverFactory,
+					apiSchemaResolver,
+					clusterPathResolver,
+				)
 			}
 
-			r := controller.NewAPIBindingReconciler(ioHandler, discoverFactory, apiSchemaResolver, clusterPathResolver, log)
+			r := controller.NewAPIBindingReconciler(
+				ioHandler,
+				discoverFactory,
+				apiSchemaResolver,
+				clusterPathResolver,
+				log,
+			)
 			_, err := r.Reconcile(context.Background(), ctrl.Request{ClusterName: tt.clusterName})
 
 			if tt.name == "logicalcluster_get_error" {

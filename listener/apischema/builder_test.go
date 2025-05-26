@@ -112,7 +112,8 @@ func TestNewSchemaBuilder(t *testing.T) {
 		{
 			name: "populates_schemas",
 			client: &fakeClient{paths: map[string]openapi.GroupVersion{"/X/v1": fakeGV{data: func() []byte {
-				d, _ := json.Marshal(&schemaResponse{Components: schemasComponentsWrapper{Schemas: map[string]*spec.Schema{"X.v1.K": {}}}})
+				d, _ := json.Marshal(&schemaResponse{
+					Components: schemasComponentsWrapper{Schemas: map[string]*spec.Schema{"X.v1.K": {}}}})
 				return d
 			}(), err: nil}}},
 			wantLen: 1,
