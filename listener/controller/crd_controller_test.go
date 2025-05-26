@@ -7,37 +7,17 @@ import (
 
 	"github.com/openmfp/kubernetes-graphql-gateway/gateway/resolver/mocks"
 	"github.com/openmfp/kubernetes-graphql-gateway/listener/controller"
+	controllerMocks "github.com/openmfp/kubernetes-graphql-gateway/listener/controller/mocks"
 	workspacefileMocks "github.com/openmfp/kubernetes-graphql-gateway/listener/workspacefile/mocks"
 
 	"github.com/openmfp/golang-commons/logger/testlogger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
-
-type mockCRDResolver struct {
-	mock.Mock
-}
-
-func (m *mockCRDResolver) Resolve() ([]byte, error) {
-	args := m.Called()
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).([]byte), args.Error(1)
-}
-
-func (m *mockCRDResolver) ResolveApiSchema(crd *apiextensionsv1.CustomResourceDefinition) ([]byte, error) {
-	args := m.Called(crd)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).([]byte), args.Error(1)
-}
 
 // TestCRDReconciler tests the CRDReconciler's Reconcile method.
 // It checks if the method handles different scenarios correctly, including
@@ -87,7 +67,7 @@ func TestCRDReconciler(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ioHandler := workspacefileMocks.NewMockIOHandler(t)
 			fakeClient := mocks.NewMockClient(t)
-			crdResolver := &mockCRDResolver{}
+			crdResolver := controllerMocks.NewMockCRDResolver(t)
 
 			r := controller.NewCRDReconciler(
 				"cluster1",
@@ -108,17 +88,17 @@ func TestCRDReconciler(t *testing.T) {
 				ioHandler.EXPECT().Read("cluster1").Return([]byte("{}"), tc.readErr)
 				if tc.readErr == nil {
 					if tc.wantErr == controller.ErrResolveSchema {
-						crdResolver.On("Resolve").Return(nil, errors.New("resolve error"))
+						crdResolver.EXPECT().Resolve().Return(nil, errors.New("resolve error"))
 					} else if tc.wantErr == controller.ErrWriteJSON {
-						crdResolver.On("Resolve").Return([]byte(`{"new":"schema"}`), nil)
+						crdResolver.EXPECT().Resolve().Return([]byte(`{"new":"schema"}`), nil)
 						ioHandler.EXPECT().Write([]byte(`{"new":"schema"}`), "cluster1").Return(errors.New("write error"))
 					} else {
-						crdResolver.On("Resolve").Return([]byte("{}"), nil)
+						crdResolver.EXPECT().Resolve().Return([]byte("{}"), nil)
 					}
 				}
 			} else if tc.getErr == nil {
 				ioHandler.EXPECT().Read("cluster1").Return([]byte("{}"), nil)
-				crdResolver.On("ResolveApiSchema", mock.Anything).Return([]byte(`{"new":"schema"}`), nil)
+				crdResolver.EXPECT().ResolveApiSchema(mock.Anything).Return([]byte(`{"new":"schema"}`), nil)
 				ioHandler.EXPECT().Write([]byte(`{"new":"schema"}`), "cluster1").Return(nil)
 			}
 

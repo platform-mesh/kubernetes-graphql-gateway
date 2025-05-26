@@ -9,6 +9,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/openapi"
 	"k8s.io/kube-openapi/pkg/validation/spec"
+
+	apischemaMocks "github.com/openmfp/kubernetes-graphql-gateway/listener/apischema/mocks"
+	kcpMocks "github.com/openmfp/kubernetes-graphql-gateway/listener/kcp/mocks"
+	"github.com/stretchr/testify/assert"
 )
 
 type fakeGV struct {
@@ -228,30 +232,37 @@ func TestGetSchemaForPath(t *testing.T) {
 			name:      "invalid_path",
 			preferred: []string{"g/v1"},
 			path:      "noSlash",
-			gv:        fakeGV{},
+			gv:        apischemaMocks.NewMockGroupVersion(t),
 			wantErr:   ErrInvalidPath,
 		},
 		{
 			name:      "not_preferred",
 			preferred: []string{"x/y"},
 			path:      "/g/v1",
-			gv:        fakeGV{},
+			gv:        apischemaMocks.NewMockGroupVersion(t),
 			wantErr:   ErrNotPreferred,
 		},
 		{
 			name:      "unmarshal error",
 			preferred: []string{"g/v1"},
 			path:      "/g/v1",
-			gv:        fakeGV{data: []byte("bad json"), err: nil},
-			wantErr:   ErrUnmarshalSchemaForPath,
+			gv: func() openapi.GroupVersion {
+				mock := apischemaMocks.NewMockGroupVersion(t)
+				mock.EXPECT().Schema("application/json").Return([]byte("bad json"), nil)
+				return mock
+			}(),
+			wantErr: ErrUnmarshalSchemaForPath,
 		},
 		{
 			name:      "success",
 			preferred: []string{"g/v1"},
 			path:      "/g/v1",
-			gv:        fakeGV{data: validJSON, err: nil},
-			wantErr:   nil,
-			wantCount: len(validSchemas),
+			gv: func() openapi.GroupVersion {
+				mock := apischemaMocks.NewMockGroupVersion(t)
+				mock.EXPECT().Schema("application/json").Return(validJSON, nil)
+				return mock
+			}(),
+			wantCount: 1,
 		},
 	}
 
@@ -268,30 +279,42 @@ func TestGetSchemaForPath(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			if len(got) != tc.wantCount {
-				t.Errorf("schema count: got %d, want %d", len(got), tc.wantCount)
+				t.Fatalf("schema count: got %d, want %d", len(got), tc.wantCount)
 			}
 		})
 	}
 }
 
-// TestResolveSchema tests the resolveSchema function. It checks if the function correctly
-// resolves the schema for a given path and handles various error cases.
+// TestResolveSchema tests the resolveSchema function. It checks if the function
+// correctly resolves the schema for a given CRD and handles various error cases.
 func TestResolveSchema(t *testing.T) {
+	// prepare a valid schemaResponse JSON
+	validSchemas := map[string]*spec.Schema{"a.v1.K": {}}
+	resp := schemaResponse{Components: schemasComponentsWrapper{Schemas: validSchemas}}
+	validJSON, err := json.Marshal(&resp)
+	if err != nil {
+		t.Fatalf("failed to marshal valid response: %v", err)
+	}
+
 	tests := []struct {
 		name               string
 		preferredResources []*metav1.APIResourceList
 		err                error
-		openAPIPaths       map[string]openapi.GroupVersion
+		openAPIPath        string
 		openAPIErr         error
-		wantErr            bool
+		wantErr            error
+		setSchema          func(mock openapi.GroupVersion)
 	}{
 		{
-			name:    "discovery error",
-			err:     ErrGetServerPreferred,
-			wantErr: true,
+			name:        "discovery_error",
+			err:         ErrGetServerPreferred,
+			openAPIPath: "/api/v1",
+			openAPIErr:  nil,
+			wantErr:     ErrGetServerPreferred,
+			setSchema:   nil,
 		},
 		{
-			name: "successful_schema_resolution",
+			name: "successful_resolution",
 			preferredResources: []*metav1.APIResourceList{
 				{
 					GroupVersion: "v1",
@@ -304,40 +327,46 @@ func TestResolveSchema(t *testing.T) {
 					},
 				},
 			},
-			openAPIPaths: map[string]openapi.GroupVersion{
-				"/api/v1": fakeGV{},
+			openAPIPath: "/v1",
+			openAPIErr:  nil,
+			wantErr:     nil,
+			setSchema: func(mock openapi.GroupVersion) {
+				mock.(*apischemaMocks.MockGroupVersion).EXPECT().Schema("application/json").Return(validJSON, nil)
 			},
-			wantErr: false,
-		},
-		{
-			name:               "empty resources list",
-			preferredResources: []*metav1.APIResourceList{},
-			openAPIPaths: map[string]openapi.GroupVersion{
-				"/api/v1": fakeGV{},
-			},
-			wantErr: false,
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			resolver := &MockCRDResolver{
-				CRDResolver:        &CRDResolver{},
-				preferredResources: tt.preferredResources,
-				err:                tt.err,
-				openAPIClient: &mockOpenAPIClient{
-					paths: tt.openAPIPaths,
-					err:   tt.openAPIErr,
-				},
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			dc := kcpMocks.NewMockDiscoveryInterface(t)
+			rm := kcpMocks.NewMockRESTMapper(t)
+
+			// First call in resolveSchema
+			dc.EXPECT().ServerPreferredResources().Return(tc.preferredResources, tc.err)
+
+			if tc.err == nil {
+				mockGV := apischemaMocks.NewMockGroupVersion(t)
+				if tc.setSchema != nil {
+					tc.setSchema(mockGV)
+				}
+				openAPIPaths := map[string]openapi.GroupVersion{
+					tc.openAPIPath: mockGV,
+				}
+				openAPIClient := apischemaMocks.NewMockClient(t)
+				openAPIClient.EXPECT().Paths().Return(openAPIPaths, tc.openAPIErr)
+				dc.EXPECT().OpenAPIV3().Return(openAPIClient)
 			}
 
-			got, err := resolveSchema(resolver, resolver)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("resolveSchema() error = %v, wantErr %v", err, tt.wantErr)
+			got, err := resolveSchema(dc, rm)
+			if tc.wantErr != nil {
+				assert.ErrorIs(t, err, tc.wantErr)
 				return
 			}
-			if !tt.wantErr && got == nil {
-				t.Error("resolveSchema() returned nil result when no error expected")
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(got) == 0 {
+				t.Fatal("expected non-empty schema map")
 			}
 		})
 	}

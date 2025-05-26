@@ -4,9 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/openapi"
 
 	"github.com/openmfp/kubernetes-graphql-gateway/listener/kcp/mocks"
@@ -17,38 +15,8 @@ type resolverMockOpenAPIClient struct {
 	err   error
 }
 
-type mockRESTMapper struct{}
-
 func (m *resolverMockOpenAPIClient) Paths() (map[string]openapi.GroupVersion, error) {
 	return m.paths, m.err
-}
-
-func (m *mockRESTMapper) KindFor(resource schema.GroupVersionResource) (schema.GroupVersionKind, error) {
-	return schema.GroupVersionKind{}, nil
-}
-
-func (m *mockRESTMapper) KindsFor(resource schema.GroupVersionResource) ([]schema.GroupVersionKind, error) {
-	return nil, nil
-}
-
-func (m *mockRESTMapper) ResourceFor(input schema.GroupVersionResource) (schema.GroupVersionResource, error) {
-	return schema.GroupVersionResource{}, nil
-}
-
-func (m *mockRESTMapper) ResourcesFor(input schema.GroupVersionResource) ([]schema.GroupVersionResource, error) {
-	return nil, nil
-}
-
-func (m *mockRESTMapper) RESTMapping(gk schema.GroupKind, versions ...string) (*meta.RESTMapping, error) {
-	return nil, nil
-}
-
-func (m *mockRESTMapper) RESTMappings(gk schema.GroupKind, versions ...string) ([]*meta.RESTMapping, error) {
-	return nil, nil
-}
-
-func (m *mockRESTMapper) ResourceSingularizer(resource string) (singular string, err error) {
-	return "", nil
 }
 
 // Compile-time check that ResolverProvider implements Resolver interface
@@ -104,6 +72,7 @@ func TestResolverProvider_Resolve(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			resolver := NewResolver()
 			dc := mocks.NewMockDiscoveryInterface(t)
+			rm := mocks.NewMockRESTMapper(t)
 
 			// First call in resolveSchema
 			dc.EXPECT().ServerPreferredResources().Return(tt.preferredResources, tt.err)
@@ -116,8 +85,6 @@ func TestResolverProvider_Resolve(t *testing.T) {
 				}
 				dc.EXPECT().OpenAPIV3().Return(openAPIClient)
 			}
-
-			rm := &mockRESTMapper{}
 
 			got, err := resolver.Resolve(dc, rm)
 			if tt.wantErr {

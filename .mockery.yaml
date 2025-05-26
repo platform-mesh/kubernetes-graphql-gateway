@@ -9,6 +9,13 @@ packages:
     interfaces:
       DiscoveryInterface:
 
+  k8s.io/apimachinery/pkg/api/meta:
+    config:
+      dir: listener/kcp/mocks
+      outpkg: mocks
+    interfaces:
+      RESTMapper:
+
   sigs.k8s.io/controller-runtime/pkg/client:
     config:
       dir: gateway/resolver/mocks
@@ -51,3 +58,18 @@ packages:
       outpkg: mocks
     interfaces:
       Resolver:
+
+  github.com/openmfp/kubernetes-graphql-gateway/listener/controller:
+    config:
+      dir: listener/controller/mocks
+      outpkg: mocks
+    interfaces:
+      CRDResolver:
+
+  k8s.io/client-go/openapi:
+    config:
+      dir: listener/apischema/mocks
+      outpkg: mocks
+    interfaces:
+      GroupVersion:
+      Client:
