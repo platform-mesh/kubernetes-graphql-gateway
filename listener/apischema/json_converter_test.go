@@ -5,6 +5,9 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestConvertJSON_InvalidInput tests the ConvertJSON function with invalid input.
@@ -77,24 +80,18 @@ func TestConvertJSON(t *testing.T) {
 				raw = []byte(in)
 			default:
 				raw, err = json.Marshal(in)
-				if err != nil {
-					t.Fatalf("failed to marshal input %s: %v", tc.name, err)
-				}
+				require.NoError(t, err, "failed to marshal input %s", tc.name)
 			}
 			out, err := ConvertJSON(raw)
 			if tc.wantErr != nil {
-				if err == nil || !errors.Is(err, tc.wantErr) {
-					t.Fatalf("%s: expected error %v, got %v", tc.name, tc.wantErr, err)
-				}
+				assert.ErrorIs(t, err, tc.wantErr, "error mismatch")
 				return
 			}
-			if err != nil {
-				t.Fatalf("%s: unexpected error: %v", tc.name, err)
-			}
+			assert.NoError(t, err, "unexpected error")
 			var w v2RootWrapper
-			if err := json.Unmarshal(out, &w); err != nil {
-				t.Fatalf("%s: failed to unmarshal output: %v", tc.name, err)
-			}
+			err = json.Unmarshal(out, &w)
+			require.NoErrorf(t, err, "%s: failed to unmarshal output", tc.name)
+
 			if tc.check != nil {
 				defs := map[string]map[string]any{}
 				for k, v := range w.Definitions {
@@ -102,9 +99,8 @@ func TestConvertJSON(t *testing.T) {
 						defs[k] = m
 					}
 				}
-				if err := tc.check(defs); err != nil {
-					t.Errorf("%s: check failed: %v", tc.name, err)
-				}
+				err := tc.check(defs)
+				assert.NoErrorf(t, err, "%s: check failed", tc.name)
 			}
 		})
 	}
