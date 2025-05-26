@@ -91,7 +91,9 @@ func TestCRDReconciler(t *testing.T) {
 						crdResolver.EXPECT().Resolve().Return(nil, errors.New("resolve error"))
 					} else if tc.wantErr == controller.ErrWriteJSON {
 						crdResolver.EXPECT().Resolve().Return([]byte(`{"new":"schema"}`), nil)
-						ioHandler.EXPECT().Write([]byte(`{"new":"schema"}`), "cluster1").Return(errors.New("write error"))
+						ioHandler.EXPECT().
+							Write([]byte(`{"new":"schema"}`), "cluster1").
+							Return(errors.New("write error"))
 					} else {
 						crdResolver.EXPECT().Resolve().Return([]byte("{}"), nil)
 					}

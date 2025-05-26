@@ -7,17 +7,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/openapi"
 
-	"github.com/openmfp/kubernetes-graphql-gateway/listener/kcp/mocks"
+	apischemaMocks "github.com/openmfp/kubernetes-graphql-gateway/listener/apischema/mocks"
+	kcpMocks "github.com/openmfp/kubernetes-graphql-gateway/listener/kcp/mocks"
 )
-
-type resolverMockOpenAPIClient struct {
-	paths map[string]openapi.GroupVersion
-	err   error
-}
-
-func (m *resolverMockOpenAPIClient) Paths() (map[string]openapi.GroupVersion, error) {
-	return m.paths, m.err
-}
 
 // Compile-time check that ResolverProvider implements Resolver interface
 var _ Resolver = (*ResolverProvider)(nil)
@@ -43,7 +35,7 @@ func TestResolverProvider_Resolve(t *testing.T) {
 			name: "discovery_error",
 			err:  ErrGetServerPreferred,
 			openAPIPaths: map[string]openapi.GroupVersion{
-				"/api/v1": &fakeGV{},
+				"/api/v1": apischemaMocks.NewMockGroupVersion(t),
 			},
 			wantErr: true,
 		},
@@ -62,7 +54,7 @@ func TestResolverProvider_Resolve(t *testing.T) {
 				},
 			},
 			openAPIPaths: map[string]openapi.GroupVersion{
-				"/api/v1": &fakeGV{},
+				"/api/v1": apischemaMocks.NewMockGroupVersion(t),
 			},
 			wantErr: false,
 		},
@@ -71,18 +63,16 @@ func TestResolverProvider_Resolve(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			resolver := NewResolver()
-			dc := mocks.NewMockDiscoveryInterface(t)
-			rm := mocks.NewMockRESTMapper(t)
+			dc := kcpMocks.NewMockDiscoveryInterface(t)
+			rm := kcpMocks.NewMockRESTMapper(t)
 
 			// First call in resolveSchema
 			dc.EXPECT().ServerPreferredResources().Return(tt.preferredResources, tt.err)
 
 			// These calls are only made if ServerPreferredResources succeeds
 			if tt.err == nil {
-				openAPIClient := &resolverMockOpenAPIClient{
-					paths: tt.openAPIPaths,
-					err:   tt.openAPIErr,
-				}
+				openAPIClient := apischemaMocks.NewMockClient(t)
+				openAPIClient.EXPECT().Paths().Return(tt.openAPIPaths, tt.openAPIErr)
 				dc.EXPECT().OpenAPIV3().Return(openAPIClient)
 			}
 

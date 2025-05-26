@@ -1,11 +1,11 @@
 package apischema
 
 import (
-	"encoding/json"
 	"errors"
 	"testing"
 
 	"github.com/openmfp/kubernetes-graphql-gateway/common"
+	apischemaMocks "github.com/openmfp/kubernetes-graphql-gateway/listener/apischema/mocks"
 	"github.com/stretchr/testify/assert"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -14,20 +14,6 @@ import (
 	"k8s.io/client-go/openapi"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
-
-type fakeClient struct {
-	paths map[string]openapi.GroupVersion
-}
-
-type fakeErrClient struct{}
-
-func (f *fakeClient) Paths() (map[string]openapi.GroupVersion, error) {
-	return f.paths, nil
-}
-
-func (f *fakeErrClient) Paths() (map[string]openapi.GroupVersion, error) {
-	return nil, errors.New("fail Paths")
-}
 
 // TestGetOpenAPISchemaKey tests the getOpenAPISchemaKey function. It checks if the
 // function correctly formats the GroupVersionKind into the expected schema key format.
@@ -103,33 +89,52 @@ func TestGetCRDGroupVersionKind(t *testing.T) {
 // and the expected schema key.
 func TestNewSchemaBuilder(t *testing.T) {
 	tests := []struct {
-		name      string
-		client    openapi.Client
-		wantLen   int
-		wantKey   string
-		wantError bool
+		name    string
+		client  openapi.Client
+		wantErr error
+		wantLen int
+		wantKey string
 	}{
 		{
 			name: "populates_schemas",
-			client: &fakeClient{paths: map[string]openapi.GroupVersion{"/X/v1": fakeGV{data: func() []byte {
-				d, _ := json.Marshal(&schemaResponse{
-					Components: schemasComponentsWrapper{Schemas: map[string]*spec.Schema{"X.v1.K": {}}}})
-				return d
-			}(), err: nil}}},
+			client: func() openapi.Client {
+				mock := apischemaMocks.NewMockClient(t)
+				mockGV := apischemaMocks.NewMockGroupVersion(t)
+				paths := map[string]openapi.GroupVersion{
+					"/v1": mockGV,
+				}
+				mock.EXPECT().Paths().Return(paths, nil)
+				mockGV.EXPECT().Schema("application/json").Return([]byte(`{
+					"components": {
+						"schemas": {
+							"v1.Pod": {
+								"type": "object",
+								"x-kubernetes-group-version-kind": [{"group": "", "kind": "Pod", "version": "v1"}]
+							}
+						}
+					}
+				}`), nil)
+				return mock
+			}(),
+			wantErr: nil,
 			wantLen: 1,
-			wantKey: "X.v1.K",
+			wantKey: "v1.Pod",
 		},
 		{
-			name:      "error_on_Paths",
-			client:    &fakeErrClient{},
-			wantLen:   0,
-			wantError: true,
+			name: "error_on_Paths",
+			client: func() openapi.Client {
+				mock := apischemaMocks.NewMockClient(t)
+				mock.EXPECT().Paths().Return(nil, errors.New("paths error"))
+				return mock
+			}(),
+			wantErr: ErrGetOpenAPIPaths,
 		},
 	}
+
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			b := NewSchemaBuilder(tc.client, []string{"X/v1"})
-			if tc.wantError {
+			b := NewSchemaBuilder(tc.client, []string{"v1"})
+			if tc.wantErr != nil {
 				assert.NotNil(t, b.err, "expected error, got nil")
 				assert.Equal(t, 0, len(b.schemas), "expected 0 schemas on error")
 				return
@@ -144,7 +149,8 @@ func TestNewSchemaBuilder(t *testing.T) {
 }
 
 // TestWithCRDCategories tests the WithCRDCategories method
-// for the SchemaBuilder struct. It checks if the categories are correctly added to the schema's extensions.
+// for the SchemaBuilder struct. It checks if the categories are correctly added
+// to the schema's extensions.
 func TestWithCRDCategories(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -190,14 +196,10 @@ func TestWithCRDCategories(t *testing.T) {
 			b.WithCRDCategories(tc.crd)
 			ext, found := b.schemas[tc.key].VendorExtensible.Extensions[common.CategoriesExtensionKey]
 			if tc.wantCats == nil {
-				if found {
-					t.Errorf("expected no categories, but found: %#v", ext)
-				}
+				assert.False(t, found, "expected no categories")
 				return
 			}
-			if !found {
-				t.Fatal("expected CategoriesExtensionKey to be set")
-			}
+			assert.True(t, found, "expected CategoriesExtensionKey to be set")
 			cats, ok := ext.([]string)
 			assert.True(t, ok, "categories should be []string")
 			assert.Equal(t, tc.wantCats, cats, "categories mismatch")
@@ -206,7 +208,8 @@ func TestWithCRDCategories(t *testing.T) {
 }
 
 // TestWithApiResourceCategories tests the WithApiResourceCategories method
-// for the SchemaBuilder struct. It checks if the categories are correctly added to the schema's extensions.
+// for the SchemaBuilder struct. It checks if the categories are correctly added
+// to the schema's extensions.
 func TestWithApiResourceCategories(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -241,14 +244,10 @@ func TestWithApiResourceCategories(t *testing.T) {
 			b.WithApiResourceCategories(tc.list)
 			ext, found := b.schemas[tc.key].VendorExtensible.Extensions[common.CategoriesExtensionKey]
 			if tc.wantCats == nil {
-				if found {
-					t.Errorf("expected no categories, but found: %#v", ext)
-				}
+				assert.False(t, found, "expected no categories")
 				return
 			}
-			if !found {
-				t.Fatal("expected CategoriesExtensionKey to be set by WithApiResourceCategories")
-			}
+			assert.True(t, found, "expected CategoriesExtensionKey to be set")
 			cats, ok := ext.([]string)
 			assert.True(t, ok, "categories should be []string")
 			assert.Equal(t, tc.wantCats, cats, "categories mismatch")

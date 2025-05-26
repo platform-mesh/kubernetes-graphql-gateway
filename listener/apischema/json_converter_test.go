@@ -2,16 +2,14 @@ package apischema
 
 import (
 	"encoding/json"
-	"errors"
-	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestConvertJSON_InvalidInput(t *testing.T) {
 	_, err := ConvertJSON([]byte("not a json"))
-	if !errors.Is(err, ErrUnmarshalJSON) {
-		t.Errorf("expected ErrUnmarshalJSON, got %v", err)
-	}
+	assert.ErrorIs(t, err, ErrUnmarshalJSON)
 }
 
 func TestConvertJSON_Transforms(t *testing.T) {
@@ -45,19 +43,10 @@ func TestConvertJSON_Transforms(t *testing.T) {
 	}`
 
 	out, err := ConvertJSON(input)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	assert.NoError(t, err)
 
 	var got, want map[string]any
-	if err := json.Unmarshal(out, &got); err != nil {
-		t.Fatalf("unmarshal output: %v", err)
-	}
-	if err := json.Unmarshal([]byte(expected), &want); err != nil {
-		t.Fatalf("unmarshal expected: %v", err)
-	}
-
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("output mismatch:\n got: %v\nwant: %v", got, want)
-	}
+	assert.NoError(t, json.Unmarshal(out, &got), "unmarshal output")
+	assert.NoError(t, json.Unmarshal([]byte(expected), &want), "unmarshal expected")
+	assert.Equal(t, want, got, "output mismatch")
 }
