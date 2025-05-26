@@ -3,6 +3,7 @@ package apischema
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -57,9 +58,7 @@ var _ Resolver = (*ResolverProvider)(nil)
 // instance. This is a runtime check to ensure that the function behaves as expected.
 func TestNewResolverNotNil(t *testing.T) {
 	r := NewResolver()
-	if r == nil {
-		t.Fatal("NewResolver() returned nil, expected non-nil *ResolverProvider")
-	}
+	assert.NotNil(t, r, "NewResolver() should return non-nil *ResolverProvider")
 }
 
 // TestResolverProvider_Resolve tests the Resolve method of the ResolverProvider struct.
@@ -121,12 +120,11 @@ func TestResolverProvider_Resolve(t *testing.T) {
 			rm := &mockRESTMapper{}
 
 			got, err := resolver.Resolve(dc, rm)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Resolver.Resolve() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !tt.wantErr && got == nil {
-				t.Error("Resolver.Resolve() returned nil result when no error expected")
+			if tt.wantErr {
+				assert.Error(t, err, "should return error")
+			} else {
+				assert.NoError(t, err, "should not return error")
+				assert.NotNil(t, got, "should return non-nil result when no error expected")
 			}
 		})
 	}
