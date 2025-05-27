@@ -2,9 +2,10 @@ package resolver
 
 import (
 	"errors"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"maps"
 	"strings"
+
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/graphql-go/graphql"
 	"github.com/rs/zerolog/log"
@@ -18,6 +19,7 @@ const (
 	ObjectArg         = "object"
 	SubscribeToAllArg = "subscribeToAll"
 	SortByArg         = "sortBy"
+	DryRunArg         = "dryRun"
 )
 
 // FieldConfigArgumentsBuilder helps construct GraphQL field config arguments
@@ -61,6 +63,14 @@ func (b *FieldConfigArgumentsBuilder) WithObject(resourceInputType *graphql.Inpu
 	b.arguments[ObjectArg] = &graphql.ArgumentConfig{
 		Type:        graphql.NewNonNull(resourceInputType),
 		Description: "The object to create or update",
+	}
+	return b
+}
+
+func (b *FieldConfigArgumentsBuilder) WithDryRun() *FieldConfigArgumentsBuilder {
+	b.arguments[DryRunArg] = &graphql.ArgumentConfig{
+		Type:        graphql.NewList(graphql.String),
+		Description: "If true, the object will not be persisted",
 	}
 	return b
 }
@@ -159,4 +169,37 @@ func validateSortBy(items []unstructured.Unstructured, fieldPath string) error {
 	}
 
 	return nil
+}
+
+func getDryRunArg(args map[string]interface{}, key string, required bool) ([]string, error) {
+	val, exists := args[key]
+	if !exists {
+		if required {
+			err := errors.New("missing required argument: " + key)
+			log.Error().Err(err).Msg(key + " argument is required")
+			return nil, err
+		}
+		return nil, nil
+	}
+
+	switch v := val.(type) {
+	case []interface{}:
+		result := make([]string, len(v))
+		for i, item := range v {
+			str, ok := item.(string)
+			if !ok {
+				err := errors.New("invalid type in dryRun list: expected string")
+				log.Error().Err(err).Msg("dryRun argument must be a list of strings")
+				return nil, err
+			}
+			result[i] = str
+		}
+		return result, nil
+	case nil:
+		return nil, nil
+	default:
+		err := errors.New("invalid type for dryRun argument: expected list of strings")
+		log.Error().Err(err).Msg("dryRun argument must be a list of strings")
+		return nil, err
+	}
 }

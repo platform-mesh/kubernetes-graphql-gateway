@@ -201,7 +201,7 @@ func (g *Gateway) processSingleResource(
 
 	itemArgsBuilder := resolver.NewFieldConfigArguments().WithName()
 
-	creationMutationArgsBuilder := resolver.NewFieldConfigArguments().WithObject(resourceInputType)
+	creationMutationArgsBuilder := resolver.NewFieldConfigArguments().WithObject(resourceInputType).WithDryRun()
 
 	if resourceScope == apiextensionsv1.NamespaceScoped {
 		listArgsBuilder.WithNamespace()
