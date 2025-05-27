@@ -69,8 +69,8 @@ func (b *FieldConfigArgumentsBuilder) WithObject(resourceInputType *graphql.Inpu
 
 func (b *FieldConfigArgumentsBuilder) WithDryRun() *FieldConfigArgumentsBuilder {
 	b.arguments[DryRunArg] = &graphql.ArgumentConfig{
-		Type:        graphql.NewList(graphql.String),
-		Description: "If true, the object will not be persisted",
+		Type:        graphql.Boolean,
+		Description: "If true, the operation will be performed in dry-run mode",
 	}
 	return b
 }
@@ -182,24 +182,15 @@ func getDryRunArg(args map[string]interface{}, key string, required bool) ([]str
 		return nil, nil
 	}
 
-	switch v := val.(type) {
-	case []interface{}:
-		result := make([]string, len(v))
-		for i, item := range v {
-			str, ok := item.(string)
-			if !ok {
-				err := errors.New("invalid type in dryRun list: expected string")
-				log.Error().Err(err).Msg("dryRun argument must be a list of strings")
-				return nil, err
-			}
-			result[i] = str
-		}
-		return result, nil
-	case nil:
-		return nil, nil
-	default:
-		err := errors.New("invalid type for dryRun argument: expected list of strings")
-		log.Error().Err(err).Msg("dryRun argument must be a list of strings")
+	dryRun, ok := val.(bool)
+	if !ok {
+		err := errors.New("invalid type for dryRun argument: expected boolean")
+		log.Error().Err(err).Msg("dryRun argument must be a boolean")
 		return nil, err
 	}
+
+	if dryRun {
+		return []string{"All"}, nil
+	}
+	return nil, nil
 }

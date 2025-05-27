@@ -345,7 +345,7 @@ func TestCreateItem(t *testing.T) {
 			args: map[string]interface{}{
 				resolver.NameArg:      "test-object",
 				resolver.NamespaceArg: "test-namespace",
-				resolver.DryRunArg:    []interface{}{"All"},
+				resolver.DryRunArg:    true,
 				"object": map[string]interface{}{
 					"metadata": map[string]interface{}{
 						"name": "test-object",
@@ -514,7 +514,7 @@ func TestUpdateItem(t *testing.T) {
 			args: map[string]interface{}{
 				resolver.NameArg:      "test-object",
 				resolver.NamespaceArg: "test-namespace",
-				resolver.DryRunArg:    []interface{}{"All"},
+				resolver.DryRunArg:    true,
 				"object": map[string]interface{}{
 					"metadata": map[string]interface{}{
 						"name": "test-object",
