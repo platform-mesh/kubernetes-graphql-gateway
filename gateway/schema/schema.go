@@ -240,7 +240,7 @@ func (g *Gateway) processSingleResource(
 
 	mutationGroupType.AddFieldConfig("update"+singular, &graphql.Field{
 		Type:    resourceType,
-		Args:    creationMutationArgsBuilder.WithName().WithDryRun().Complete(),
+		Args:    creationMutationArgsBuilder.WithName().Complete(),
 		Resolve: g.resolver.UpdateItem(*gvk, resourceScope),
 	})
 
