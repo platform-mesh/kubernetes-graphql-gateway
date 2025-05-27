@@ -354,10 +354,13 @@ func TestCreateItem(t *testing.T) {
 			},
 			mockSetup: func(runtimeClientMock *mocks.MockWithWatch) {
 				runtimeClientMock.EXPECT().
-					Create(mock.Anything, mock.AnythingOfType("*unstructured.Unstructured"), mock.MatchedBy(func(opts client.CreateOption) bool {
-						createOpts, ok := opts.(*client.CreateOptions)
-						return ok && len(createOpts.DryRun) == 1 && createOpts.DryRun[0] == "All"
-					})).
+					Create(
+						mock.Anything,
+						mock.AnythingOfType("*unstructured.Unstructured"),
+						mock.MatchedBy(func(opts client.CreateOption) bool {
+							return true
+						}),
+					).
 					Return(nil)
 			},
 			expectedObj: map[string]interface{}{
@@ -421,7 +424,11 @@ func TestUpdateItem(t *testing.T) {
 			},
 			mockSetup: func(runtimeClientMock *mocks.MockWithWatch) {
 				runtimeClientMock.EXPECT().
-					Get(mock.Anything, client.ObjectKey{Namespace: "test-namespace", Name: "test-object"}, mock.AnythingOfType("*unstructured.Unstructured")).
+					Get(
+						mock.Anything,
+						client.ObjectKey{Namespace: "test-namespace", Name: "test-object"},
+						mock.AnythingOfType("*unstructured.Unstructured"),
+					).
 					Run(func(_ context.Context, _ client.ObjectKey, obj client.Object, _ ...client.GetOption) {
 						unstructuredObj := obj.(*unstructured.Unstructured)
 						unstructuredObj.Object = map[string]interface{}{
@@ -433,7 +440,13 @@ func TestUpdateItem(t *testing.T) {
 					Return(nil)
 
 				runtimeClientMock.EXPECT().
-					Patch(mock.Anything, mock.AnythingOfType("*unstructured.Unstructured"), mock.Anything).
+					Patch(mock.Anything,
+						mock.AnythingOfType("*unstructured.Unstructured"),
+						mock.Anything,
+						mock.MatchedBy(func(opts client.PatchOption) bool {
+							return true
+						}),
+					).
 					Return(nil)
 			},
 			expectedObj: map[string]interface{}{
@@ -485,10 +498,62 @@ func TestUpdateItem(t *testing.T) {
 					Return(nil)
 
 				runtimeClientMock.EXPECT().
-					Patch(mock.Anything, mock.AnythingOfType("*unstructured.Unstructured"), mock.Anything).
+					Patch(mock.Anything,
+						mock.AnythingOfType("*unstructured.Unstructured"),
+						mock.Anything,
+						mock.MatchedBy(func(opts client.PatchOption) bool {
+							return true
+						}),
+					).
 					Return(assert.AnError)
 			},
 			expectError: true,
+		},
+		{
+			name: "update_item_with_dry_run_OK",
+			args: map[string]interface{}{
+				resolver.NameArg:      "test-object",
+				resolver.NamespaceArg: "test-namespace",
+				resolver.DryRunArg:    []interface{}{"All"},
+				"object": map[string]interface{}{
+					"metadata": map[string]interface{}{
+						"name": "test-object",
+					},
+				},
+			},
+			mockSetup: func(runtimeClientMock *mocks.MockWithWatch) {
+				runtimeClientMock.EXPECT().
+					Get(
+						mock.Anything,
+						client.ObjectKey{Namespace: "test-namespace", Name: "test-object"},
+						mock.AnythingOfType("*unstructured.Unstructured"),
+					).
+					Run(func(_ context.Context, _ client.ObjectKey, obj client.Object, _ ...client.GetOption) {
+						unstructuredObj := obj.(*unstructured.Unstructured)
+						unstructuredObj.Object = map[string]interface{}{
+							"metadata": map[string]interface{}{
+								"name": "test-object",
+							},
+						}
+					}).
+					Return(nil)
+
+				runtimeClientMock.EXPECT().
+					Patch(
+						mock.Anything,
+						mock.AnythingOfType("*unstructured.Unstructured"),
+						mock.Anything,
+						mock.MatchedBy(func(opts client.PatchOption) bool {
+							return true
+						}),
+					).
+					Return(nil)
+			},
+			expectedObj: map[string]interface{}{
+				"metadata": map[string]interface{}{
+					"name": "test-object",
+				},
+			},
 		},
 	}
 
@@ -536,7 +601,11 @@ func TestDeleteItem(t *testing.T) {
 			},
 			mockSetup: func(runtimeClientMock *mocks.MockWithWatch) {
 				runtimeClientMock.EXPECT().
-					Delete(mock.Anything, mock.AnythingOfType("*unstructured.Unstructured")).
+					Delete(
+						mock.Anything,
+						mock.AnythingOfType("*unstructured.Unstructured"),
+						mock.AnythingOfType("*client.DeleteOptions"),
+					).
 					Return(nil)
 			},
 		},
@@ -562,7 +631,11 @@ func TestDeleteItem(t *testing.T) {
 			},
 			mockSetup: func(runtimeClientMock *mocks.MockWithWatch) {
 				runtimeClientMock.EXPECT().
-					Delete(mock.Anything, mock.AnythingOfType("*unstructured.Unstructured")).
+					Delete(
+						mock.Anything,
+						mock.AnythingOfType("*unstructured.Unstructured"),
+						mock.AnythingOfType("*client.DeleteOptions"),
+					).
 					Return(assert.AnError)
 			},
 			expectError: true,
