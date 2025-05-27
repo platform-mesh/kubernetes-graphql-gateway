@@ -1,15 +1,16 @@
-package apischema
+package apischema_test
 
 import (
 	"encoding/json"
 	"testing"
 
+	"github.com/openmfp/kubernetes-graphql-gateway/listener/apischema"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestConvertJSON_InvalidInput(t *testing.T) {
-	_, err := ConvertJSON([]byte("not a json"))
-	assert.ErrorIs(t, err, ErrUnmarshalJSON)
+	_, err := apischema.ConvertJSON([]byte("not a json"))
+	assert.ErrorIs(t, err, apischema.ErrUnmarshalJSON)
 }
 
 func TestConvertJSON_Transforms(t *testing.T) {
@@ -42,7 +43,7 @@ func TestConvertJSON_Transforms(t *testing.T) {
 		}
 	}`
 
-	out, err := ConvertJSON(input)
+	out, err := apischema.ConvertJSON(input)
 	assert.NoError(t, err)
 
 	var got, want map[string]any
