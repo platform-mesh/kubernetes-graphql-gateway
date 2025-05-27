@@ -290,7 +290,13 @@ func TestCreateItem(t *testing.T) {
 			},
 			mockSetup: func(runtimeClientMock *mocks.MockWithWatch) {
 				runtimeClientMock.EXPECT().
-					Create(mock.Anything, mock.AnythingOfType("*unstructured.Unstructured")).
+					Create(
+						mock.Anything,
+						mock.AnythingOfType("*unstructured.Unstructured"),
+						mock.MatchedBy(func(opts client.CreateOption) bool {
+							return true
+						}),
+					).
 					Return(nil)
 			},
 			expectedObj: map[string]interface{}{
@@ -315,7 +321,13 @@ func TestCreateItem(t *testing.T) {
 			},
 			mockSetup: func(runtimeClientMock *mocks.MockWithWatch) {
 				runtimeClientMock.EXPECT().
-					Create(mock.Anything, mock.AnythingOfType("*unstructured.Unstructured")).
+					Create(
+						mock.Anything,
+						mock.AnythingOfType("*unstructured.Unstructured"),
+						mock.MatchedBy(func(opts client.CreateOption) bool {
+							return true
+						}),
+					).
 					Return(assert.AnError)
 			},
 			expectError: true,
@@ -327,6 +339,35 @@ func TestCreateItem(t *testing.T) {
 				"object":              map[string]interface{}{},
 			},
 			expectError: true,
+		},
+		{
+			name: "create_item_with_dry_run_OK",
+			args: map[string]interface{}{
+				resolver.NameArg:      "test-object",
+				resolver.NamespaceArg: "test-namespace",
+				resolver.DryRunArg:    []interface{}{"All"},
+				"object": map[string]interface{}{
+					"metadata": map[string]interface{}{
+						"name": "test-object",
+					},
+				},
+			},
+			mockSetup: func(runtimeClientMock *mocks.MockWithWatch) {
+				runtimeClientMock.EXPECT().
+					Create(mock.Anything, mock.AnythingOfType("*unstructured.Unstructured"), mock.MatchedBy(func(opts client.CreateOption) bool {
+						createOpts, ok := opts.(*client.CreateOptions)
+						return ok && len(createOpts.DryRun) == 1 && createOpts.DryRun[0] == "All"
+					})).
+					Return(nil)
+			},
+			expectedObj: map[string]interface{}{
+				"apiVersion": "group/version",
+				"kind":       "kind",
+				"metadata": map[string]interface{}{
+					"name":      "test-object",
+					"namespace": "test-namespace",
+				},
+			},
 		},
 	}
 
