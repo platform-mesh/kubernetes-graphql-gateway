@@ -170,27 +170,3 @@ func validateSortBy(items []unstructured.Unstructured, fieldPath string) error {
 
 	return nil
 }
-
-func getDryRunArg(args map[string]interface{}, key string, required bool) ([]string, error) {
-	val, exists := args[key]
-	if !exists {
-		if required {
-			err := errors.New("missing required argument: " + key)
-			log.Error().Err(err).Msg(key + " argument is required")
-			return nil, err
-		}
-		return nil, nil
-	}
-
-	dryRun, ok := val.(bool)
-	if !ok {
-		err := errors.New("invalid type for dryRun argument: expected boolean")
-		log.Error().Err(err).Msg("dryRun argument must be a boolean")
-		return nil, err
-	}
-
-	if dryRun {
-		return []string{"All"}, nil
-	}
-	return nil, nil
-}

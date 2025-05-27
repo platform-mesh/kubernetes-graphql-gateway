@@ -237,9 +237,13 @@ func (r *Service) CreateItem(gvk schema.GroupVersionKind, scope v1.ResourceScope
 			return nil, errors.New("object metadata.name is required")
 		}
 
-		dryRun, err := getDryRunArg(p.Args, DryRunArg, false)
+		dryRunBool, err := getBoolArg(p.Args, DryRunArg, false)
 		if err != nil {
 			return nil, err
+		}
+		dryRun := []string{}
+		if dryRunBool {
+			dryRun = []string{"All"}
 		}
 
 		if err := r.runtimeClient.Create(ctx, obj, &client.CreateOptions{DryRun: dryRun}); err != nil {
@@ -292,9 +296,13 @@ func (r *Service) UpdateItem(gvk schema.GroupVersionKind, scope v1.ResourceScope
 			return nil, err
 		}
 
-		dryRun, err := getDryRunArg(p.Args, DryRunArg, false)
+		dryRunBool, err := getBoolArg(p.Args, DryRunArg, false)
 		if err != nil {
 			return nil, err
+		}
+		dryRun := []string{}
+		if dryRunBool {
+			dryRun = []string{"All"}
 		}
 
 		// Apply the merge patch to the existing object
@@ -335,9 +343,13 @@ func (r *Service) DeleteItem(gvk schema.GroupVersionKind, scope v1.ResourceScope
 			obj.SetNamespace(namespace)
 		}
 
-		dryRun, err := getDryRunArg(p.Args, DryRunArg, false)
+		dryRunBool, err := getBoolArg(p.Args, DryRunArg, false)
 		if err != nil {
 			return nil, err
+		}
+		dryRun := []string{}
+		if dryRunBool {
+			dryRun = []string{"All"}
 		}
 
 		if err := r.runtimeClient.Delete(ctx, obj, &client.DeleteOptions{DryRun: dryRun}); err != nil {
