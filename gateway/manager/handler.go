@@ -68,7 +68,7 @@ func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.setContexts(r, workspace, token)
+	r = s.setContexts(r, workspace, token)
 
 	if r.Header.Get("Accept") == "text/event-stream" {
 		s.handleSubscription(w, r, h.schema)
