@@ -2,10 +2,11 @@ package resolver
 
 import (
 	"fmt"
-	"github.com/openmfp/golang-commons/sentry"
 	"reflect"
 	"sort"
 	"strings"
+
+	"github.com/openmfp/golang-commons/sentry"
 
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
@@ -117,6 +118,14 @@ func (r *Service) runWatch(
 		r.log.Error().Err(err).Msg("Failed to get sortBy argument")
 		resultChannel <- errorResult("Failed to get sortBy: " + err.Error())
 		return
+	}
+
+	if !singleItem {
+		select {
+		case <-ctx.Done():
+			return
+		case resultChannel <- []map[string]interface{}{}:
+		}
 	}
 
 	watcher, err := r.runtimeClient.Watch(ctx, list, opts...)
