@@ -106,3 +106,40 @@ func TestNewReconciler(t *testing.T) {
 		})
 	}
 }
+
+func TestPreReconcile(t *testing.T) {
+	tempDir := t.TempDir()
+
+	tests := map[string]struct {
+		cr  *apischema.CRDResolver
+		err error
+	}{
+		"error_on_empty_resolver": {
+			cr: func() *apischema.CRDResolver {
+				discovery := &mocks.MockDiscoveryInterface{}
+				discovery.On("ServerPreferredResources").Return(nil, errors.New("failed to get server resources"))
+
+				return &apischema.CRDResolver{
+					DiscoveryInterface: discovery,
+					RESTMapper:         &mocks.MockRESTMapper{},
+				}
+			}(),
+			err: errors.Join(ErrResolveSchema,
+				errors.New("failed to get server preferred resources"),
+				errors.New("failed to get server resources")),
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			ioHandler, err := workspacefile.NewIOHandler(tempDir)
+			assert.NoError(t, err)
+			err = PreReconcile(tc.cr, ioHandler)
+			if tc.err != nil {
+				assert.EqualError(t, err, tc.err.Error())
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}

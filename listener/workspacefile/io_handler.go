@@ -11,6 +11,7 @@ var (
 	ErrReadJSONFile     = errors.New("failed to read JSON file")
 	ErrWriteJSONFile    = errors.New("failed to write JSON to file")
 	ErrDeleteJSONFile   = errors.New("failed to delete JSON file")
+	ErrNotFound         = errors.New("failed to find JSON file")
 )
 
 type IOHandler interface {
@@ -37,6 +38,9 @@ func (h *IOHandlerProvider) Read(clusterName string) ([]byte, error) {
 	fileName := path.Join(h.schemasDir, clusterName)
 	JSON, err := os.ReadFile(fileName)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, ErrNotFound
+		}
 		return nil, errors.Join(ErrReadJSONFile, err)
 	}
 	return JSON, nil
