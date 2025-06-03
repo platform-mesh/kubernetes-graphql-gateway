@@ -15,9 +15,7 @@ import (
 )
 
 var (
-	ErrReadJSON         = errors.New("failed to read JSON from filesystem")
 	ErrResolveSchema    = errors.New("failed to resolve server JSON schema")
-	ErrWriteJSON        = errors.New("failed to write JSON to filesystem")
 	ErrGetReconciledObj = errors.New("failed to get reconciled object")
 )
 
@@ -79,7 +77,7 @@ func (r *CRDReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func (r *CRDReconciler) updateAPISchema() error {
 	savedJSON, err := r.io.Read(r.ClusterName)
 	if err != nil {
-		return errors.Join(ErrReadJSON, err)
+		return err
 	}
 	actualJSON, err := r.Resolve()
 	if err != nil {
@@ -87,7 +85,7 @@ func (r *CRDReconciler) updateAPISchema() error {
 	}
 	if !bytes.Equal(actualJSON, savedJSON) {
 		if err := r.io.Write(actualJSON, r.ClusterName); err != nil {
-			return errors.Join(ErrWriteJSON, err)
+			return err
 		}
 	}
 	return nil
@@ -96,7 +94,7 @@ func (r *CRDReconciler) updateAPISchema() error {
 func (r *CRDReconciler) updateAPISchemaWith(crd *apiextensionsv1.CustomResourceDefinition) error {
 	savedJSON, err := r.io.Read(r.ClusterName)
 	if err != nil {
-		return errors.Join(ErrReadJSON, err)
+		return err
 	}
 	actualJSON, err := r.ResolveApiSchema(crd)
 	if err != nil {
@@ -104,7 +102,7 @@ func (r *CRDReconciler) updateAPISchemaWith(crd *apiextensionsv1.CustomResourceD
 	}
 	if !bytes.Equal(actualJSON, savedJSON) {
 		if err := r.io.Write(actualJSON, r.ClusterName); err != nil {
-			return errors.Join(ErrWriteJSON, err)
+			return err
 		}
 	}
 	return nil

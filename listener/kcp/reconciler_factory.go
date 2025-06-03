@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io/fs"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -116,7 +117,7 @@ func PreReconcile(
 
 	savedJSON, err := io.Read(kubernetesClusterName)
 	if err != nil {
-		if errors.Is(err, workspacefile.ErrNotFound) {
+		if errors.Is(err, fs.ErrNotExist) {
 			return io.Write(actualJSON, kubernetesClusterName)
 		}
 		return errors.Join(ErrReadJSON, err)

@@ -8,6 +8,7 @@ import (
 	"github.com/openmfp/kubernetes-graphql-gateway/gateway/resolver/mocks"
 	"github.com/openmfp/kubernetes-graphql-gateway/listener/controller"
 	controllerMocks "github.com/openmfp/kubernetes-graphql-gateway/listener/controller/mocks"
+	"github.com/openmfp/kubernetes-graphql-gateway/listener/workspacefile"
 	workspacefileMocks "github.com/openmfp/kubernetes-graphql-gateway/listener/workspacefile/mocks"
 
 	"github.com/openmfp/golang-commons/logger/testlogger"
@@ -40,8 +41,8 @@ func TestCRDReconciler(t *testing.T) {
 		{
 			name:    "not_found_read_error",
 			getErr:  apierrors.NewNotFound(schema.GroupResource{Group: "", Resource: "crds"}, "my-crd"),
-			readErr: errors.New("read-error"),
-			wantErr: controller.ErrReadJSON,
+			readErr: workspacefile.ErrReadJSONFile,
+			wantErr: workspacefile.ErrReadJSONFile,
 		},
 		{
 			name:    "not_found_resolve_error",
@@ -53,7 +54,7 @@ func TestCRDReconciler(t *testing.T) {
 			name:    "not_found_write_error",
 			getErr:  apierrors.NewNotFound(schema.GroupResource{Group: "", Resource: "crds"}, "my-crd"),
 			readErr: nil,
-			wantErr: controller.ErrWriteJSON,
+			wantErr: workspacefile.ErrWriteJSONFile,
 		},
 		{
 			name:    "successful_update",
@@ -89,11 +90,11 @@ func TestCRDReconciler(t *testing.T) {
 				if tc.readErr == nil {
 					if tc.wantErr == controller.ErrResolveSchema {
 						crdResolver.EXPECT().Resolve().Return(nil, errors.New("resolve error"))
-					} else if tc.wantErr == controller.ErrWriteJSON {
+					} else if tc.wantErr == workspacefile.ErrWriteJSONFile {
 						crdResolver.EXPECT().Resolve().Return([]byte(`{"new":"schema"}`), nil)
 						ioHandler.EXPECT().
 							Write([]byte(`{"new":"schema"}`), "cluster1").
-							Return(errors.New("write error"))
+							Return(workspacefile.ErrWriteJSONFile)
 					} else {
 						crdResolver.EXPECT().Resolve().Return([]byte("{}"), nil)
 					}
