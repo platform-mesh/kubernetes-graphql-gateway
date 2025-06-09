@@ -25,7 +25,13 @@ For this you need to export the `KUBEBUILDER_ASSETS` environment variable:
 ```shell
 KUBEBUILDER_ASSETS=$(pwd)/bin/k8s/$DIR_WITH_ASSETS
 # where $DIR_WITH_ASSETS is the directory that contains binaries for your OS.
+o
 ```
+
+### Live Local Test
+
+See [Local Test](local_test.md).
+
 ### See Test Coverage
 
 You can check the coverage as HTML report:
