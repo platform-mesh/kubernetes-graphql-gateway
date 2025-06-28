@@ -24,7 +24,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/kcp-dev/kcp/sdk v0.27.1
 	github.com/kcp-dev/logicalcluster/v3 v3.0.5
-	github.com/openmfp/account-operator v0.170.9
+	github.com/openmfp/account-operator v0.170.10
 	github.com/openmfp/golang-commons v0.150.10
 	github.com/pkg/errors v0.9.1
 	github.com/rs/zerolog v1.34.0
