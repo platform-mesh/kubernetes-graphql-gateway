@@ -141,8 +141,8 @@ github.com/onsi/ginkgo/v2 v2.21.0 h1:7rg/4f3rB88pb5obDgNZrNHrQ4e6WpjonchcpuBRnZM
 github.com/onsi/ginkgo/v2 v2.21.0/go.mod h1:7Du3c42kxCUegi0IImZ1wUQzMBVecgIHjR1C+NkhLQo=
 github.com/onsi/gomega v1.35.1 h1:Cwbd75ZBPxFSuZ6T+rN/WCb/gOc6YgFBXLlZLhC7Ds4=
 github.com/onsi/gomega v1.35.1/go.mod h1:PvZbdDc8J6XJEpDK4HCuRBm8a6Fzp9/DmhC9C7yFlog=
-github.com/openmfp/account-operator v0.170.10 h1:3k+oYlv01AJbAMOROnnOVvQu+nSAuPTcoTJaWT/2/DA=
-github.com/openmfp/account-operator v0.170.10/go.mod h1:9ICn3R4P3Yu1q+vBBTrEWaQn9ToQ7GLptbiqz75HB48=
+github.com/openmfp/account-operator v0.170.11 h1:Lo2CXyTAfcse0yZ7rOtYSJAJ9dIB/iUyRlGBmoNsAuY=
+github.com/openmfp/account-operator v0.170.11/go.mod h1:Vvg/Yuei3ap+K5yqeaSuXKgDhnErnabWQhdAvu1gsK8=
 github.com/openmfp/golang-commons v0.150.11 h1:g9NbX75c5GTQkF7qHRDHU4a/En0LVW45nd5Gi1lOV7U=
 github.com/openmfp/golang-commons v0.150.11/go.mod h1:6CUKMI6gmVldZa6HohpOV/g/xC8oNnX87cLT21BabSA=
 github.com/pelletier/go-toml/v2 v2.2.3 h1:YmeHyLY8mFWbdkNWwpr+qIL2bEqT0o95WSdkNHvL12M=
