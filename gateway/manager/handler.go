@@ -79,10 +79,8 @@ func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (s *Service) handleCORS(w http.ResponseWriter, r *http.Request) bool {
 	if s.AppCfg.Gateway.Cors.Enabled {
-		allowedOrigins := strings.Join(s.AppCfg.Gateway.Cors.AllowedOrigins, ",")
-		allowedHeaders := strings.Join(s.AppCfg.Gateway.Cors.AllowedHeaders, ",")
-		w.Header().Set("Access-Control-Allow-Origin", allowedOrigins)
-		w.Header().Set("Access-Control-Allow-Headers", allowedHeaders)
+		w.Header().Set("Access-Control-Allow-Origin", s.AppCfg.Gateway.Cors.AllowedOrigins)
+		w.Header().Set("Access-Control-Allow-Headers", s.AppCfg.Gateway.Cors.AllowedHeaders)
 		// setting cors allowed methods is not needed for this service,
 		// as all graphql methods are part of the cors safelisted methods
 		// https://fetch.spec.whatwg.org/#cors-safelisted-method

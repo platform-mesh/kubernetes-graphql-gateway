@@ -67,8 +67,8 @@ func initConfig() {
 	v.SetDefault("gateway-handler-graphiql", true)
 	// Gateway CORS
 	v.SetDefault("gateway-cors-enabled", false)
-	v.SetDefault("gateway-cors-allowed-origins", []string{"*"})
-	v.SetDefault("gateway-cors-allowed-headers", []string{"*"})
+	v.SetDefault("gateway-cors-allowed-origins", "*")
+	v.SetDefault("gateway-cors-allowed-headers", "*")
 }
 
 func Execute() {

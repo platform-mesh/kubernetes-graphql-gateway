@@ -10,8 +10,8 @@ import (
 func NewManagerForTest() *Service {
 	cfg := appConfig.Config{}
 	cfg.Gateway.Cors.Enabled = true
-	cfg.Gateway.Cors.AllowedOrigins = []string{"*"}
-	cfg.Gateway.Cors.AllowedHeaders = []string{"Authorization"}
+	cfg.Gateway.Cors.AllowedOrigins = "*"
+	cfg.Gateway.Cors.AllowedHeaders = "Authorization"
 
 	s := &Service{
 		AppCfg:   cfg,

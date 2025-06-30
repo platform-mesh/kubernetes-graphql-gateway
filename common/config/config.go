@@ -22,9 +22,9 @@ type Config struct {
 		} `mapstructure:",squash"`
 
 		Cors struct {
-			Enabled        bool     `mapstructure:"gateway-cors-enabled"`
-			AllowedOrigins []string `mapstructure:"gateway-cors-allowed-origins"`
-			AllowedHeaders []string `mapstructure:"gateway-cors-allowed-headers"`
+			Enabled        bool   `mapstructure:"gateway-cors-enabled"`
+			AllowedOrigins string `mapstructure:"gateway-cors-allowed-origins"`
+			AllowedHeaders string `mapstructure:"gateway-cors-allowed-headers"`
 		} `mapstructure:",squash"`
 	} `mapstructure:",squash"`
 }
