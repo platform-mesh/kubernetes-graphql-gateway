@@ -10,6 +10,7 @@ import (
 	openmfpcontext "github.com/openmfp/golang-commons/context"
 	"github.com/openmfp/golang-commons/sentry"
 	"github.com/openmfp/golang-commons/traces"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/cobra"
 	ctrl "sigs.k8s.io/controller-runtime"
 	restCfg "sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -84,6 +85,9 @@ var gatewayCmd = &cobra.Command{
 
 		// Set up HTTP handler
 		http.Handle("/", managerInstance)
+
+		// Replace the /metrics endpoint handler
+		http.Handle("/metrics", promhttp.Handler())
 
 		// Start HTTP server with context
 		server := &http.Server{
