@@ -8,6 +8,9 @@ import (
 
 	"github.com/openmfp/golang-commons/sentry"
 	"github.com/pkg/errors"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
@@ -27,6 +30,8 @@ var (
 
 func (r *Service) SubscribeItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
 	return func(p graphql.ResolveParams) (interface{}, error) {
+		_, span := otel.Tracer("").Start(p.Context, "SubscribeItem", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
+		defer span.End()
 		resultChannel := make(chan interface{})
 		go r.runWatch(p, gvk, resultChannel, true, scope)
 
@@ -36,6 +41,8 @@ func (r *Service) SubscribeItem(gvk schema.GroupVersionKind, scope v1.ResourceSc
 
 func (r *Service) SubscribeItems(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
 	return func(p graphql.ResolveParams) (interface{}, error) {
+		_, span := otel.Tracer("").Start(p.Context, "SubscribeItems", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
+		defer span.End()
 		resultChannel := make(chan interface{})
 		go r.runWatch(p, gvk, resultChannel, false, scope)
 
