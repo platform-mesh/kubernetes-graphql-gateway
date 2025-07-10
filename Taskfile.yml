@@ -6,6 +6,7 @@ vars:
   ENVTEST_K8S_VERSION: "1.30.0" # to get latest version run $(pwd)/bin/setup-envtest list
   ENVTEST_VERSION: "release-0.20" # https://github.com/kubernetes-sigs/controller-runtime/releases
   MOCKERY_VERSION: v2.52.3 # https://github.com/vektra/mockery/releases
+  CONTROLLER_GEN_VERSION: v0.18.0 # https://github.com/kubernetes-sigs/controller-tools/releases
 tasks:
   ## Setup
   setup:mockery:
@@ -16,6 +17,10 @@ tasks:
     internal: true
     cmds:
       - test -s {{.LOCAL_BIN}}/setup-envtest || GOBIN=$(pwd)/{{.LOCAL_BIN}} go install sigs.k8s.io/controller-runtime/tools/setup-envtest@{{.ENVTEST_VERSION}}
+  setup:controller-gen:
+    internal: true
+    cmds:
+      - test -s {{.LOCAL_BIN}}/controller-gen || GOBIN=$(pwd)/{{.LOCAL_BIN}} go install sigs.k8s.io/controller-tools/cmd/controller-gen@{{.CONTROLLER_GEN_VERSION}}
   update:crd:
     desc: "Download the latest CRD from OpenMFP"
     cmds:
@@ -30,6 +35,25 @@ tasks:
     internal: true
     cmds:
       - test -s {{.LOCAL_BIN}}/go-test-coverage || GOBIN=$(pwd)/{{.LOCAL_BIN}} go install github.com/vladopajic/go-test-coverage/v2@latest
+
+  ## Code Generation
+  generate:crd:
+    desc: "Generate CRD manifests from Go types"
+    deps: [setup:controller-gen]
+    cmds:
+      - "{{.LOCAL_BIN}}/controller-gen crd:crdVersions=v1 paths=./common/apis/v1alpha1 output:crd:artifacts:config=config/crd"
+      - echo "CRD manifests generated successfully in config/crd/"
+  generate:deepcopy:
+    desc: "Generate deepcopy methods for API types"
+    deps: [setup:controller-gen]
+    cmds:
+      - "{{.LOCAL_BIN}}/controller-gen object paths=./common/apis/v1alpha1"
+      - echo "Deepcopy methods generated successfully"
+  generate:
+    desc: "Generate all CRD-related files (manifests + deepcopy methods)"
+    deps: [generate:crd, generate:deepcopy]
+    cmds:
+      - echo "All CRD generation completed successfully!"
 
   ## Development
   mockery:
@@ -62,7 +86,7 @@ tasks:
         vars:
           ADDITIONAL_COMMAND_ARGS: -coverprofile=./cover.out -covermode=atomic -coverpkg=./...
   cover:
-    deps: [ setup:envtest, setup:go-test-coverage ]
+    deps: [ setup:envtest, update:crd, setup:go-test-coverage ]
     cmds:
       - task: envtest
         vars:
@@ -75,16 +99,36 @@ tasks:
       - go tool cover -html=cover.out -o coverage.html
       - open coverage.html || xdg-open coverage.html || start coverage.html
   validate:
+    desc: "Run all validation checks including code generation, linting, and testing"
     cmds:
+      - task: generate
       - task: mockery
       - task: lint
       - task: test
 
 
   gateway:
+    desc: "Start the GraphQL gateway server (kills existing process on port 8080 if needed)"
     cmds:
+      - |
+        # Check if port 8080 is in use and kill the process if found
+        PID=$(lsof -ti:8080 2>/dev/null || echo "")
+        if [ ! -z "$PID" ]; then
+          echo "Found existing process $PID on port 8080, killing it..."
+          kill $PID 2>/dev/null || true
+          sleep 2
+        fi
       - go run main.go gateway
 
   listener:
+    desc: "Start the listener server (kills existing process on port 8090 if needed)"
     cmds:
+      - |
+        # Check if port 8090 is in use and kill the process if found
+        PID=$(lsof -ti:8090 2>/dev/null || echo "")
+        if [ ! -z "$PID" ]; then
+          echo "Found existing process $PID on port 8090, killing it..."
+          kill $PID 2>/dev/null || true
+          sleep 2
+        fi
       - go run main.go listener

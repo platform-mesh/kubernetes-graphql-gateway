@@ -24,6 +24,7 @@ coverage.html
 *.swp
 *.swo
 *~
+*.log
 
 # MacOS
 **/.DS_Store
@@ -41,3 +42,4 @@ go.work
 
 # binary files
 main
+kubernetes-graphql-gateway

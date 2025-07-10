@@ -44,6 +44,11 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
+
+	err = openmfpconfig.BindConfigToFlags(v, listenCmd, &appCfg)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func initConfig() {
@@ -59,6 +64,7 @@ func initConfig() {
 
 	// Gateway
 	v.SetDefault("gateway-port", "8080")
+
 	v.SetDefault("gateway-username-claim", "email")
 	v.SetDefault("gateway-should-impersonate", true)
 	// Gateway Handler config

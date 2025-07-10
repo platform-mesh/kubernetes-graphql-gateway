@@ -2,10 +2,11 @@ package gateway_test
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"net/http"
 	"path/filepath"
 	"strings"
+
+	"github.com/stretchr/testify/require"
 )
 
 func (suite *CommonTestSuite) TestTokenValidation() {
@@ -18,7 +19,7 @@ func (suite *CommonTestSuite) TestTokenValidation() {
 
 	workspaceName := "myWorkspace"
 
-	require.NoError(suite.T(), writeToFile(
+	require.NoError(suite.T(), suite.writeToFileWithClusterMetadata(
 		filepath.Join("testdata", "kubernetes"),
 		filepath.Join(suite.appCfg.OpenApiDefinitionsPath, workspaceName),
 	))
@@ -50,7 +51,7 @@ func (suite *CommonTestSuite) TestIntrospectionAuth() {
 
 	workspaceName := "myWorkspace"
 
-	require.NoError(suite.T(), writeToFile(
+	require.NoError(suite.T(), suite.writeToFileWithClusterMetadata(
 		filepath.Join("testdata", "kubernetes"),
 		filepath.Join(suite.appCfg.OpenApiDefinitionsPath, workspaceName),
 	))

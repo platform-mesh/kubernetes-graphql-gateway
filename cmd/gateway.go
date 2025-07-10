@@ -13,8 +13,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/cobra"
 	ctrl "sigs.k8s.io/controller-runtime"
-	restCfg "sigs.k8s.io/controller-runtime/pkg/client/config"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/openmfp/golang-commons/logger"
 
@@ -48,12 +46,12 @@ var gatewayCmd = &cobra.Command{
 			defer openmfpcontext.Recover(log)
 		}
 
-		ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
+		ctrl.SetLogger(log.Logr())
 
-		// Get Kubernetes restCfg
-		restCfg, err := restCfg.GetConfig()
+		gatewayInstance, err := manager.NewGateway(log, appCfg)
 		if err != nil {
-			log.Fatal().Err(err).Msg("Error getting Kubernetes restCfg, exiting")
+			log.Error().Err(err).Msg("Error creating gateway")
+			return fmt.Errorf("failed to create gateway: %w", err)
 		}
 
 		// Initialize tracing provider
@@ -76,15 +74,14 @@ var gatewayCmd = &cobra.Command{
 			}
 		}()
 
-		// Initialize Manager
-		managerInstance, err := manager.NewManager(log, restCfg, appCfg)
-		if err != nil {
-			log.Error().Err(err).Msg("Error creating manager")
-			return fmt.Errorf("failed to create manager: %w", err)
-		}
+		defer func() {
+			if err := providerShutdown(ctx); err != nil {
+				log.Fatal().Err(err).Msg("failed to shutdown TracerProvider")
+			}
+		}()
 
 		// Set up HTTP handler
-		http.Handle("/", managerInstance)
+		http.Handle("/", gatewayInstance)
 
 		// Replace the /metrics endpoint handler
 		http.Handle("/metrics", promhttp.Handler())
@@ -111,6 +108,10 @@ var gatewayCmd = &cobra.Command{
 		log.Info().Msg("Shutting down HTTP server...")
 		if err := server.Shutdown(shutdownCtx); err != nil {
 			log.Fatal().Err(err).Msg("HTTP server shutdown failed")
+		}
+
+		if err := gatewayInstance.Close(); err != nil {
+			log.Error().Err(err).Msg("Error closing gateway services")
 		}
 
 		// Call the shutdown cleanup

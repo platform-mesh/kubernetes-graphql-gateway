@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/graphql-go/graphql"
+	pkgErrors "github.com/pkg/errors"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -108,7 +109,7 @@ func (r *Service) ListItems(gvk schema.GroupVersionKind, scope v1.ResourceScope)
 
 		if err = r.runtimeClient.List(ctx, list, opts...); err != nil {
 			log.Error().Err(err).Msg("Unable to list objects")
-			return nil, err
+			return nil, pkgErrors.Wrap(err, "unable to list objects")
 		}
 
 		sortBy, err := getStringArg(p.Args, SortByArg, false)

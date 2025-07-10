@@ -15,8 +15,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/openmfp/kubernetes-graphql-gateway/common/mocks"
 	"github.com/openmfp/kubernetes-graphql-gateway/gateway/resolver"
-	"github.com/openmfp/kubernetes-graphql-gateway/gateway/resolver/mocks"
 )
 
 func getResolver(runtimeClientMock client.WithWatch) (*resolver.Service, error) {

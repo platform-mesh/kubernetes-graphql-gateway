@@ -3,83 +3,70 @@ package manager
 import (
 	"fmt"
 	"net/http"
-	"net/url"
-	"path/filepath"
 
-	"github.com/fsnotify/fsnotify"
 	"github.com/openmfp/golang-commons/logger"
+	"github.com/pkg/errors"
 	"k8s.io/client-go/rest"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/kcp"
 
 	appConfig "github.com/openmfp/kubernetes-graphql-gateway/common/config"
-	"github.com/openmfp/kubernetes-graphql-gateway/gateway/resolver"
+	"github.com/openmfp/kubernetes-graphql-gateway/gateway/manager/roundtripper"
+	"github.com/openmfp/kubernetes-graphql-gateway/gateway/manager/targetcluster"
+	"github.com/openmfp/kubernetes-graphql-gateway/gateway/manager/watcher"
 )
 
-type Provider interface {
-	Start()
-	ServeHTTP(w http.ResponseWriter, r *http.Request)
-}
-
+// Service orchestrates the domain-driven architecture with target clusters
 type Service struct {
-	AppCfg  appConfig.Config
-	restCfg *rest.Config
-
-	log      *logger.Logger
-	resolver resolver.Provider
-
-	handlers handlerStore
-	watcher  *fsnotify.Watcher
+	log             *logger.Logger
+	clusterRegistry ClusterManager
+	schemaWatcher   SchemaWatcher
 }
 
-func NewManager(log *logger.Logger, cfg *rest.Config, appCfg appConfig.Config) (*Service, error) {
-	watcher, err := fsnotify.NewWatcher()
-	if err != nil {
-		return nil, err
-	}
-
-	// lets ensure that kcp url points directly to kcp domain
-	u, err := url.Parse(cfg.Host)
-	if err != nil {
-		return nil, err
-	}
-	cfg.Host = fmt.Sprintf("%s://%s", u.Scheme, u.Host)
-
-	cfg.Wrap(func(rt http.RoundTripper) http.RoundTripper {
-		return NewRoundTripper(log, rt, appCfg.Gateway.UsernameClaim, appCfg.Gateway.ShouldImpersonate)
+// NewGateway creates a new domain-driven Gateway instance
+func NewGateway(log *logger.Logger, appCfg appConfig.Config) (*Service, error) {
+	// Create round tripper factory
+	roundTripperFactory := targetcluster.RoundTripperFactory(func(adminRT http.RoundTripper, tlsConfig rest.TLSClientConfig) http.RoundTripper {
+		return roundtripper.New(log, appCfg, adminRT, roundtripper.NewUnauthorizedRoundTripper())
 	})
 
-	runtimeClient, err := kcp.NewClusterAwareClientWithWatch(cfg, client.Options{})
+	clusterRegistry := targetcluster.NewClusterRegistry(log, appCfg, roundTripperFactory)
+
+	schemaWatcher, err := watcher.NewFileWatcher(log, clusterRegistry)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create schema watcher")
 	}
 
-	m := &Service{
-		AppCfg: appCfg,
-		handlers: handlerStore{
-			registry: make(map[string]*graphqlHandler),
-		},
-		log:      log,
-		resolver: resolver.New(log, runtimeClient),
-		restCfg:  cfg,
-		watcher:  watcher,
+	gateway := &Service{
+		log:             log,
+		clusterRegistry: clusterRegistry,
+		schemaWatcher:   schemaWatcher,
 	}
 
-	err = m.watcher.Add(appCfg.OpenApiDefinitionsPath)
-	if err != nil {
-		return nil, err
+	// Initialize schema watcher
+	if err := schemaWatcher.Initialize(appCfg.OpenApiDefinitionsPath); err != nil {
+		return nil, fmt.Errorf("failed to initialize schema watcher: %w", err)
 	}
 
-	files, err := filepath.Glob(filepath.Join(appCfg.OpenApiDefinitionsPath, "*"))
-	if err != nil {
-		return nil, err
-	}
-	for _, file := range files {
-		filename := filepath.Base(file)
-		m.OnFileChanged(filename)
-	}
+	log.Info().
+		Str("definitions_path", appCfg.OpenApiDefinitionsPath).
+		Str("port", appCfg.Gateway.Port).
+		Msg("Gateway initialized successfully")
 
-	m.Start()
+	return gateway, nil
+}
 
-	return m, nil
+// ServeHTTP delegates HTTP requests to the cluster registry
+func (g *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	g.clusterRegistry.ServeHTTP(w, r)
+}
+
+// Close gracefully shuts down the gateway and all its services
+func (g *Service) Close() error {
+	if g.schemaWatcher != nil {
+		g.schemaWatcher.Close()
+	}
+	if g.clusterRegistry != nil {
+		g.clusterRegistry.Close()
+	}
+	g.log.Info().Msg("The Gateway has been closed")
+	return nil
 }

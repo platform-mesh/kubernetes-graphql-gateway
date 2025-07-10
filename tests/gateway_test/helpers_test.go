@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"time"
 )
 
@@ -45,6 +44,10 @@ type GraphQLErrorLocation struct {
 }
 
 func sendRequest(url, query string) (*GraphQLResponse, int, error) {
+	return sendRequestWithAuth(url, query, "")
+}
+
+func sendRequestWithAuth(url, query, token string) (*GraphQLResponse, int, error) {
 	reqBody := map[string]string{
 		"query": query,
 	}
@@ -53,11 +56,25 @@ func sendRequest(url, query string) (*GraphQLResponse, int, error) {
 		return nil, 0, err
 	}
 
-	resp, err := http.Post(url, "application/json", bytes.NewReader(reqBodyBytes))
+	req, err := http.NewRequest("POST", url, bytes.NewReader(reqBodyBytes))
+	if err != nil {
+		return nil, 0, err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	// Add Authorization header if token is provided
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, 0, err
 	}
 	defer resp.Body.Close()
+
 	respBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, 0, err
@@ -70,22 +87,4 @@ func sendRequest(url, query string) (*GraphQLResponse, int, error) {
 	}
 
 	return &bodyResp, resp.StatusCode, err
-}
-
-// writeToFile adds a new file to the watched directory which will trigger schema generation
-func writeToFile(from, to string) error {
-	specContent, err := os.ReadFile(from)
-	if err != nil {
-		return err
-	}
-
-	err = os.WriteFile(to, specContent, 0644)
-	if err != nil {
-		return err
-	}
-
-	// let's give some time to the manager to process the file and create a url
-	time.Sleep(sleepTime)
-
-	return nil
 }

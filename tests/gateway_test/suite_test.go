@@ -1,11 +1,15 @@
 package gateway_test
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -29,6 +33,8 @@ import (
 	"github.com/openmfp/kubernetes-graphql-gateway/gateway/manager"
 	"github.com/openmfp/kubernetes-graphql-gateway/gateway/resolver"
 	"github.com/openmfp/kubernetes-graphql-gateway/gateway/schema"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
 // Initialize the logger for the test suite
@@ -47,14 +53,16 @@ type CommonTestSuite struct {
 	appCfg        appConfig.Config
 	runtimeClient client.WithWatch
 	graphqlSchema graphql.Schema
-	manager       manager.Provider
+	manager       http.Handler
 	server        *httptest.Server
 
 	LocalDevelopment           bool
 	AuthenticateSchemaRequests bool
 
-	staticTokenFile string
-	staticToken     string
+	staticTokenFile    string
+	staticToken        string
+	originalKubeconfig string
+	tempKubeconfigFile string
 }
 
 func TestCommonTestSuite(t *testing.T) {
@@ -66,6 +74,10 @@ func (suite *CommonTestSuite) SetupSuite() {
 }
 
 func (suite *CommonTestSuite) SetupTest() {
+	// Store and clear KUBECONFIG to prevent interference with test environment
+	suite.originalKubeconfig = os.Getenv("KUBECONFIG")
+	os.Unsetenv("KUBECONFIG")
+
 	runtimeScheme := runtime.NewScheme()
 	utilruntime.Must(v1alpha1.AddToScheme(runtimeScheme))
 	utilruntime.Must(appsv1.AddToScheme(runtimeScheme))
@@ -98,6 +110,11 @@ func (suite *CommonTestSuite) SetupTest() {
 	// 3. Set BearerToken in restCfg
 	suite.restCfg.BearerToken = suite.staticToken
 
+	// 4. Create a temporary kubeconfig file from our test restCfg and set KUBECONFIG to it
+	suite.tempKubeconfigFile, err = suite.createTempKubeconfig()
+	require.NoError(suite.T(), err)
+	os.Setenv("KUBECONFIG", suite.tempKubeconfigFile)
+
 	suite.appCfg.OpenApiDefinitionsPath, err = os.MkdirTemp("", "watchedDir")
 	require.NoError(suite.T(), err)
 
@@ -113,7 +130,7 @@ func (suite *CommonTestSuite) SetupTest() {
 	})
 	require.NoError(suite.T(), err)
 
-	definitions, err := manager.ReadDefinitionFromFile("./testdata/kubernetes")
+	definitions, err := readDefinitionFromFile("./testdata/kubernetes")
 	require.NoError(suite.T(), err)
 
 	g, err := schema.New(suite.log, definitions, resolver.New(suite.log, suite.runtimeClient))
@@ -121,7 +138,7 @@ func (suite *CommonTestSuite) SetupTest() {
 
 	suite.graphqlSchema = *g.GetSchema()
 
-	suite.manager, err = manager.NewManager(suite.log, suite.restCfg, suite.appCfg)
+	suite.manager, err = manager.NewGateway(suite.log, suite.appCfg)
 	require.NoError(suite.T(), err)
 
 	suite.server = httptest.NewServer(suite.manager)
@@ -131,7 +148,115 @@ func (suite *CommonTestSuite) TearDownTest() {
 	require.NoError(suite.T(), os.RemoveAll(suite.appCfg.OpenApiDefinitionsPath))
 	require.NoError(suite.T(), suite.testEnv.Stop())
 	suite.server.Close()
+
+	// Clean up the token file
 	if suite.staticTokenFile != "" {
 		os.Remove(suite.staticTokenFile)
 	}
+
+	// Clean up the temporary kubeconfig file
+	if suite.tempKubeconfigFile != "" {
+		os.Remove(suite.tempKubeconfigFile)
+	}
+
+	// Restore original KUBECONFIG if it was set
+	if suite.originalKubeconfig != "" {
+		os.Setenv("KUBECONFIG", suite.originalKubeconfig)
+	}
+}
+
+// createTempKubeconfig creates a temporary kubeconfig file from the test environment's rest.Config
+func (suite *CommonTestSuite) createTempKubeconfig() (string, error) {
+	// Create a temporary kubeconfig file
+	tempKubeconfig, err := os.CreateTemp("", "test-kubeconfig-*.yaml")
+	if err != nil {
+		return "", err
+	}
+	defer tempKubeconfig.Close()
+
+	// Create a kubeconfig structure
+	kubeconfig := &clientcmdapi.Config{
+		Clusters: map[string]*clientcmdapi.Cluster{
+			"test-cluster": {
+				Server:                suite.restCfg.Host,
+				InsecureSkipTLSVerify: suite.restCfg.TLSClientConfig.Insecure,
+			},
+		},
+		Contexts: map[string]*clientcmdapi.Context{
+			"test-context": {
+				Cluster:   "test-cluster",
+				AuthInfo:  "test-user",
+				Namespace: "default",
+			},
+		},
+		AuthInfos: map[string]*clientcmdapi.AuthInfo{
+			"test-user": {
+				Token: suite.restCfg.BearerToken,
+			},
+		},
+		CurrentContext: "test-context",
+	}
+
+	// Add CA data if present
+	if len(suite.restCfg.TLSClientConfig.CAData) > 0 {
+		kubeconfig.Clusters["test-cluster"].CertificateAuthorityData = suite.restCfg.TLSClientConfig.CAData
+		kubeconfig.Clusters["test-cluster"].InsecureSkipTLSVerify = false
+	}
+
+	// Write the kubeconfig to the temporary file
+	err = clientcmd.WriteToFile(*kubeconfig, tempKubeconfig.Name())
+	if err != nil {
+		return "", err
+	}
+
+	return tempKubeconfig.Name(), nil
+}
+
+// writeToFileWithClusterMetadata writes an enhanced schema file with cluster metadata for cluster access mode
+func (suite *CommonTestSuite) writeToFileWithClusterMetadata(from, to string) error {
+	// Read the base schema file (definitions only)
+	definitions, err := readDefinitionFromFile(from)
+	if err != nil {
+		return fmt.Errorf("failed to read base schema: %w", err)
+	}
+
+	// Create schema data with cluster metadata
+	schemaData := map[string]interface{}{
+		"definitions": definitions,
+		"x-cluster-metadata": map[string]interface{}{
+			"host": suite.restCfg.Host,
+			"auth": map[string]interface{}{
+				"type":  "token",
+				"token": base64.StdEncoding.EncodeToString([]byte(suite.staticToken)),
+			},
+		},
+	}
+
+	// Add CA data if present
+	if len(suite.restCfg.TLSClientConfig.CAData) > 0 {
+		schemaData["x-cluster-metadata"].(map[string]interface{})["ca"] = map[string]interface{}{
+			"data": base64.StdEncoding.EncodeToString(suite.restCfg.TLSClientConfig.CAData),
+		}
+	}
+
+	// Write the enhanced schema file
+	data, err := json.Marshal(schemaData)
+	if err != nil {
+		return fmt.Errorf("failed to marshal schema data: %w", err)
+	}
+
+	err = os.WriteFile(to, data, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write schema file: %w", err)
+	}
+
+	// let's give some time to the manager to process the file and create a url
+	time.Sleep(sleepTime)
+
+	return nil
+}
+
+// sendAuthenticatedRequest is a helper method to send authenticated GraphQL requests using the test token
+func (suite *CommonTestSuite) sendAuthenticatedRequest(url, query string) (*GraphQLResponse, int, error) {
+	return sendRequestWithAuth(url, query, suite.staticToken)
 }

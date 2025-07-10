@@ -3,13 +3,14 @@ package gateway_test
 import (
 	"context"
 	"fmt"
-	"github.com/graphql-go/graphql"
-	"github.com/stretchr/testify/require"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"net/http"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/graphql-go/graphql"
+	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/openmfp/account-operator/api/v1alpha1"
 )
@@ -19,7 +20,7 @@ func (suite *CommonTestSuite) TestSortByListItems() {
 	workspaceName := "myWorkspace"
 	url := fmt.Sprintf("%s/%s/graphql", suite.server.URL, workspaceName)
 
-	require.NoError(suite.T(), writeToFile(
+	require.NoError(suite.T(), suite.writeToFileWithClusterMetadata(
 		filepath.Join("testdata", "kubernetes"),
 		filepath.Join(suite.appCfg.OpenApiDefinitionsPath, workspaceName),
 	))
@@ -27,7 +28,7 @@ func (suite *CommonTestSuite) TestSortByListItems() {
 	suite.createAccountsForSorting(context.Background())
 
 	suite.T().Run("accounts_sorted_by_default", func(t *testing.T) {
-		listResp, statusCode, err := sendRequest(url, listAccountsQuery(false))
+		listResp, statusCode, err := suite.sendAuthenticatedRequest(url, listAccountsQuery(false))
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, statusCode, "Expected status code 200")
 		require.Nil(t, listResp.Errors, "GraphQL errors: %v", listResp.Errors)
@@ -46,7 +47,7 @@ func (suite *CommonTestSuite) TestSortByListItems() {
 
 	// Test sorted case
 	suite.T().Run("accounts_sorted_by_displayName", func(t *testing.T) {
-		listResp, statusCode, err := sendRequest(url, listAccountsQuery(true))
+		listResp, statusCode, err := suite.sendAuthenticatedRequest(url, listAccountsQuery(true))
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, statusCode, "Expected status code 200")
 		require.Nil(t, listResp.Errors, "GraphQL errors: %v", listResp.Errors)

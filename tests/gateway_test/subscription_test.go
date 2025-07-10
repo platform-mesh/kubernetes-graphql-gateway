@@ -2,12 +2,20 @@ package gateway_test
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/graphql-go/graphql"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -15,6 +23,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/openmfp/kubernetes-graphql-gateway/gateway/manager"
 )
 
 func (suite *CommonTestSuite) TestSchemaSubscribe() {
@@ -149,6 +159,113 @@ func (suite *CommonTestSuite) TestSchemaSubscribe() {
 			wg.Wait()
 			if eventsReceived > tt.expectedEvents {
 				t.Errorf("Received more events than expected. Expected: %d, Got: %d", tt.expectedEvents, eventsReceived)
+			}
+		})
+	}
+}
+
+// TestMultiClusterHTTPSubscription tests the HTTP-level subscription functionality
+// specifically for the multi-cluster gateway architecture.
+// This test covers the HandleSubscription method that was missing from coverage.
+func (suite *CommonTestSuite) TestMultiClusterHTTPSubscription() {
+	// Create a temporary schema file to enable multi-cluster mode
+	tempDir, err := os.MkdirTemp("", "test-cluster-schema")
+	require.NoError(suite.T(), err)
+	defer os.RemoveAll(tempDir)
+
+	// Read the test definitions and create a schema file
+	definitions, err := readDefinitionFromFile("./testdata/kubernetes")
+	require.NoError(suite.T(), err)
+
+	schemaData := map[string]interface{}{
+		"definitions": definitions,
+		"x-cluster-metadata": map[string]interface{}{
+			"host": suite.restCfg.Host,
+			"auth": map[string]interface{}{
+				"type":  "token",
+				"token": base64.StdEncoding.EncodeToString([]byte(suite.staticToken)),
+			},
+		},
+	}
+
+	if len(suite.restCfg.TLSClientConfig.CAData) > 0 {
+		schemaData["x-cluster-metadata"].(map[string]interface{})["ca"] = map[string]interface{}{
+			"data": base64.StdEncoding.EncodeToString(suite.restCfg.TLSClientConfig.CAData),
+		}
+	}
+
+	schemaFile := filepath.Join(tempDir, "test-cluster.json")
+	data, err := json.Marshal(schemaData)
+	require.NoError(suite.T(), err)
+	err = os.WriteFile(schemaFile, data, 0644)
+	require.NoError(suite.T(), err)
+
+	// Create a multi-cluster manager
+	appCfg := suite.appCfg
+	appCfg.OpenApiDefinitionsPath = tempDir
+
+	multiClusterManager, err := manager.NewGateway(suite.log, appCfg)
+	require.NoError(suite.T(), err)
+
+	// Start a test server with the multi-cluster manager
+	testServer := httptest.NewServer(multiClusterManager)
+	defer testServer.Close()
+
+	// Wait a bit for the file watcher to load the cluster
+	time.Sleep(200 * time.Millisecond)
+
+	tests := []struct {
+		name           string
+		acceptHeader   string
+		expectedStatus int
+		expectSSE      bool
+	}{
+		{
+			name:           "subscription_with_sse_header",
+			acceptHeader:   "text/event-stream",
+			expectedStatus: http.StatusOK, // HandleSubscription properly handles the request
+			expectSSE:      true,
+		},
+		{
+			name:           "normal_query_without_sse_header",
+			acceptHeader:   "application/json",
+			expectedStatus: http.StatusOK,
+			expectSSE:      false,
+		},
+	}
+
+	for _, tt := range tests {
+		suite.T().Run(tt.name, func(t *testing.T) {
+			// Create request to multi-cluster endpoint
+			reqBody := `{"query": "subscription { apps_deployments(namespace: \"default\") { metadata { name } } }"}`
+			req, err := http.NewRequest("POST", testServer.URL+"/test-cluster/graphql", strings.NewReader(reqBody))
+			require.NoError(t, err)
+
+			req.Header.Set("Accept", tt.acceptHeader)
+			req.Header.Set("Content-Type", "application/json")
+
+			if suite.staticToken != "" {
+				req.Header.Set("Authorization", "Bearer "+suite.staticToken)
+			}
+
+			// Create client with timeout for SSE requests
+			client := &http.Client{
+				Timeout: 3 * time.Second,
+			}
+
+			// Make request
+			resp, err := client.Do(req)
+			require.NoError(t, err)
+			defer resp.Body.Close()
+
+			// Check status code
+			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
+
+			// Check content type for SSE - this is the key test that proves HandleSubscription was called
+			if tt.expectSSE {
+				assert.Equal(t, "text/event-stream", resp.Header.Get("Content-Type"))
+				assert.Equal(t, "no-cache", resp.Header.Get("Cache-Control"))
+				assert.Equal(t, "keep-alive", resp.Header.Get("Connection"))
 			}
 		})
 	}

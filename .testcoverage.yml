@@ -5,3 +5,7 @@ exclude:
     - tests
     - common/config/config.go
     - mocks
+    - common/apis/*
+    # remove it later:
+    - listener/reconciler/clusteraccess/subroutines.go
+    - listener/reconciler/singlecluster

@@ -14,32 +14,33 @@ func (suite *CommonTestSuite) TestWorkspaceRemove() {
 	workspaceName := "myWorkspace"
 	url := fmt.Sprintf("%s/%s/graphql", suite.server.URL, workspaceName)
 
-	require.NoError(suite.T(), writeToFile(
+	require.NoError(suite.T(), suite.writeToFileWithClusterMetadata(
 		filepath.Join("testdata", "kubernetes"),
 		filepath.Join(suite.appCfg.OpenApiDefinitionsPath, workspaceName),
 	))
 
-	// Create the Pod
-	_, statusCode, err := sendRequest(url, createPodMutation())
+	// first request should be handled successfully
+	resp, statusCode, err := sendRequest(url, getPodQuery())
 	require.NoError(suite.T(), err)
 	require.Equal(suite.T(), http.StatusOK, statusCode, "Expected status code 200")
+	require.NotNil(suite.T(), resp.Data)
 
 	err = os.Remove(filepath.Join(suite.appCfg.OpenApiDefinitionsPath, workspaceName))
 	require.NoError(suite.T(), err)
 
-	// Wait until the handler is removed
+	// let's give some time to the manager to process the file and handle the removal
 	time.Sleep(sleepTime)
 
-	// Attempt to access the URL again
-	_, statusCode, _ = sendRequest(url, createPodMutation())
-	require.Equal(suite.T(), http.StatusNotFound, statusCode, "Expected StatusNotFound after handler is removed")
+	// second request should fail since the workspace was removed
+	_, statusCode, _ = sendRequest(url, getPodQuery())
+	require.Equal(suite.T(), http.StatusNotFound, statusCode, "Expected status code 404")
 }
 
 func (suite *CommonTestSuite) TestWorkspaceRename() {
 	workspaceName := "myWorkspace"
 	url := fmt.Sprintf("%s/%s/graphql", suite.server.URL, workspaceName)
 
-	require.NoError(suite.T(), writeToFile(
+	require.NoError(suite.T(), suite.writeToFileWithClusterMetadata(
 		filepath.Join("testdata", "kubernetes"),
 		filepath.Join(suite.appCfg.OpenApiDefinitionsPath, workspaceName),
 	))
