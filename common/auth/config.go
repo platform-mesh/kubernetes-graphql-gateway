@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 
+	authv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
+
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -254,9 +256,49 @@ func ConfigureAuthentication(config *rest.Config, auth *gatewayv1alpha1.AuthConf
 		return nil
 	}
 
-	if auth.ServiceAccount != "" {
-		// TODO: Implement service account-based authentication
-		return errors.New("service account authentication not yet implemented")
+	if auth.ServiceAccount != nil {
+		var expirationSeconds int64
+		if auth.ServiceAccount.TokenExpiration != nil {
+			// If TokenExpiration is provided, use its value
+			expirationSeconds = int64(auth.ServiceAccount.TokenExpiration.Duration.Seconds())
+		} else {
+			// If TokenExpiration is nil, use the desired default (3600 seconds = 1 hour)
+			expirationSeconds = 3600
+			fmt.Println("Warning: auth.ServiceAccount.TokenExpiration is nil, defaulting to 3600 seconds.")
+		}
+
+		// Build the TokenRequest object
+		tokenRequest := &authv1.TokenRequest{
+			Spec: authv1.TokenRequestSpec{
+				Audiences: auth.ServiceAccount.Audience,
+				// Optionally set ExpirationSeconds, BoundObjectRef, etc.
+				ExpirationSeconds: &expirationSeconds,
+			},
+		}
+
+		// Get the service account token using the Kubernetes API
+		sa := &corev1.ServiceAccount{}
+		err := k8sClient.Get(ctx, types.NamespacedName{
+			Name:      auth.ServiceAccount.Name,
+			Namespace: auth.ServiceAccount.Namespace,
+		}, sa)
+		if err != nil {
+			return errors.Join(errors.New("failed to get service account"), err)
+		}
+
+		err = k8sClient.SubResource("token").Create(ctx, sa, tokenRequest)
+		if err != nil {
+			return errors.Join(errors.New("failed to create token request for service account"), err)
+		}
+
+		if tokenRequest.Status.Token == "" {
+			return errors.New("received empty token from TokenRequest API")
+		}
+
+		config.BearerToken = tokenRequest.Status.Token
+
+		fmt.Println("Token:", config.BearerToken)
+		return nil
 	}
 
 	// No authentication configured - this might work for some clusters

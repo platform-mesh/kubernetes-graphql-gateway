@@ -170,18 +170,6 @@ clusters:
 			wantErr: false,
 		},
 		{
-			name: "service_account_auth_not_implemented",
-			auth: &gatewayv1alpha1.AuthConfig{
-				ServiceAccount: "test-sa",
-			},
-			mockSetup: func(m *mocks.MockClient) {},
-			wantConfig: func(config *rest.Config) *rest.Config {
-				return config
-			},
-			wantErr:     true,
-			errContains: "service account authentication not yet implemented",
-		},
-		{
 			name: "secret_not_found",
 			auth: &gatewayv1alpha1.AuthConfig{
 				SecretRef: &gatewayv1alpha1.SecretRef{

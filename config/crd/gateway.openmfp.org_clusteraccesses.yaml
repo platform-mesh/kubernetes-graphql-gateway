@@ -82,7 +82,18 @@ spec:
                   serviceAccount:
                     description: ServiceAccount is the name of the service account
                       to use
-                    type: string
+                    properties:
+                      audience:
+                        items:
+                          type: string
+                        type: array
+                      name:
+                        type: string
+                      namespace:
+                        type: string
+                      token_expiration:
+                        type: string
+                    type: object
                 type: object
               ca:
                 description: CA configuration for the cluster
