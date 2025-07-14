@@ -296,8 +296,6 @@ func ConfigureAuthentication(config *rest.Config, auth *gatewayv1alpha1.AuthConf
 		}
 
 		config.BearerToken = tokenRequest.Status.Token
-
-		fmt.Println("Token:", config.BearerToken)
 		return nil
 	}
 
