@@ -82,6 +82,12 @@ var gatewayCmd = &cobra.Command{
 
 		// Set up HTTP handler
 		http.Handle("/", gatewayInstance)
+		http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		})
+		http.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		})
 
 		// Replace the /metrics endpoint handler
 		http.Handle("/metrics", promhttp.Handler())
