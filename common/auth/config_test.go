@@ -1,4 +1,4 @@
-package clusteraccess_test
+package auth
 
 import (
 	"context"
@@ -15,7 +15,6 @@ import (
 
 	gatewayv1alpha1 "github.com/openmfp/kubernetes-graphql-gateway/common/apis/v1alpha1"
 	"github.com/openmfp/kubernetes-graphql-gateway/common/mocks"
-	"github.com/openmfp/kubernetes-graphql-gateway/listener/reconciler/clusteraccess"
 )
 
 func TestConfigureAuthentication(t *testing.T) {
@@ -257,7 +256,7 @@ clusters:
 				},
 			}
 
-			err := clusteraccess.ConfigureAuthentication(config, tt.auth, mockClient)
+			err := ConfigureAuthentication(t.Context(), config, tt.auth, mockClient)
 
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -366,7 +365,7 @@ func TestExtractAuthFromKubeconfig(t *testing.T) {
 				},
 			}
 
-			err := clusteraccess.ExtractAuthFromKubeconfig(config, tt.authInfo)
+			err := ExtractAuthFromKubeconfig(config, tt.authInfo)
 
 			if tt.wantErr {
 				assert.Error(t, err)

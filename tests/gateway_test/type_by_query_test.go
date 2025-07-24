@@ -1,7 +1,6 @@
 package gateway_test
 
 import (
-	"context"
 	"encoding/json"
 	"os"
 	"testing"
@@ -63,7 +62,7 @@ func TestTypeByCategory(t *testing.T) {
 	require.NoError(t, err)
 
 	res := graphql.Do(graphql.Params{
-		Context:       context.Background(),
+		Context:       t.Context(),
 		Schema:        *g.GetSchema(),
 		RequestString: typeByCategoryQuery(),
 	})

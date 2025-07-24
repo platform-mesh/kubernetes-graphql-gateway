@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"io/fs"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	kcpcore "github.com/kcp-dev/kcp/sdk/apis/core/v1alpha1"
@@ -25,6 +28,42 @@ import (
 )
 
 func TestAPIBindingReconciler_Reconcile(t *testing.T) {
+	// Set up a minimal kubeconfig for tests to avoid reading complex system kubeconfig
+	tempDir, err := os.MkdirTemp("", "kcp-test-")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	kubeconfigContent := `apiVersion: v1
+kind: Config
+current-context: test
+contexts:
+- context: {cluster: test, user: test}
+  name: test
+clusters:
+- cluster: {server: 'https://test.example.com'}
+  name: test
+users:
+- name: test
+  user: {token: test-token}
+`
+	kubeconfigPath := filepath.Join(tempDir, "config")
+	err = os.WriteFile(kubeconfigPath, []byte(kubeconfigContent), 0600)
+	if err != nil {
+		t.Fatalf("Failed to write kubeconfig: %v", err)
+	}
+
+	originalKubeconfig := os.Getenv("KUBECONFIG")
+	os.Setenv("KUBECONFIG", kubeconfigPath)
+	defer func() {
+		if originalKubeconfig != "" {
+			os.Setenv("KUBECONFIG", originalKubeconfig)
+		} else {
+			os.Unsetenv("KUBECONFIG")
+		}
+	}()
+
 	mockLogger, _ := logger.New(logger.DefaultConfig())
 
 	tests := []struct {
@@ -236,8 +275,13 @@ func TestAPIBindingReconciler_Reconcile(t *testing.T) {
 				mar.EXPECT().Resolve(mockDiscoveryClient, mockRestMapper).
 					Return(schemaJSON, nil).Once()
 
-				mio.EXPECT().Write(schemaJSON, "root:org:new-cluster").
-					Return(nil).Once()
+				// Expect schema with KCP metadata injected
+				mio.EXPECT().Write(mock.MatchedBy(func(data []byte) bool {
+					return strings.Contains(string(data), `"schema":"test"`) &&
+						strings.Contains(string(data), `"x-cluster-metadata"`) &&
+						strings.Contains(string(data), `"host":"https://test.example.com"`) &&
+						strings.Contains(string(data), `"path":"root:org:new-cluster"`)
+				}), "root:org:new-cluster").Return(nil).Once()
 			},
 			wantResult: ctrl.Result{},
 			wantErr:    false,
@@ -278,11 +322,10 @@ func TestAPIBindingReconciler_Reconcile(t *testing.T) {
 				mdf.EXPECT().RestMapperForCluster("root:org:schema-error-cluster").
 					Return(mockRestMapper, nil).Once()
 
-				mio.EXPECT().Read("root:org:schema-error-cluster").
-					Return(nil, fs.ErrNotExist).Once()
-
 				mar.EXPECT().Resolve(mockDiscoveryClient, mockRestMapper).
 					Return(nil, errors.New("schema resolution failed")).Once()
+
+				// No Read call expected since schema generation fails early
 			},
 			wantResult:  ctrl.Result{},
 			wantErr:     true,
@@ -331,8 +374,11 @@ func TestAPIBindingReconciler_Reconcile(t *testing.T) {
 				mar.EXPECT().Resolve(mockDiscoveryClient, mockRestMapper).
 					Return(schemaJSON, nil).Once()
 
-				mio.EXPECT().Write(schemaJSON, "root:org:write-error-cluster").
-					Return(errors.New("write failed")).Once()
+				// Expect schema with KCP metadata injected
+				mio.EXPECT().Write(mock.MatchedBy(func(data []byte) bool {
+					return strings.Contains(string(data), `"schema":"test"`) &&
+						strings.Contains(string(data), `"x-cluster-metadata"`)
+				}), "root:org:write-error-cluster").Return(errors.New("write failed")).Once()
 			},
 			wantResult:  ctrl.Result{},
 			wantErr:     true,
@@ -373,6 +419,11 @@ func TestAPIBindingReconciler_Reconcile(t *testing.T) {
 
 				mdf.EXPECT().RestMapperForCluster("root:org:read-error-cluster").
 					Return(mockRestMapper, nil).Once()
+
+				// Schema generation happens before read, so we need this expectation
+				schemaJSON := []byte(`{"schema": "test"}`)
+				mar.EXPECT().Resolve(mockDiscoveryClient, mockRestMapper).
+					Return(schemaJSON, nil).Once()
 
 				mio.EXPECT().Read("root:org:read-error-cluster").
 					Return(nil, errors.New("read failed")).Once()
@@ -425,7 +476,12 @@ func TestAPIBindingReconciler_Reconcile(t *testing.T) {
 				mar.EXPECT().Resolve(mockDiscoveryClient, mockRestMapper).
 					Return(savedJSON, nil).Once()
 
-				// No Write call expected since schema is unchanged
+				// Write call expected since metadata injection makes the schemas different
+				mio.EXPECT().Write(mock.MatchedBy(func(data []byte) bool {
+					return strings.Contains(string(data), `"schema":"existing"`) &&
+						strings.Contains(string(data), `"x-cluster-metadata"`) &&
+						strings.Contains(string(data), `"path":"root:org:unchanged-cluster"`)
+				}), "root:org:unchanged-cluster").Return(nil).Once()
 			},
 			wantResult: ctrl.Result{},
 			wantErr:    false,
@@ -474,8 +530,12 @@ func TestAPIBindingReconciler_Reconcile(t *testing.T) {
 				mar.EXPECT().Resolve(mockDiscoveryClient, mockRestMapper).
 					Return(newJSON, nil).Once()
 
-				mio.EXPECT().Write(newJSON, "root:org:changed-cluster").
-					Return(nil).Once()
+				// Expect schema with KCP metadata injected
+				mio.EXPECT().Write(mock.MatchedBy(func(data []byte) bool {
+					return strings.Contains(string(data), `"schema":"new"`) &&
+						strings.Contains(string(data), `"x-cluster-metadata"`) &&
+						strings.Contains(string(data), `"path":"root:org:changed-cluster"`)
+				}), "root:org:changed-cluster").Return(nil).Once()
 			},
 			wantResult: ctrl.Result{},
 			wantErr:    false,
@@ -509,7 +569,7 @@ func TestAPIBindingReconciler_Reconcile(t *testing.T) {
 			// 2. Use integration tests for the full flow
 			// 3. Create a wrapper that can be mocked
 
-			got, err := reconciler.Reconcile(context.Background(), tt.req)
+			got, err := reconciler.Reconcile(t.Context(), tt.req)
 
 			if tt.wantErr {
 				assert.Error(t, err)

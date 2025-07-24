@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/go-openapi/spec"
 	"github.com/openmfp/golang-commons/logger"
 	"k8s.io/client-go/rest"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/kcp"
 
@@ -17,7 +17,6 @@ import (
 	appConfig "github.com/openmfp/kubernetes-graphql-gateway/common/config"
 	"github.com/openmfp/kubernetes-graphql-gateway/gateway/resolver"
 	"github.com/openmfp/kubernetes-graphql-gateway/gateway/schema"
-	kcputil "github.com/openmfp/kubernetes-graphql-gateway/listener/reconciler/kcp"
 )
 
 // FileData represents the data extracted from a schema file
@@ -50,6 +49,7 @@ type CAMetadata struct {
 
 // TargetCluster represents a single target Kubernetes cluster
 type TargetCluster struct {
+	appCfg        appConfig.Config
 	name          string
 	client        client.WithWatch
 	restCfg       *rest.Config
@@ -72,8 +72,9 @@ func NewTargetCluster(
 	}
 
 	cluster := &TargetCluster{
-		name: name,
-		log:  log,
+		appCfg: appCfg,
+		name:   name,
+		log:    log,
 	}
 
 	// Connect to cluster - use metadata if available, otherwise fall back to standard config
@@ -96,61 +97,38 @@ func NewTargetCluster(
 
 // connect establishes connection to the target cluster
 func (tc *TargetCluster) connect(appCfg appConfig.Config, metadata *ClusterMetadata, roundTripperFactory func(http.RoundTripper, rest.TLSClientConfig) http.RoundTripper) error {
-	var config *rest.Config
-	var err error
-
-	// In multicluster mode, we MUST have metadata to connect
-	if appCfg.EnableKcp {
-		tc.log.Info().
-			Str("cluster", tc.name).
-			Bool("enableKcp", appCfg.EnableKcp).
-			Bool("localDevelopment", appCfg.LocalDevelopment).
-			Msg("Using standard config for connection (single cluster, KCP mode, or local development)")
-
-		config, err = ctrl.GetConfig()
-		if err != nil {
-			return fmt.Errorf("failed to get Kubernetes config: %w", err)
-		}
-
-		// For KCP mode, modify the config to point to the specific workspace
-		config, err = kcputil.ConfigForKCPCluster(tc.name, config)
-		if err != nil {
-			return fmt.Errorf("failed to configure KCP workspace: %w", err)
-		}
-	} else { // clusterAccess path
-		if metadata == nil {
-			return fmt.Errorf("multicluster mode requires cluster metadata in schema file")
-		}
-
-		tc.log.Info().
-			Str("cluster", tc.name).
-			Str("host", metadata.Host).
-			Msg("Using cluster metadata for connection (multicluster mode)")
-
-		config, err = buildConfigFromMetadata(metadata, tc.log)
-		if err != nil {
-			return fmt.Errorf("failed to build config from metadata: %w", err)
-		}
+	// All clusters now use metadata from schema files to get kubeconfig
+	if metadata == nil {
+		return fmt.Errorf("cluster %s requires cluster metadata in schema file", tc.name)
 	}
 
-	// Apply round tripper
+	tc.log.Info().
+		Str("cluster", tc.name).
+		Str("host", metadata.Host).
+		Bool("isVirtualWorkspace", strings.HasPrefix(tc.name, tc.appCfg.Url.VirtualWorkspacePrefix)).
+		Msg("Using cluster metadata from schema file for connection")
+
+	var err error
+	tc.restCfg, err = buildConfigFromMetadata(metadata, tc.log)
+	if err != nil {
+		return fmt.Errorf("failed to build config from metadata: %w", err)
+	}
+
 	if roundTripperFactory != nil {
-		config.Wrap(func(rt http.RoundTripper) http.RoundTripper {
-			return roundTripperFactory(rt, config.TLSClientConfig)
+		tc.restCfg.Wrap(func(rt http.RoundTripper) http.RoundTripper {
+			return roundTripperFactory(rt, tc.restCfg.TLSClientConfig)
 		})
 	}
 
 	// Create client - use KCP-aware client only for KCP mode, standard client otherwise
 	if appCfg.EnableKcp {
-		tc.client, err = kcp.NewClusterAwareClientWithWatch(config, client.Options{})
+		tc.client, err = kcp.NewClusterAwareClientWithWatch(tc.restCfg, client.Options{})
 	} else {
-		tc.client, err = client.NewWithWatch(config, client.Options{})
+		tc.client, err = client.NewWithWatch(tc.restCfg, client.Options{})
 	}
 	if err != nil {
 		return fmt.Errorf("failed to create cluster client: %w", err)
 	}
-
-	tc.restCfg = config
 
 	return nil
 }
@@ -222,13 +200,20 @@ func (tc *TargetCluster) GetConfig() *rest.Config {
 
 // GetEndpoint returns the HTTP endpoint for this cluster's GraphQL API
 func (tc *TargetCluster) GetEndpoint(appCfg appConfig.Config) string {
+	// Build the path with virtual workspace suffix if needed
+	// tc.name format:
+	// - For virtual workspaces: "virtual-workspace/{name}"
+	// - For regular workspaces: "{workspace-name}"
 	path := tc.name
-
-	if appCfg.LocalDevelopment {
-		return fmt.Sprintf("http://localhost:%s/%s/graphql", appCfg.Gateway.Port, path)
+	if strings.HasPrefix(path, appCfg.Url.VirtualWorkspacePrefix) {
+		path = fmt.Sprintf("%s/%s", path, appCfg.Url.DefaultKcpWorkspace)
 	}
 
-	return fmt.Sprintf("/%s/graphql", path)
+	if appCfg.LocalDevelopment {
+		return fmt.Sprintf("http://localhost:%s/%s/%s", appCfg.Gateway.Port, path, appCfg.Url.GraphqlSuffix)
+	}
+
+	return fmt.Sprintf("/%s/%s", path, appCfg.Url.GraphqlSuffix)
 }
 
 // ServeHTTP handles HTTP requests for this cluster

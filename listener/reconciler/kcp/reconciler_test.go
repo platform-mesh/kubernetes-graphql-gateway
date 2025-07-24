@@ -1,7 +1,6 @@
 package kcp_test
 
 import (
-	"context"
 	"testing"
 
 	kcpapis "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
@@ -133,7 +132,7 @@ func TestKCPReconciler_Reconcile(t *testing.T) {
 	}
 
 	// The Reconcile method should be a no-op and always return empty result with no error
-	result, err := reconciler.Reconcile(context.Background(), req)
+	result, err := reconciler.Reconcile(t.Context(), req)
 
 	assert.NoError(t, err)
 	assert.Equal(t, ctrl.Result{}, result)

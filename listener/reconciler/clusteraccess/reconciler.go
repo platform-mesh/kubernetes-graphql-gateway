@@ -42,7 +42,7 @@ func CreateMultiClusterReconciler(
 	log.Info().Msg("Using multi-cluster reconciler")
 
 	// Check if ClusterAccess CRD is available
-	caStatus, err := CheckClusterAccessCRDStatus(opts.Client, log)
+	caStatus, err := CheckClusterAccessCRDStatus(context.Background(), opts.Client, log)
 	if err != nil {
 		if errors.Is(err, ErrCRDNotRegistered) {
 			log.Error().Msg("Multi-cluster mode enabled but ClusterAccess CRD not registered")
@@ -71,8 +71,7 @@ func CreateMultiClusterReconciler(
 }
 
 // CheckClusterAccessCRDStatus checks the availability and usage of ClusterAccess CRD
-func CheckClusterAccessCRDStatus(k8sClient client.Client, log *logger.Logger) (CRDStatus, error) {
-	ctx := context.Background()
+func CheckClusterAccessCRDStatus(ctx context.Context, k8sClient client.Client, log *logger.Logger) (CRDStatus, error) {
 	clusterAccessList := &gatewayv1alpha1.ClusterAccessList{}
 
 	err := k8sClient.List(ctx, clusterAccessList)

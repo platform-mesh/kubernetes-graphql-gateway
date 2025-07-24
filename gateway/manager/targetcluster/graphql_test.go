@@ -14,6 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/kontext"
 
 	"github.com/openmfp/golang-commons/logger"
+	"github.com/openmfp/kubernetes-graphql-gateway/common"
 	appConfig "github.com/openmfp/kubernetes-graphql-gateway/common/config"
 	"github.com/openmfp/kubernetes-graphql-gateway/gateway/manager/roundtripper"
 	"github.com/openmfp/kubernetes-graphql-gateway/gateway/manager/targetcluster"
@@ -313,7 +314,7 @@ func TestHandleSubscription_Headers(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 
 	// Use context with timeout to prevent hanging
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), common.ShortTimeout)
 	defer cancel()
 	req = req.WithContext(ctx)
 
@@ -377,7 +378,7 @@ func TestHandleSubscription_SubscriptionLoop(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 
 	// Use context with timeout to prevent hanging
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), common.ShortTimeout)
 	defer cancel()
 	req = req.WithContext(ctx)
 

@@ -107,6 +107,7 @@ func TestRoundTripper_DiscoveryRequests(t *testing.T) {
 		path        string
 		isDiscovery bool
 	}{
+		// Basic discovery endpoints
 		{
 			name:        "api_root_discovery",
 			method:      "GET",
@@ -120,15 +121,129 @@ func TestRoundTripper_DiscoveryRequests(t *testing.T) {
 			isDiscovery: true,
 		},
 		{
+			name:        "api_version_discovery",
+			method:      "GET",
+			path:        "/api/v1",
+			isDiscovery: true,
+		},
+		{
+			name:        "apis_group_discovery",
+			method:      "GET",
+			path:        "/apis/apps",
+			isDiscovery: true,
+		},
+		{
+			name:        "apis_group_version_discovery",
+			method:      "GET",
+			path:        "/apis/apps/v1",
+			isDiscovery: true,
+		},
+
+		// KCP workspace prefixed discovery endpoints
+		{
+			name:        "kcp_api_root_discovery",
+			method:      "GET",
+			path:        "/clusters/workspace1/api",
+			isDiscovery: true,
+		},
+		{
+			name:        "kcp_apis_root_discovery",
+			method:      "GET",
+			path:        "/clusters/workspace1/apis",
+			isDiscovery: true,
+		},
+		{
+			name:        "kcp_api_version_discovery",
+			method:      "GET",
+			path:        "/clusters/workspace1/api/v1",
+			isDiscovery: true,
+		},
+		{
+			name:        "kcp_apis_group_discovery",
+			method:      "GET",
+			path:        "/clusters/workspace1/apis/apps",
+			isDiscovery: true,
+		},
+		{
+			name:        "kcp_apis_group_version_discovery",
+			method:      "GET",
+			path:        "/clusters/workspace1/apis/apps/v1",
+			isDiscovery: true,
+		},
+
+		// Virtual workspace prefixed discovery endpoints
+		{
+			name:        "virtual_api_root_discovery",
+			method:      "GET",
+			path:        "/services/myservice/clusters/workspace1/api",
+			isDiscovery: true,
+		},
+		{
+			name:        "virtual_apis_root_discovery",
+			method:      "GET",
+			path:        "/services/myservice/clusters/workspace1/apis",
+			isDiscovery: true,
+		},
+		{
+			name:        "virtual_api_version_discovery",
+			method:      "GET",
+			path:        "/services/myservice/clusters/workspace1/api/v1",
+			isDiscovery: true,
+		},
+		{
+			name:        "virtual_apis_group_discovery",
+			method:      "GET",
+			path:        "/services/myservice/clusters/workspace1/apis/apps",
+			isDiscovery: true,
+		},
+		{
+			name:        "virtual_apis_group_version_discovery",
+			method:      "GET",
+			path:        "/services/myservice/clusters/workspace1/apis/apps/v1",
+			isDiscovery: true,
+		},
+
+		// Non-discovery requests
+		{
 			name:        "resource_request",
 			method:      "GET",
 			path:        "/api/v1/pods",
 			isDiscovery: false,
 		},
 		{
+			name:        "kcp_resource_request",
+			method:      "GET",
+			path:        "/clusters/workspace1/api/v1/pods",
+			isDiscovery: false,
+		},
+		{
+			name:        "virtual_resource_request",
+			method:      "GET",
+			path:        "/services/myservice/clusters/workspace1/api/v1/pods",
+			isDiscovery: false,
+		},
+		{
 			name:        "post_request",
 			method:      "POST",
 			path:        "/api/v1/pods",
+			isDiscovery: false,
+		},
+		{
+			name:        "empty_path",
+			method:      "GET",
+			path:        "/",
+			isDiscovery: false,
+		},
+		{
+			name:        "invalid_path",
+			method:      "GET",
+			path:        "/invalid",
+			isDiscovery: false,
+		},
+		{
+			name:        "too_many_parts",
+			method:      "GET",
+			path:        "/apis/apps/v1/deployments",
 			isDiscovery: false,
 		},
 	}

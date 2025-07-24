@@ -1,18 +1,12 @@
 package clusteraccess_test
 
 import (
-	"context"
-	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	corev1 "k8s.io/api/core/v1"
+	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/openmfp/golang-commons/logger"
 	gatewayv1alpha1 "github.com/openmfp/kubernetes-graphql-gateway/common/apis/v1alpha1"
@@ -49,196 +43,172 @@ func TestInjectClusterMetadata(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:       "metadata_injection_with_CA_secret",
+			name:       "metadata_injection_with_custom_path",
 			schemaJSON: []byte(`{"openapi": "3.0.0", "info": {"title": "Test"}}`),
 			clusterAccess: gatewayv1alpha1.ClusterAccess{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-cluster"},
 				Spec: gatewayv1alpha1.ClusterAccessSpec{
 					Host: "https://test-cluster.example.com",
-					CA: &gatewayv1alpha1.CAConfig{
-						SecretRef: &gatewayv1alpha1.SecretRef{
-							Name:      "ca-secret",
-							Namespace: "test-ns",
-							Key:       "ca.crt",
-						},
-					},
+					Path: "custom-path",
 				},
 			},
-			mockSetup: func(m *mocks.MockClient) {
-				secret := &corev1.Secret{
-					Data: map[string][]byte{
-						"ca.crt": []byte("test-ca-data"),
-					},
-				}
-				m.EXPECT().Get(mock.Anything, types.NamespacedName{Name: "ca-secret", Namespace: "test-ns"}, mock.AnythingOfType("*v1.Secret")).
-					RunAndReturn(func(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-						secretObj := obj.(*corev1.Secret)
-						*secretObj = *secret
-						return nil
-					}).Once()
-			},
+			mockSetup: func(m *mocks.MockClient) {},
 			wantMetadata: map[string]interface{}{
 				"host": "https://test-cluster.example.com",
-				"path": "test-cluster",
-				"ca": map[string]interface{}{
-					"data": base64.StdEncoding.EncodeToString([]byte("test-ca-data")),
-				},
+				"path": "custom-path",
 			},
 			wantErr: false,
 		},
 		{
-			name:       "metadata_injection_with_auth_secret",
+			name:       "invalid_json",
+			schemaJSON: []byte(`invalid json`),
+			clusterAccess: gatewayv1alpha1.ClusterAccess{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-cluster"},
+				Spec: gatewayv1alpha1.ClusterAccessSpec{
+					Host: "https://test-cluster.example.com",
+				},
+			},
+			mockSetup: func(m *mocks.MockClient) {},
+			wantErr:   true,
+		},
+		{
+			name:       "empty_cluster_name_uses_empty_path",
 			schemaJSON: []byte(`{"openapi": "3.0.0", "info": {"title": "Test"}}`),
 			clusterAccess: gatewayv1alpha1.ClusterAccess{
-				ObjectMeta: metav1.ObjectMeta{Name: "test-cluster"},
+				ObjectMeta: metav1.ObjectMeta{Name: ""},
 				Spec: gatewayv1alpha1.ClusterAccessSpec{
-					Host: "https://test-cluster.example.com",
-					Auth: &gatewayv1alpha1.AuthConfig{
-						SecretRef: &gatewayv1alpha1.SecretRef{
-							Name:      "auth-secret",
-							Namespace: "test-ns",
-							Key:       "token",
-						},
-					},
+					Host: "https://example.com",
 				},
 			},
-			mockSetup: func(m *mocks.MockClient) {
-				secret := &corev1.Secret{
-					Data: map[string][]byte{
-						"token": []byte("test-token"),
-					},
-				}
-				m.EXPECT().Get(mock.Anything, types.NamespacedName{Name: "auth-secret", Namespace: "test-ns"}, mock.AnythingOfType("*v1.Secret")).
-					RunAndReturn(func(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-						secretObj := obj.(*corev1.Secret)
-						*secretObj = *secret
-						return nil
-					}).Once()
-			},
+			mockSetup: func(m *mocks.MockClient) {},
 			wantMetadata: map[string]interface{}{
-				"host": "https://test-cluster.example.com",
-				"path": "test-cluster",
-				"auth": map[string]interface{}{
-					"type":  "token",
-					"token": base64.StdEncoding.EncodeToString([]byte("test-token")),
-				},
+				"host": "https://example.com",
+				"path": "",
 			},
 			wantErr: false,
 		},
 		{
-			name:       "metadata_injection_with_kubeconfig",
+			name:       "empty_path_empty_name_defaults_to_empty",
 			schemaJSON: []byte(`{"openapi": "3.0.0", "info": {"title": "Test"}}`),
 			clusterAccess: gatewayv1alpha1.ClusterAccess{
-				ObjectMeta: metav1.ObjectMeta{Name: "test-cluster"},
+				ObjectMeta: metav1.ObjectMeta{Name: ""},
 				Spec: gatewayv1alpha1.ClusterAccessSpec{
-					Host: "https://test-cluster.example.com",
-					Auth: &gatewayv1alpha1.AuthConfig{
-						KubeconfigSecretRef: &gatewayv1alpha1.KubeconfigSecretRef{
-							Name:      "kubeconfig-secret",
-							Namespace: "test-ns",
-						},
-					},
+					Host: "https://example.com",
+					Path: "",
 				},
 			},
-			mockSetup: func(m *mocks.MockClient) {
-				kubeconfigData := `
-apiVersion: v1
-kind: Config
-current-context: test-context
-contexts:
-- name: test-context
-  context:
-    cluster: test-cluster
-    user: test-user
-users:
-- name: test-user
-  user:
-    token: test-token
-clusters:
-- name: test-cluster
-  cluster:
-    server: https://test.example.com
-    certificate-authority-data: ` + base64.StdEncoding.EncodeToString([]byte("ca-from-kubeconfig"))
-				secret := &corev1.Secret{
-					Data: map[string][]byte{
-						"kubeconfig": []byte(kubeconfigData),
-					},
-				}
-				m.EXPECT().Get(mock.Anything, types.NamespacedName{Name: "kubeconfig-secret", Namespace: "test-ns"}, mock.AnythingOfType("*v1.Secret")).
-					RunAndReturn(func(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-						secretObj := obj.(*corev1.Secret)
-						*secretObj = *secret
-						return nil
-					}).Once()
-			},
+			mockSetup: func(m *mocks.MockClient) {},
 			wantMetadata: map[string]interface{}{
-				"host": "https://test-cluster.example.com",
-				"path": "test-cluster",
-				"auth": map[string]interface{}{
-					"type": "kubeconfig",
-					"kubeconfig": base64.StdEncoding.EncodeToString([]byte(`
-apiVersion: v1
-kind: Config
-current-context: test-context
-contexts:
-- name: test-context
-  context:
-    cluster: test-cluster
-    user: test-user
-users:
-- name: test-user
-  user:
-    token: test-token
-clusters:
-- name: test-cluster
-  cluster:
-    server: https://test.example.com
-    certificate-authority-data: ` + base64.StdEncoding.EncodeToString([]byte("ca-from-kubeconfig")))),
-				},
-				"ca": map[string]interface{}{
-					"data": base64.StdEncoding.EncodeToString([]byte("ca-from-kubeconfig")),
-				},
+				"host": "https://example.com",
+				"path": "",
 			},
 			wantErr: false,
 		},
 		{
-			name:       "invalid_schema_JSON",
-			schemaJSON: []byte(`invalid-json`),
-			clusterAccess: gatewayv1alpha1.ClusterAccess{
-				ObjectMeta: metav1.ObjectMeta{Name: "test-cluster"},
-				Spec: gatewayv1alpha1.ClusterAccessSpec{
-					Host: "https://test-cluster.example.com",
-				},
-			},
-			mockSetup:   func(m *mocks.MockClient) {},
-			wantErr:     true,
-			errContains: "failed to parse schema JSON",
-		},
-		{
-			name:       "auth_secret_not_found_(warning_logged,_continues)",
+			name:       "empty_host",
 			schemaJSON: []byte(`{"openapi": "3.0.0", "info": {"title": "Test"}}`),
 			clusterAccess: gatewayv1alpha1.ClusterAccess{
+				ObjectMeta: metav1.ObjectMeta{Name: "no-host-cluster"},
+				Spec: gatewayv1alpha1.ClusterAccessSpec{
+					Host: "",
+				},
+			},
+			mockSetup: func(m *mocks.MockClient) {},
+			wantMetadata: map[string]interface{}{
+				"host": "",
+				"path": "no-host-cluster",
+			},
+			wantErr: false,
+		},
+		{
+			name:       "special_characters_in_name_and_path",
+			schemaJSON: []byte(`{"openapi": "3.0.0", "info": {"title": "Test"}}`),
+			clusterAccess: gatewayv1alpha1.ClusterAccess{
+				ObjectMeta: metav1.ObjectMeta{Name: "special-chars_cluster.test"},
+				Spec: gatewayv1alpha1.ClusterAccessSpec{
+					Host: "https://special.example.com",
+					Path: "special/chars_path.test",
+				},
+			},
+			mockSetup: func(m *mocks.MockClient) {},
+			wantMetadata: map[string]interface{}{
+				"host": "https://special.example.com",
+				"path": "special/chars_path.test",
+			},
+			wantErr: false,
+		},
+		{
+			name:       "minimal_valid_json",
+			schemaJSON: []byte(`{}`),
+			clusterAccess: gatewayv1alpha1.ClusterAccess{
+				ObjectMeta: metav1.ObjectMeta{Name: "minimal"},
+				Spec: gatewayv1alpha1.ClusterAccessSpec{
+					Host: "https://minimal.example.com",
+				},
+			},
+			mockSetup: func(m *mocks.MockClient) {},
+			wantMetadata: map[string]interface{}{
+				"host": "https://minimal.example.com",
+				"path": "minimal",
+			},
+			wantErr: false,
+		},
+		{
+			name:       "long_complex_path",
+			schemaJSON: []byte(`{"openapi": "3.0.0", "info": {"title": "Test"}}`),
+			clusterAccess: gatewayv1alpha1.ClusterAccess{
+				ObjectMeta: metav1.ObjectMeta{Name: "path-test"},
+				Spec: gatewayv1alpha1.ClusterAccessSpec{
+					Host: "https://example.com",
+					Path: "very/long/path/with/multiple/segments",
+				},
+			},
+			mockSetup: func(m *mocks.MockClient) {},
+			wantMetadata: map[string]interface{}{
+				"host": "https://example.com",
+				"path": "very/long/path/with/multiple/segments",
+			},
+			wantErr: false,
+		},
+		{
+			name:       "unicode_characters_in_name",
+			schemaJSON: []byte(`{"openapi": "3.0.0", "info": {"title": "Test"}}`),
+			clusterAccess: gatewayv1alpha1.ClusterAccess{
+				ObjectMeta: metav1.ObjectMeta{Name: "üñíçødé-cluster"},
+				Spec: gatewayv1alpha1.ClusterAccessSpec{
+					Host: "https://unicode.example.com",
+				},
+			},
+			mockSetup: func(m *mocks.MockClient) {},
+			wantMetadata: map[string]interface{}{
+				"host": "https://unicode.example.com",
+				"path": "üñíçødé-cluster",
+			},
+			wantErr: false,
+		},
+		{
+			name:       "malformed_json_brackets",
+			schemaJSON: []byte(`{"openapi": "3.0.0", "info": {"title": "Test"`),
+			clusterAccess: gatewayv1alpha1.ClusterAccess{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-cluster"},
 				Spec: gatewayv1alpha1.ClusterAccessSpec{
 					Host: "https://test-cluster.example.com",
-					Auth: &gatewayv1alpha1.AuthConfig{
-						SecretRef: &gatewayv1alpha1.SecretRef{
-							Name:      "missing-secret",
-							Namespace: "test-ns",
-							Key:       "token",
-						},
-					},
 				},
 			},
-			mockSetup: func(m *mocks.MockClient) {
-				m.EXPECT().Get(mock.Anything, types.NamespacedName{Name: "missing-secret", Namespace: "test-ns"}, mock.AnythingOfType("*v1.Secret")).
-					Return(errors.New("secret not found")).Once()
+			mockSetup: func(m *mocks.MockClient) {},
+			wantErr:   true,
+		},
+		{
+			name:       "empty_json",
+			schemaJSON: []byte(``),
+			clusterAccess: gatewayv1alpha1.ClusterAccess{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-cluster"},
+				Spec: gatewayv1alpha1.ClusterAccessSpec{
+					Host: "https://test-cluster.example.com",
+				},
 			},
-			wantMetadata: map[string]interface{}{
-				"host": "https://test-cluster.example.com",
-				"path": "test-cluster",
-			},
-			wantErr: false,
+			mockSetup: func(m *mocks.MockClient) {},
+			wantErr:   true,
 		},
 	}
 
@@ -247,237 +217,83 @@ clusters:
 			mockClient := mocks.NewMockClient(t)
 			tt.mockSetup(mockClient)
 
-			got, err := clusteraccess.InjectClusterMetadata(tt.schemaJSON, tt.clusterAccess, mockClient, mockLogger)
+			result, err := clusteraccess.InjectClusterMetadata(t.Context(), tt.schemaJSON, tt.clusterAccess, mockClient, mockLogger)
 
 			if tt.wantErr {
 				assert.Error(t, err)
 				if tt.errContains != "" {
 					assert.Contains(t, err.Error(), tt.errContains)
 				}
-			} else {
-				assert.NoError(t, err)
+				return
+			}
 
-				var result map[string]interface{}
-				err := json.Unmarshal(got, &result)
-				assert.NoError(t, err)
+			require.NoError(t, err)
+			assert.NotNil(t, result)
 
-				metadata, exists := result["x-cluster-metadata"]
-				assert.True(t, exists, "x-cluster-metadata should exist")
+			// Parse the result to verify metadata injection
+			var resultData map[string]interface{}
+			err = json.Unmarshal(result, &resultData)
+			require.NoError(t, err)
 
-				metadataMap, ok := metadata.(map[string]interface{})
-				assert.True(t, ok, "x-cluster-metadata should be a map")
+			// Check that metadata was injected
+			metadata, exists := resultData["x-cluster-metadata"]
+			require.True(t, exists, "x-cluster-metadata should be present")
 
-				for key, expected := range tt.wantMetadata {
-					actual, exists := metadataMap[key]
-					assert.True(t, exists, "Expected metadata key %s should exist", key)
-					assert.Equal(t, expected, actual, "Metadata key %s should match", key)
-				}
+			metadataMap, ok := metadata.(map[string]interface{})
+			require.True(t, ok, "x-cluster-metadata should be a map")
+
+			// Verify expected metadata
+			for key, expectedValue := range tt.wantMetadata {
+				actualValue, exists := metadataMap[key]
+				require.True(t, exists, "metadata key %s should be present", key)
+				assert.Equal(t, expectedValue, actualValue, "metadata key %s should match", key)
 			}
 		})
 	}
 }
 
-func TestExtractAuthDataForMetadata(t *testing.T) {
-	tests := []struct {
-		name      string
-		auth      *gatewayv1alpha1.AuthConfig
-		mockSetup func(*mocks.MockClient)
-		want      map[string]interface{}
-		wantErr   bool
-	}{
-		{
-			name:      "nil_auth_returns_nil",
-			auth:      nil,
-			mockSetup: func(m *mocks.MockClient) {},
-			want:      nil,
-			wantErr:   false,
-		},
-		{
-			name: "token_auth_from_secret",
-			auth: &gatewayv1alpha1.AuthConfig{
-				SecretRef: &gatewayv1alpha1.SecretRef{
-					Name:      "auth-secret",
-					Namespace: "test-ns",
-					Key:       "token",
-				},
-			},
-			mockSetup: func(m *mocks.MockClient) {
-				secret := &corev1.Secret{
-					Data: map[string][]byte{
-						"token": []byte("test-token"),
-					},
-				}
-				m.EXPECT().Get(mock.Anything, types.NamespacedName{Name: "auth-secret", Namespace: "test-ns"}, mock.AnythingOfType("*v1.Secret")).
-					RunAndReturn(func(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-						secretObj := obj.(*corev1.Secret)
-						*secretObj = *secret
-						return nil
-					}).Once()
-			},
-			want: map[string]interface{}{
-				"type":  "token",
-				"token": base64.StdEncoding.EncodeToString([]byte("test-token")),
-			},
-			wantErr: false,
-		},
-		{
-			name: "kubeconfig_auth",
-			auth: &gatewayv1alpha1.AuthConfig{
-				KubeconfigSecretRef: &gatewayv1alpha1.KubeconfigSecretRef{
-					Name:      "kubeconfig-secret",
-					Namespace: "test-ns",
-				},
-			},
-			mockSetup: func(m *mocks.MockClient) {
-				kubeconfigData := `apiVersion: v1
-kind: Config`
-				secret := &corev1.Secret{
-					Data: map[string][]byte{
-						"kubeconfig": []byte(kubeconfigData),
-					},
-				}
-				m.EXPECT().Get(mock.Anything, types.NamespacedName{Name: "kubeconfig-secret", Namespace: "test-ns"}, mock.AnythingOfType("*v1.Secret")).
-					RunAndReturn(func(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-						secretObj := obj.(*corev1.Secret)
-						*secretObj = *secret
-						return nil
-					}).Once()
-			},
-			want: map[string]interface{}{
-				"type": "kubeconfig",
-				"kubeconfig": base64.StdEncoding.EncodeToString([]byte(`apiVersion: v1
-kind: Config`)),
-			},
-			wantErr: false,
-		},
-		{
-			name: "client_certificate_auth",
-			auth: &gatewayv1alpha1.AuthConfig{
-				ClientCertificateRef: &gatewayv1alpha1.ClientCertificateRef{
-					Name:      "cert-secret",
-					Namespace: "test-ns",
-				},
-			},
-			mockSetup: func(m *mocks.MockClient) {
-				secret := &corev1.Secret{
-					Data: map[string][]byte{
-						"tls.crt": []byte("cert-data"),
-						"tls.key": []byte("key-data"),
-					},
-				}
-				m.EXPECT().Get(mock.Anything, types.NamespacedName{Name: "cert-secret", Namespace: "test-ns"}, mock.AnythingOfType("*v1.Secret")).
-					RunAndReturn(func(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-						secretObj := obj.(*corev1.Secret)
-						*secretObj = *secret
-						return nil
-					}).Once()
-			},
-			want: map[string]interface{}{
-				"type":     "clientCert",
-				"certData": base64.StdEncoding.EncodeToString([]byte("cert-data")),
-				"keyData":  base64.StdEncoding.EncodeToString([]byte("key-data")),
-			},
-			wantErr: false,
-		},
-		{
-			name: "secret_not_found",
-			auth: &gatewayv1alpha1.AuthConfig{
-				SecretRef: &gatewayv1alpha1.SecretRef{
-					Name:      "missing-secret",
-					Namespace: "test-ns",
-					Key:       "token",
-				},
-			},
-			mockSetup: func(m *mocks.MockClient) {
-				m.EXPECT().Get(mock.Anything, types.NamespacedName{Name: "missing-secret", Namespace: "test-ns"}, mock.AnythingOfType("*v1.Secret")).
-					Return(errors.New("secret not found")).Once()
-			},
-			want:    nil,
-			wantErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			mockClient := mocks.NewMockClient(t)
-			tt.mockSetup(mockClient)
-
-			got, err := clusteraccess.ExtractAuthDataForMetadata(tt.auth, mockClient)
-
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, tt.want, got)
-			}
-		})
-	}
-}
-
-func TestExtractCAFromKubeconfig(t *testing.T) {
+func TestInjectClusterMetadata_PathLogic(t *testing.T) {
 	mockLogger, _ := logger.New(logger.DefaultConfig())
+	mockClient := mocks.NewMockClient(t)
+	schemaJSON := []byte(`{"openapi": "3.0.0", "info": {"title": "Test"}}`)
 
-	tests := []struct {
-		name          string
-		kubeconfigB64 string
-		want          []byte
-	}{
-		{
-			name: "CA_data_from_kubeconfig",
-			kubeconfigB64: base64.StdEncoding.EncodeToString([]byte(`
-apiVersion: v1
-kind: Config
-clusters:
-- cluster:
-    certificate-authority-data: ` + base64.StdEncoding.EncodeToString([]byte("test-ca-data")) + `
-    server: https://test.example.com
-  name: test-cluster
-current-context: test-context
-contexts:
-- context:
-    cluster: test-cluster
-    user: test-user
-  name: test-context
-users:
-- name: test-user
-  user:
-    token: test-token
-`)),
-			want: []byte("test-ca-data"),
-		},
-		{
-			name: "no_CA_data_in_kubeconfig",
-			kubeconfigB64: base64.StdEncoding.EncodeToString([]byte(`
-apiVersion: v1
-kind: Config
-clusters:
-- cluster:
-    server: https://test.example.com
-  name: test-cluster
-current-context: test-context
-contexts:
-- context:
-    cluster: test-cluster
-    user: test-user
-  name: test-context
-users:
-- name: test-user
-  user:
-    token: test-token
-`)),
-			want: nil,
-		},
-		{
-			name:          "invalid_kubeconfig",
-			kubeconfigB64: "invalid-base64",
-			want:          nil,
-		},
-	}
+	t.Run("path_precedence_custom_over_name", func(t *testing.T) {
+		clusterAccess := gatewayv1alpha1.ClusterAccess{
+			ObjectMeta: metav1.ObjectMeta{Name: "cluster-name"},
+			Spec: gatewayv1alpha1.ClusterAccessSpec{
+				Host: "https://test.example.com",
+				Path: "custom-path",
+			},
+		}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := clusteraccess.ExtractCAFromKubeconfig(tt.kubeconfigB64, mockLogger)
-			assert.Equal(t, tt.want, got)
-		})
-	}
+		result, err := clusteraccess.InjectClusterMetadata(t.Context(), schemaJSON, clusterAccess, mockClient, mockLogger)
+		require.NoError(t, err)
+
+		var resultData map[string]interface{}
+		err = json.Unmarshal(result, &resultData)
+		require.NoError(t, err)
+
+		metadata := resultData["x-cluster-metadata"].(map[string]interface{})
+		assert.Equal(t, "custom-path", metadata["path"])
+	})
+
+	t.Run("fallback_to_name_when_path_empty", func(t *testing.T) {
+		clusterAccess := gatewayv1alpha1.ClusterAccess{
+			ObjectMeta: metav1.ObjectMeta{Name: "fallback-name"},
+			Spec: gatewayv1alpha1.ClusterAccessSpec{
+				Host: "https://test.example.com",
+				Path: "",
+			},
+		}
+
+		result, err := clusteraccess.InjectClusterMetadata(t.Context(), schemaJSON, clusterAccess, mockClient, mockLogger)
+		require.NoError(t, err)
+
+		var resultData map[string]interface{}
+		err = json.Unmarshal(result, &resultData)
+		require.NoError(t, err)
+
+		metadata := resultData["x-cluster-metadata"].(map[string]interface{})
+		assert.Equal(t, "fallback-name", metadata["path"])
+	})
 }

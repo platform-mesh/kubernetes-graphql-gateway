@@ -6,8 +6,14 @@ type Config struct {
 	LocalDevelopment            bool   `mapstructure:"local-development"`
 	IntrospectionAuthentication bool   `mapstructure:"introspection-authentication"`
 
+	Url struct {
+		VirtualWorkspacePrefix string `mapstructure:"gateway-url-virtual-workspace-prefix"`
+		DefaultKcpWorkspace    string `mapstructure:"gateway-url-default-kcp-workspace"`
+		GraphqlSuffix          string `mapstructure:"gateway-url-graphql-suffix"`
+	} `mapstructure:",squash"`
+
 	Listener struct {
-		// Listener fields will be added here
+		VirtualWorkspacesConfigPath string `mapstructure:"virtual-workspaces-config-path"`
 	} `mapstructure:",squash"`
 
 	Gateway struct {

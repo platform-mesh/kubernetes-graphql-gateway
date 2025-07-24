@@ -1,6 +1,7 @@
 package manager
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
@@ -22,7 +23,7 @@ type Service struct {
 }
 
 // NewGateway creates a new domain-driven Gateway instance
-func NewGateway(log *logger.Logger, appCfg appConfig.Config) (*Service, error) {
+func NewGateway(ctx context.Context, log *logger.Logger, appCfg appConfig.Config) (*Service, error) {
 	// Create round tripper factory
 	roundTripperFactory := targetcluster.RoundTripperFactory(func(adminRT http.RoundTripper, tlsConfig rest.TLSClientConfig) http.RoundTripper {
 		return roundtripper.New(log, appCfg, adminRT, roundtripper.NewUnauthorizedRoundTripper())
@@ -41,8 +42,8 @@ func NewGateway(log *logger.Logger, appCfg appConfig.Config) (*Service, error) {
 		schemaWatcher:   schemaWatcher,
 	}
 
-	// Initialize schema watcher
-	if err := schemaWatcher.Initialize(appCfg.OpenApiDefinitionsPath); err != nil {
+	// Initialize schema watcher with context
+	if err := schemaWatcher.Initialize(ctx, appCfg.OpenApiDefinitionsPath); err != nil {
 		return nil, fmt.Errorf("failed to initialize schema watcher: %w", err)
 	}
 
@@ -61,9 +62,6 @@ func (g *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // Close gracefully shuts down the gateway and all its services
 func (g *Service) Close() error {
-	if g.schemaWatcher != nil {
-		g.schemaWatcher.Close()
-	}
 	if g.clusterRegistry != nil {
 		g.clusterRegistry.Close()
 	}

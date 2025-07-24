@@ -1,11 +1,12 @@
 package roundtripper
 
 import (
+	"net/http"
+	"strings"
+
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/openmfp/golang-commons/logger"
 	"k8s.io/client-go/transport"
-	"net/http"
-	"strings"
 
 	"github.com/openmfp/kubernetes-graphql-gateway/common/config"
 )
@@ -35,10 +36,11 @@ func NewUnauthorizedRoundTripper() http.RoundTripper {
 }
 
 func (rt *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	rt.log.Debug().
+	rt.log.Info().
+		Str("req.Host", req.Host).
+		Str("req.URL.Host", req.URL.Host).
 		Str("path", req.URL.Path).
 		Str("method", req.Method).
-		Bool("localDev", rt.appCfg.LocalDevelopment).
 		Bool("shouldImpersonate", rt.appCfg.Gateway.ShouldImpersonate).
 		Str("usernameClaim", rt.appCfg.Gateway.UsernameClaim).
 		Msg("RoundTripper processing request")
@@ -111,30 +113,38 @@ func (u *unauthorizedRoundTripper) RoundTrip(req *http.Request) (*http.Response,
 }
 
 func isDiscoveryRequest(req *http.Request) bool {
+	// Only GET requests can be discovery requests
 	if req.Method != http.MethodGet {
 		return false
 	}
 
-	// in case of kcp, the req.URL.Path contains /clusters/<workspace> prefix, which we need to trim for further check.
-	path := strings.TrimPrefix(req.URL.Path, req.URL.RawPath)
+	// Parse and clean the URL path
+	path := req.URL.Path
 	path = strings.Trim(path, "/") // remove leading and trailing slashes
+	if path == "" {
+		return false
+	}
 	parts := strings.Split(path, "/")
 
-	// Handle KCP workspace prefixes: /clusters/<workspace>/api or /clusters/<workspace>/apis
-	if len(parts) >= 3 && parts[0] == "clusters" {
-		// Remove /clusters/<workspace> prefix
-		parts = parts[2:]
+	// Remove workspace prefixes to get the actual API path
+	if len(parts) >= 5 && parts[0] == "services" && parts[2] == "clusters" {
+		// Handle virtual workspace prefixes first: /services/<service>/clusters/<workspace>/api
+		parts = parts[4:] // Remove /services/<service>/clusters/<workspace> prefix
+	} else if len(parts) >= 3 && parts[0] == "clusters" {
+		// Handle KCP workspace prefixes: /clusters/<workspace>/api
+		parts = parts[2:] // Remove /clusters/<workspace> prefix
 	}
 
+	// Check if the remaining path matches Kubernetes discovery API patterns
 	switch {
 	case len(parts) == 1 && (parts[0] == "api" || parts[0] == "apis"):
-		return true // /api or /apis (root groups)
+		return true // /api or /apis (root discovery endpoints)
 	case len(parts) == 2 && parts[0] == "apis":
-		return true // /apis/<group>
+		return true // /apis/<group> (group discovery)
 	case len(parts) == 2 && parts[0] == "api":
-		return true // /api/v1 (core group version)
+		return true // /api/v1 (core API version discovery)
 	case len(parts) == 3 && parts[0] == "apis":
-		return true // /apis/<group>/<version>
+		return true // /apis/<group>/<version> (group version discovery)
 	default:
 		return false
 	}

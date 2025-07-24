@@ -485,6 +485,11 @@ func (g *Gateway) getGroupVersionKind(resourceKey string) (*schema.GroupVersionK
 			version, _ := gvkMap["version"].(string)
 			kind, _ := gvkMap["kind"].(string)
 
+			// Validate that kind is not empty - empty kinds cannot be used for GraphQL type names
+			if kind == "" {
+				return nil, fmt.Errorf("kind cannot be empty for resource %s", resourceKey)
+			}
+
 			// Sanitize the group and kind names
 			return &schema.GroupVersionKind{
 				Group:   g.resolver.SanitizeGroupName(group),

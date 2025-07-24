@@ -48,7 +48,7 @@ var gatewayCmd = &cobra.Command{
 
 		ctrl.SetLogger(log.Logr())
 
-		gatewayInstance, err := manager.NewGateway(log, appCfg)
+		gatewayInstance, err := manager.NewGateway(ctx, log, appCfg)
 		if err != nil {
 			log.Error().Err(err).Msg("Error creating gateway")
 			return fmt.Errorf("failed to create gateway: %w", err)

@@ -1,6 +1,7 @@
 package clusteraccess
 
 import (
+	"context"
 	"errors"
 
 	"k8s.io/client-go/rest"
@@ -11,7 +12,7 @@ import (
 )
 
 // BuildTargetClusterConfigFromTyped extracts connection info from ClusterAccess and builds rest.Config
-func BuildTargetClusterConfigFromTyped(clusterAccess v1alpha1.ClusterAccess, k8sClient client.Client) (*rest.Config, string, error) {
+func BuildTargetClusterConfigFromTyped(ctx context.Context, clusterAccess v1alpha1.ClusterAccess, k8sClient client.Client) (*rest.Config, string, error) {
 	spec := clusterAccess.Spec
 
 	// Extract host (required)
@@ -27,7 +28,7 @@ func BuildTargetClusterConfigFromTyped(clusterAccess v1alpha1.ClusterAccess, k8s
 	}
 
 	// Use common auth package to build config
-	config, err := auth.BuildConfig(host, spec.Auth, spec.CA, k8sClient)
+	config, err := auth.BuildConfig(ctx, host, spec.Auth, spec.CA, k8sClient)
 	if err != nil {
 		return nil, "", err
 	}

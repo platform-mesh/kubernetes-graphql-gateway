@@ -25,7 +25,7 @@ func (suite *CommonTestSuite) TestSortByListItems() {
 		filepath.Join(suite.appCfg.OpenApiDefinitionsPath, workspaceName),
 	))
 
-	suite.createAccountsForSorting(context.Background())
+	suite.createAccountsForSorting(suite.T().Context())
 
 	suite.T().Run("accounts_sorted_by_default", func(t *testing.T) {
 		listResp, statusCode, err := suite.sendAuthenticatedRequest(url, listAccountsQuery(false))
@@ -66,7 +66,7 @@ func (suite *CommonTestSuite) TestSortByListItems() {
 }
 
 func (suite *CommonTestSuite) TestSortBySubscription() {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(suite.T().Context())
 	defer cancel()
 	suite.createAccountsForSorting(ctx)
 

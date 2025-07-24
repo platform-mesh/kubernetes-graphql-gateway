@@ -1,6 +1,8 @@
 package clusteraccess
 
 import (
+	"context"
+
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd/api"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -13,45 +15,33 @@ import (
 // Exported functions for testing private functions
 
 // Config builder exports
-func ExtractCAData(ca *gatewayv1alpha1.CAConfig, k8sClient client.Client) ([]byte, error) {
-	return auth.ExtractCAData(ca, k8sClient)
+// ExtractCAData exposes the common auth ExtractCAData function for testing
+func ExtractCAData(ctx context.Context, ca *gatewayv1alpha1.CAConfig, k8sClient client.Client) ([]byte, error) {
+	return auth.ExtractCAData(ctx, ca, k8sClient)
 }
 
-func ConfigureAuthentication(config *rest.Config, authConfig *gatewayv1alpha1.AuthConfig, k8sClient client.Client) error {
-	return auth.ConfigureAuthentication(config, authConfig, k8sClient)
+// ConfigureAuthentication exposes the common auth ConfigureAuthentication function for testing
+func ConfigureAuthentication(ctx context.Context, config *rest.Config, authConfig *gatewayv1alpha1.AuthConfig, k8sClient client.Client) error {
+	return auth.ConfigureAuthentication(ctx, config, authConfig, k8sClient)
 }
 
 func ExtractAuthFromKubeconfig(config *rest.Config, authInfo *api.AuthInfo) error {
 	return auth.ExtractAuthFromKubeconfig(config, authInfo)
 }
 
-// Metadata injector exports
-func InjectClusterMetadata(schemaJSON []byte, clusterAccess gatewayv1alpha1.ClusterAccess, k8sClient client.Client, log *logger.Logger) ([]byte, error) {
-	return injectClusterMetadata(schemaJSON, clusterAccess, k8sClient, log)
+// Metadata injector exports - now all delegated to common auth package
+func InjectClusterMetadata(ctx context.Context, schemaJSON []byte, clusterAccess gatewayv1alpha1.ClusterAccess, k8sClient client.Client, log *logger.Logger) ([]byte, error) {
+	return injectClusterMetadata(ctx, schemaJSON, clusterAccess, k8sClient, log)
 }
 
-func ExtractCADataForMetadata(ca *gatewayv1alpha1.CAConfig, k8sClient client.Client) ([]byte, error) {
-	return extractCADataForMetadata(ca, k8sClient)
-}
-
-func ExtractAuthDataForMetadata(authConfig *gatewayv1alpha1.AuthConfig, k8sClient client.Client) (map[string]interface{}, error) {
-	return extractAuthDataForMetadata(authConfig, k8sClient)
-}
-
-func ExtractCAFromKubeconfig(kubeconfigB64 string, log *logger.Logger) []byte {
-	return extractCAFromKubeconfig(kubeconfigB64, log)
-}
+// The following functions are now part of the common auth package
+// and can be accessed directly from there for testing if needed
 
 // Subroutines exports
 type GenerateSchemaSubroutine = generateSchemaSubroutine
 
 func NewGenerateSchemaSubroutine(reconciler *ExportedClusterAccessReconciler) *GenerateSchemaSubroutine {
 	return &generateSchemaSubroutine{reconciler: reconciler}
-}
-
-func (s *generateSchemaSubroutine) RestMapperFromConfig(cfg *rest.Config) (interface{}, error) {
-	rm, err := s.restMapperFromConfig(cfg)
-	return rm, err
 }
 
 // Type and constant exports

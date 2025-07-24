@@ -106,7 +106,7 @@ func (suite *CommonTestSuite) TestSchemaSubscribe() {
 			suite.SetupTest()
 			defer suite.TearDownTest()
 
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 
 			c := graphql.Subscribe(graphql.Params{
@@ -204,7 +204,7 @@ func (suite *CommonTestSuite) TestMultiClusterHTTPSubscription() {
 	appCfg := suite.appCfg
 	appCfg.OpenApiDefinitionsPath = tempDir
 
-	multiClusterManager, err := manager.NewGateway(suite.log, appCfg)
+	multiClusterManager, err := manager.NewGateway(suite.T().Context(), suite.log, appCfg)
 	require.NoError(suite.T(), err)
 
 	// Start a test server with the multi-cluster manager

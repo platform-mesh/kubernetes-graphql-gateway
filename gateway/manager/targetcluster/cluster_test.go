@@ -359,3 +359,120 @@ users:
 		})
 	}
 }
+
+func TestTargetCluster_GetEndpoint(t *testing.T) {
+	tests := []struct {
+		name           string
+		clusterName    string
+		localDev       bool
+		gatewayPort    string
+		expectedResult string
+	}{
+		{
+			name:           "regular_cluster_local_dev",
+			clusterName:    "production",
+			localDev:       true,
+			gatewayPort:    "8080",
+			expectedResult: "http://localhost:8080/production/graphql",
+		},
+		{
+			name:           "regular_cluster_non_local_dev",
+			clusterName:    "production",
+			localDev:       false,
+			gatewayPort:    "8080",
+			expectedResult: "/production/graphql",
+		},
+		{
+			name:           "virtual_workspace_local_dev",
+			clusterName:    "virtual-workspace/my-workspace",
+			localDev:       true,
+			gatewayPort:    "8080",
+			expectedResult: "http://localhost:8080/virtual-workspace/my-workspace/root/graphql",
+		},
+		{
+			name:           "virtual_workspace_non_local_dev",
+			clusterName:    "virtual-workspace/my-workspace",
+			localDev:       false,
+			gatewayPort:    "8080",
+			expectedResult: "/virtual-workspace/my-workspace/root/graphql",
+		},
+		{
+			name:           "virtual_workspace_complex_name_local_dev",
+			clusterName:    "virtual-workspace/team-a/project-x",
+			localDev:       true,
+			gatewayPort:    "9090",
+			expectedResult: "http://localhost:9090/virtual-workspace/team-a/project-x/root/graphql",
+		},
+		{
+			name:           "virtual_workspace_complex_name_non_local_dev",
+			clusterName:    "virtual-workspace/team-a/project-x",
+			localDev:       false,
+			gatewayPort:    "9090",
+			expectedResult: "/virtual-workspace/team-a/project-x/root/graphql",
+		},
+		{
+			name:           "cluster_with_dashes_local_dev",
+			clusterName:    "staging-cluster",
+			localDev:       true,
+			gatewayPort:    "3000",
+			expectedResult: "http://localhost:3000/staging-cluster/graphql",
+		},
+		{
+			name:           "cluster_with_dashes_non_local_dev",
+			clusterName:    "staging-cluster",
+			localDev:       false,
+			gatewayPort:    "3000",
+			expectedResult: "/staging-cluster/graphql",
+		},
+		{
+			name:           "single_character_cluster_local_dev",
+			clusterName:    "a",
+			localDev:       true,
+			gatewayPort:    "8888",
+			expectedResult: "http://localhost:8888/a/graphql",
+		},
+		{
+			name:           "single_character_cluster_non_local_dev",
+			clusterName:    "a",
+			localDev:       false,
+			gatewayPort:    "8888",
+			expectedResult: "/a/graphql",
+		},
+		{
+			name:           "cluster_containing_virtual_workspace_but_not_prefix",
+			clusterName:    "my-virtual-workspace-cluster",
+			localDev:       true,
+			gatewayPort:    "8080",
+			expectedResult: "http://localhost:8080/my-virtual-workspace-cluster/graphql",
+		},
+		{
+			name:           "exact_virtual_workspace_prefix_only",
+			clusterName:    "virtual-workspace",
+			localDev:       true,
+			gatewayPort:    "8080",
+			expectedResult: "http://localhost:8080/virtual-workspace/root/graphql",
+		},
+		{
+			name:           "empty_port_local_dev",
+			clusterName:    "test",
+			localDev:       true,
+			gatewayPort:    "",
+			expectedResult: "http://localhost:/test/graphql",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create TargetCluster with test name
+			tc := targetcluster.NewTestTargetCluster(tt.clusterName)
+
+			// Create app config
+			appCfg := targetcluster.CreateTestConfig(tt.localDev, tt.gatewayPort)
+
+			// Test GetEndpoint
+			result := tc.GetEndpoint(appCfg)
+
+			assert.Equal(t, tt.expectedResult, result)
+		})
+	}
+}

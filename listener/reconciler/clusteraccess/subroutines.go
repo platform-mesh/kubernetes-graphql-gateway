@@ -33,7 +33,7 @@ func (s *generateSchemaSubroutine) Process(ctx context.Context, instance lifecyc
 	s.reconciler.log.Info().Str("clusterAccess", clusterAccessName).Msg("processing ClusterAccess resource")
 
 	// Extract target cluster config from ClusterAccess spec
-	targetConfig, clusterName, err := BuildTargetClusterConfigFromTyped(*clusterAccess, s.reconciler.opts.Client)
+	targetConfig, clusterName, err := BuildTargetClusterConfigFromTyped(ctx, *clusterAccess, s.reconciler.opts.Client)
 	if err != nil {
 		s.reconciler.log.Error().Err(err).Str("clusterAccess", clusterAccessName).Msg("failed to build target cluster config")
 		return ctrl.Result{}, commonserrors.NewOperatorError(err, false, false)
@@ -69,7 +69,7 @@ func (s *generateSchemaSubroutine) Process(ctx context.Context, instance lifecyc
 	}
 
 	// Create the complete schema file with x-cluster-metadata
-	schemaWithMetadata, err := injectClusterMetadata(JSON, *clusterAccess, s.reconciler.opts.Client, s.reconciler.log)
+	schemaWithMetadata, err := injectClusterMetadata(ctx, JSON, *clusterAccess, s.reconciler.opts.Client, s.reconciler.log)
 	if err != nil {
 		s.reconciler.log.Error().Err(err).Str("clusterAccess", clusterAccessName).Msg("failed to inject cluster metadata")
 		return ctrl.Result{}, commonserrors.NewOperatorError(err, false, false)

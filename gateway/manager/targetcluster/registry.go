@@ -16,6 +16,12 @@ import (
 	"k8s.io/client-go/rest"
 )
 
+// contextKey is a custom type for context keys to avoid collisions
+type contextKey string
+
+// kcpWorkspaceKey is the context key for storing KCP workspace information
+const kcpWorkspaceKey contextKey = "kcpWorkspace"
+
 // RoundTripperFactory creates HTTP round trippers for authentication
 type RoundTripperFactory func(http.RoundTripper, rest.TLSClientConfig) http.RoundTripper
 
@@ -47,8 +53,8 @@ func (cr *ClusterRegistry) LoadCluster(schemaFilePath string) error {
 	cr.mu.Lock()
 	defer cr.mu.Unlock()
 
-	// Extract cluster name from filename
-	name := strings.TrimSuffix(filepath.Base(schemaFilePath), filepath.Ext(schemaFilePath))
+	// Extract cluster name from file path, preserving subdirectory structure
+	name := cr.extractClusterNameFromPath(schemaFilePath)
 
 	cr.log.Info().
 		Str("cluster", name).
@@ -83,8 +89,8 @@ func (cr *ClusterRegistry) RemoveCluster(schemaFilePath string) error {
 	cr.mu.Lock()
 	defer cr.mu.Unlock()
 
-	// Extract cluster name from filename
-	name := strings.TrimSuffix(filepath.Base(schemaFilePath), filepath.Ext(schemaFilePath))
+	// Extract cluster name from file path, preserving subdirectory structure
+	name := cr.extractClusterNameFromPath(schemaFilePath)
 
 	cr.log.Info().
 		Str("cluster", name).
@@ -139,7 +145,7 @@ func (cr *ClusterRegistry) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Extract cluster name from path
-	clusterName, ok := cr.extractClusterName(w, r)
+	clusterName, r, ok := cr.extractClusterName(w, r)
 	if !ok {
 		return
 	}
@@ -199,7 +205,7 @@ func (cr *ClusterRegistry) handleAuth(w http.ResponseWriter, r *http.Request, to
 
 		if cr.appCfg.IntrospectionAuthentication {
 			if IsIntrospectionQuery(r) {
-				valid, err := cr.validateToken(token, cluster)
+				valid, err := cr.validateToken(r.Context(), token, cluster)
 				if err != nil {
 					cr.log.Error().Err(err).Str("cluster", cluster.name).Msg("Error validating token")
 					http.Error(w, "Token validation failed", http.StatusUnauthorized)
@@ -230,7 +236,7 @@ func (cr *ClusterRegistry) handleCORS(w http.ResponseWriter, r *http.Request) bo
 	return false
 }
 
-func (cr *ClusterRegistry) validateToken(token string, cluster *TargetCluster) (bool, error) {
+func (cr *ClusterRegistry) validateToken(ctx context.Context, token string, cluster *TargetCluster) (bool, error) {
 	if cluster == nil {
 		return false, errors.New("no cluster provided to validate token")
 	}
@@ -261,7 +267,6 @@ func (cr *ClusterRegistry) validateToken(token string, cluster *TargetCluster) (
 
 	// Use namespaces endpoint for token validation - it's a resource endpoint (not discovery)
 	// so it will use the token authentication instead of being routed to admin credentials
-	ctx := context.Background()
 	apiURL, err := url.JoinPath(clusterConfig.Host, "/api/v1/namespaces")
 	if err != nil {
 		return false, fmt.Errorf("failed to construct API URL: %w", err)
@@ -304,26 +309,46 @@ func (cr *ClusterRegistry) validateToken(token string, cluster *TargetCluster) (
 	}
 }
 
-// extractClusterName extracts the cluster name from the request path
-// Expected format: /{clusterName}/graphql
-func (cr *ClusterRegistry) extractClusterName(w http.ResponseWriter, r *http.Request) (string, bool) {
-	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
-	if len(parts) != 2 {
+// extractClusterName extracts the cluster name from the request path using pattern matching
+// Expected formats:
+//   - Regular workspace: /{clusterName}/graphql
+//   - Virtual workspace: /virtual-workspace/{virtualWorkspaceName}/{kcpWorkspace}/graphql
+func (cr *ClusterRegistry) extractClusterName(w http.ResponseWriter, r *http.Request) (string, *http.Request, bool) {
+	clusterName, kcpWorkspace, valid := MatchURL(r.URL.Path, cr.appCfg)
+
+	if !valid {
 		cr.log.Error().
 			Str("path", r.URL.Path).
-			Msg("Invalid path format, expected /{clusterName}/graphql")
+			Msg(fmt.Sprintf(
+				"Invalid path format, expected /{clusterName}/%s or /%s/{virtualWorkspaceName}/{kcpWorkspace}/%s",
+				cr.appCfg.Url.GraphqlSuffix,
+				cr.appCfg.Url.VirtualWorkspacePrefix,
+				cr.appCfg.Url.GraphqlSuffix,
+			))
 		http.NotFound(w, r)
-		return "", false
+		return "", r, false
 	}
 
-	clusterName := parts[0]
-	if clusterName == "" {
-		cr.log.Error().
-			Str("path", r.URL.Path).
-			Msg("Empty cluster name in path")
-		http.NotFound(w, r)
-		return "", false
+	// Store the KCP workspace name in the request context if present
+	if kcpWorkspace != "" {
+		r = r.WithContext(context.WithValue(r.Context(), kcpWorkspaceKey, kcpWorkspace))
 	}
 
-	return clusterName, true
+	return clusterName, r, true
+}
+
+// extractClusterNameFromPath extracts cluster name from schema file path, preserving subdirectory structure
+func (cr *ClusterRegistry) extractClusterNameFromPath(schemaFilePath string) string {
+	// First try to find relative path from definitions directory
+	if strings.Contains(schemaFilePath, "definitions/") {
+		parts := strings.Split(schemaFilePath, "definitions/")
+		if len(parts) >= 2 {
+			relativePath := parts[len(parts)-1]
+			// Remove file extension
+			return strings.TrimSuffix(relativePath, filepath.Ext(relativePath))
+		}
+	}
+
+	// Fallback to just filename without extension
+	return strings.TrimSuffix(filepath.Base(schemaFilePath), filepath.Ext(schemaFilePath))
 }

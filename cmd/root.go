@@ -75,6 +75,10 @@ func initConfig() {
 	v.SetDefault("gateway-cors-enabled", false)
 	v.SetDefault("gateway-cors-allowed-origins", "*")
 	v.SetDefault("gateway-cors-allowed-headers", "*")
+	// Gateway URL
+	v.SetDefault("gateway-url-virtual-workspace-prefix", "virtual-workspace")
+	v.SetDefault("gateway-url-default-kcp-workspace", "root")
+	v.SetDefault("gateway-url-graphql-suffix", "graphql")
 }
 
 func Execute() {

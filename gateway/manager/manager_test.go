@@ -35,7 +35,6 @@ func TestService_Close(t *testing.T) {
 				assert.NoError(t, err)
 
 				mockSchema := mocks.NewMockSchemaWatcher(t)
-				mockSchema.EXPECT().Close().Return(nil)
 
 				return &Service{
 					log:             log,
@@ -72,7 +71,6 @@ func TestService_Close(t *testing.T) {
 				mockCluster.EXPECT().Close().Return(nil)
 
 				mockSchema := mocks.NewMockSchemaWatcher(t)
-				mockSchema.EXPECT().Close().Return(nil)
 
 				return &Service{
 					log:             log,
@@ -92,7 +90,6 @@ func TestService_Close(t *testing.T) {
 				mockCluster.EXPECT().Close().Return(nil)
 
 				mockSchema := mocks.NewMockSchemaWatcher(t)
-				mockSchema.EXPECT().Close().Return(errors.New("schema watcher close error"))
 
 				return &Service{
 					log:             log,
@@ -112,7 +109,6 @@ func TestService_Close(t *testing.T) {
 				mockCluster.EXPECT().Close().Return(errors.New("cluster registry close error"))
 
 				mockSchema := mocks.NewMockSchemaWatcher(t)
-				mockSchema.EXPECT().Close().Return(nil)
 
 				return &Service{
 					log:             log,
@@ -132,7 +128,6 @@ func TestService_Close(t *testing.T) {
 				mockCluster.EXPECT().Close().Return(errors.New("cluster registry close error"))
 
 				mockSchema := mocks.NewMockSchemaWatcher(t)
-				mockSchema.EXPECT().Close().Return(errors.New("schema watcher close error"))
 
 				return &Service{
 					log:             log,

@@ -1,7 +1,6 @@
 package clusteraccess_test_test
 
 import (
-	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -128,10 +127,10 @@ func (suite *ClusterAccessSubroutinesTestSuite) SetupTest() {
 		},
 	}
 
-	err = suite.primaryClient.Create(context.Background(), primaryNs)
+	err = suite.primaryClient.Create(suite.T().Context(), primaryNs)
 	require.NoError(suite.T(), err)
 
-	err = suite.targetClient.Create(context.Background(), targetNs)
+	err = suite.targetClient.Create(suite.T().Context(), targetNs)
 	require.NoError(suite.T(), err)
 
 	// Setup reconciler options
@@ -155,7 +154,7 @@ func (suite *ClusterAccessSubroutinesTestSuite) TearDownTest() {
 }
 
 func (suite *ClusterAccessSubroutinesTestSuite) TestSubroutine_Process_Success() {
-	ctx := context.Background()
+	ctx := suite.T().Context()
 
 	// Create target cluster secret with kubeconfig
 	targetKubeconfig := suite.createKubeconfigForTarget()
@@ -231,7 +230,7 @@ func (suite *ClusterAccessSubroutinesTestSuite) TestSubroutine_Process_Success()
 }
 
 func (suite *ClusterAccessSubroutinesTestSuite) TestSubroutine_Process_InvalidClusterAccess() {
-	ctx := context.Background()
+	ctx := suite.T().Context()
 
 	// Create reconciler and subroutine
 	reconcilerInstance, err := clusteraccess.NewReconciler(
@@ -260,7 +259,7 @@ func (suite *ClusterAccessSubroutinesTestSuite) TestSubroutine_Process_InvalidCl
 }
 
 func (suite *ClusterAccessSubroutinesTestSuite) TestSubroutine_Process_MissingSecret() {
-	ctx := context.Background()
+	ctx := suite.T().Context()
 
 	// Create ClusterAccess resource pointing to non-existent secret
 	clusterAccess := &gatewayv1alpha1.ClusterAccess{
@@ -303,7 +302,7 @@ func (suite *ClusterAccessSubroutinesTestSuite) TestSubroutine_Process_MissingSe
 }
 
 func (suite *ClusterAccessSubroutinesTestSuite) TestSubroutine_Lifecycle_Methods() {
-	ctx := context.Background()
+	ctx := suite.T().Context()
 
 	// Create reconciler and subroutine
 	reconcilerInstance, err := clusteraccess.NewReconciler(

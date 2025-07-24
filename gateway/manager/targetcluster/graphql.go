@@ -57,7 +57,14 @@ func (s *GraphQLServer) CreateHandler(schema *graphql.Schema) *GraphQLHandler {
 // SetContexts sets the required contexts for KCP and authentication
 func SetContexts(r *http.Request, workspace, token string, enableKcp bool) *http.Request {
 	if enableKcp {
-		r = r.WithContext(kontext.WithCluster(r.Context(), logicalcluster.Name(workspace)))
+		// For virtual workspaces, use the KCP workspace from the request context if available
+		// This allows the URL to specify the actual KCP workspace (e.g., root, root:orgs)
+		// while keeping the file mapping based on the virtual workspace name
+		kcpWorkspaceName := workspace
+		if kcpWorkspace, ok := r.Context().Value(kcpWorkspaceKey).(string); ok && kcpWorkspace != "" {
+			kcpWorkspaceName = kcpWorkspace
+		}
+		r = r.WithContext(kontext.WithCluster(r.Context(), logicalcluster.Name(kcpWorkspaceName)))
 	}
 	return r.WithContext(context.WithValue(r.Context(), roundtripper.TokenKey{}, token))
 }

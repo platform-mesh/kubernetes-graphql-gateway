@@ -15,8 +15,13 @@ import (
 )
 
 type KCPReconciler struct {
-	mgr ctrl.Manager
-	log *logger.Logger
+	mgr                        ctrl.Manager
+	log                        *logger.Logger
+	virtualWorkspaceReconciler *VirtualWorkspaceReconciler
+	configWatcher              *ConfigWatcher
+
+	// Components for controller setup (moved from constructor)
+	apiBindingReconciler *APIBindingReconciler
 }
 
 func NewKCPReconciler(
@@ -57,7 +62,7 @@ func NewKCPReconciler(
 		return nil, err
 	}
 
-	// Setup APIBinding reconciler
+	// Create APIBinding reconciler (but don't set up controller yet)
 	apiBindingReconciler := &APIBindingReconciler{
 		Client:              mgr.GetClient(),
 		Scheme:              opts.Scheme,
@@ -69,19 +74,29 @@ func NewKCPReconciler(
 		Log:                 log,
 	}
 
-	// Setup the controller with cluster context - this is crucial for req.ClusterName
-	if err := ctrl.NewControllerManagedBy(mgr).
-		For(&kcpapis.APIBinding{}).
-		Complete(kcpctrl.WithClusterInContext(apiBindingReconciler)); err != nil {
-		log.Error().Err(err).Msg("failed to setup APIBinding controller")
+	// Setup virtual workspace components
+	virtualWSManager := NewVirtualWorkspaceManager(appCfg)
+	virtualWorkspaceReconciler := NewVirtualWorkspaceReconciler(
+		virtualWSManager,
+		ioHandler,
+		schemaResolver,
+		log,
+	)
+
+	configWatcher, err := NewConfigWatcher(virtualWSManager, log)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to create config watcher")
 		return nil, err
 	}
 
 	log.Info().Msg("Successfully configured KCP reconciler with workspace discovery")
 
 	return &KCPReconciler{
-		mgr: mgr,
-		log: log,
+		mgr:                        mgr,
+		log:                        log,
+		virtualWorkspaceReconciler: virtualWorkspaceReconciler,
+		configWatcher:              configWatcher,
+		apiBindingReconciler:       apiBindingReconciler,
 	}, nil
 }
 
@@ -90,11 +105,47 @@ func (r *KCPReconciler) GetManager() ctrl.Manager {
 }
 
 func (r *KCPReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	// This method is not used - reconciliation is handled by the APIBinding controller
+	// This method is required by the reconciler.CustomReconciler interface but is not used directly.
+	// Actual reconciliation is handled by the APIBinding controller set up in SetupWithManager().
+	// KCPReconciler acts as a coordinator/manager rather than a direct reconciler.
 	return ctrl.Result{}, nil
 }
 
 func (r *KCPReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	// Controllers are already set up in the constructor
+	// Handle cases where the reconciler wasn't properly initialized (e.g., in tests)
+	if r.apiBindingReconciler == nil {
+		if r.log != nil {
+			r.log.Debug().Msg("APIBinding reconciler not initialized, skipping controller setup")
+		}
+		return nil
+	}
+
+	// Setup the APIBinding controller with cluster context - this is crucial for req.ClusterName
+	if err := ctrl.NewControllerManagedBy(mgr).
+		For(&kcpapis.APIBinding{}).
+		Complete(kcpctrl.WithClusterInContext(r.apiBindingReconciler)); err != nil {
+		r.log.Error().Err(err).Msg("failed to setup APIBinding controller")
+		return err
+	}
+
+	r.log.Info().Msg("Successfully set up APIBinding controller")
 	return nil
+}
+
+// StartVirtualWorkspaceWatching starts watching virtual workspace configuration
+func (r *KCPReconciler) StartVirtualWorkspaceWatching(ctx context.Context, configPath string) error {
+	if configPath == "" {
+		r.log.Info().Msg("no virtual workspace config path provided, skipping virtual workspace watching")
+		return nil
+	}
+
+	r.log.Info().Str("configPath", configPath).Msg("starting virtual workspace configuration watching")
+
+	// Start config watcher with a wrapper function
+	changeHandler := func(config *VirtualWorkspacesConfig) {
+		if err := r.virtualWorkspaceReconciler.ReconcileConfig(ctx, config); err != nil {
+			r.log.Error().Err(err).Msg("failed to reconcile virtual workspaces config")
+		}
+	}
+	return r.configWatcher.Watch(ctx, configPath, changeHandler)
 }

@@ -13,3 +13,11 @@ func GetGatewayForTest(typeNameRegistry map[string]string) *Gateway {
 func (g *Gateway) GetNamesForTest(gvk *schema.GroupVersionKind) (singular, plural string) {
 	return g.getNames(gvk)
 }
+
+func (g *Gateway) GenerateTypeNameForTest(typePrefix string, fieldPath []string) string {
+	return g.generateTypeName(typePrefix, fieldPath)
+}
+
+func SanitizeFieldNameForTest(name string) string {
+	return sanitizeFieldName(name)
+}

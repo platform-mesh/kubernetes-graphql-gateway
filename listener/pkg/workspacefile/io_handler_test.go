@@ -79,8 +79,10 @@ func TestWrite(t *testing.T) {
 		clusterName string
 		expectErr   bool
 	}{
-		"valid_write":  {clusterName: "root:sap:openmfp", expectErr: false},
-		"invalid_path": {clusterName: "invalid/root:invalid", expectErr: true},
+		"valid_write":         {clusterName: "root:sap:openmfp", expectErr: false},
+		"subdirectory_path":   {clusterName: "virtual-workspace/api-export-ws", expectErr: false},
+		"nested_subdirectory": {clusterName: "some/nested/path/workspace", expectErr: false},
+		"invalid_file_chars":  {clusterName: "invalid\x00name", expectErr: true},
 	}
 
 	for name, tc := range tests {

@@ -20,7 +20,7 @@ import (
 
 // BuildConfig creates a rest.Config from cluster connection parameters
 // This function unifies the authentication logic used by both listener and gateway
-func BuildConfig(host string, auth *gatewayv1alpha1.AuthConfig, ca *gatewayv1alpha1.CAConfig, k8sClient client.Client) (*rest.Config, error) {
+func BuildConfig(ctx context.Context, host string, auth *gatewayv1alpha1.AuthConfig, ca *gatewayv1alpha1.CAConfig, k8sClient client.Client) (*rest.Config, error) {
 	if host == "" {
 		return nil, errors.New("host is required")
 	}
@@ -34,7 +34,7 @@ func BuildConfig(host string, auth *gatewayv1alpha1.AuthConfig, ca *gatewayv1alp
 
 	// Handle CA configuration first
 	if ca != nil {
-		caData, err := ExtractCAData(ca, k8sClient)
+		caData, err := ExtractCAData(ctx, ca, k8sClient)
 		if err != nil {
 			return nil, errors.Join(errors.New("failed to extract CA data"), err)
 		}
@@ -46,7 +46,7 @@ func BuildConfig(host string, auth *gatewayv1alpha1.AuthConfig, ca *gatewayv1alp
 
 	// Handle Auth configuration
 	if auth != nil {
-		err := ConfigureAuthentication(config, auth, k8sClient)
+		err := ConfigureAuthentication(ctx, config, auth, k8sClient)
 		if err != nil {
 			return nil, errors.Join(errors.New("failed to configure authentication"), err)
 		}
@@ -118,12 +118,10 @@ func BuildConfigFromMetadata(host string, authType, token, kubeconfig, certData,
 }
 
 // ExtractCAData extracts CA certificate data from secret or configmap references
-func ExtractCAData(ca *gatewayv1alpha1.CAConfig, k8sClient client.Client) ([]byte, error) {
+func ExtractCAData(ctx context.Context, ca *gatewayv1alpha1.CAConfig, k8sClient client.Client) ([]byte, error) {
 	if ca == nil {
 		return nil, nil
 	}
-
-	ctx := context.Background()
 
 	if ca.SecretRef != nil {
 		secret := &corev1.Secret{}
@@ -175,12 +173,10 @@ func ExtractCAData(ca *gatewayv1alpha1.CAConfig, k8sClient client.Client) ([]byt
 }
 
 // ConfigureAuthentication configures authentication for rest.Config from AuthConfig
-func ConfigureAuthentication(config *rest.Config, auth *gatewayv1alpha1.AuthConfig, k8sClient client.Client) error {
+func ConfigureAuthentication(ctx context.Context, config *rest.Config, auth *gatewayv1alpha1.AuthConfig, k8sClient client.Client) error {
 	if auth == nil {
 		return nil
 	}
-
-	ctx := context.Background()
 
 	if auth.SecretRef != nil {
 		secret := &corev1.Secret{}

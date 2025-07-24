@@ -122,6 +122,11 @@ func (suite *CommonTestSuite) SetupTest() {
 	suite.appCfg.Gateway.Cors.Enabled = true
 	suite.appCfg.IntrospectionAuthentication = suite.AuthenticateSchemaRequests
 
+	// Set URL configuration for the gateway tests
+	suite.appCfg.Url.VirtualWorkspacePrefix = "virtual-workspace"
+	suite.appCfg.Url.DefaultKcpWorkspace = "root"
+	suite.appCfg.Url.GraphqlSuffix = "graphql"
+
 	suite.log, err = logger.New(logger.DefaultConfig())
 	require.NoError(suite.T(), err)
 
@@ -138,7 +143,7 @@ func (suite *CommonTestSuite) SetupTest() {
 
 	suite.graphqlSchema = *g.GetSchema()
 
-	suite.manager, err = manager.NewGateway(suite.log, suite.appCfg)
+	suite.manager, err = manager.NewGateway(suite.T().Context(), suite.log, suite.appCfg)
 	require.NoError(suite.T(), err)
 
 	suite.server = httptest.NewServer(suite.manager)

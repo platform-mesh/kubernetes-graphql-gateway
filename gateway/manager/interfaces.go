@@ -1,6 +1,7 @@
 package manager
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/openmfp/kubernetes-graphql-gateway/gateway/manager/targetcluster"
@@ -18,6 +19,5 @@ type ClusterManager interface {
 
 // SchemaWatcher monitors schema files and manages cluster connections
 type SchemaWatcher interface {
-	Initialize(watchPath string) error
-	Close() error
+	Initialize(ctx context.Context, watchPath string) error
 }

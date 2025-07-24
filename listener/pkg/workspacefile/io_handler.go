@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path"
+	"path/filepath"
 )
 
 var (
@@ -44,6 +45,13 @@ func (h *IOHandlerProvider) Read(clusterName string) ([]byte, error) {
 
 func (h *IOHandlerProvider) Write(JSON []byte, clusterName string) error {
 	fileName := path.Join(h.schemasDir, clusterName)
+
+	// Create intermediate directories if they don't exist
+	dir := filepath.Dir(fileName)
+	if err := os.MkdirAll(dir, os.ModePerm); err != nil {
+		return errors.Join(ErrWriteJSONFile, err)
+	}
+
 	if err := os.WriteFile(fileName, JSON, os.ModePerm); err != nil {
 		return errors.Join(ErrWriteJSONFile, err)
 	}

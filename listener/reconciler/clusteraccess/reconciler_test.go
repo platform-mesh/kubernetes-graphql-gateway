@@ -82,7 +82,7 @@ func TestCheckClusterAccessCRDStatus(t *testing.T) {
 			mockClient := mocks.NewMockClient(t)
 			tt.mockSetup(mockClient)
 
-			got, err := clusteraccess.CheckClusterAccessCRDStatus(mockClient, mockLogger)
+			got, err := clusteraccess.CheckClusterAccessCRDStatus(t.Context(), mockClient, mockLogger)
 			_ = err
 
 			assert.Equal(t, tt.want, got)
