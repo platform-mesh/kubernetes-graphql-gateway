@@ -3,6 +3,7 @@ package schema
 import "k8s.io/apimachinery/pkg/runtime/schema"
 
 var StringMapScalarForTest = stringMapScalar
+var JSONStringScalarForTest = jsonStringScalar
 
 func GetGatewayForTest(typeNameRegistry map[string]string) *Gateway {
 	return &Gateway{

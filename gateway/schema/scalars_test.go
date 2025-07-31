@@ -1,6 +1,7 @@
 package schema_test
 
 import (
+	"encoding/json"
 	"reflect"
 	"testing"
 
@@ -152,4 +153,52 @@ func TestGenerateTypeName(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestJSONStringScalar_ProperSerialization(t *testing.T) {
+	testObject := map[string]interface{}{
+		"name":      "example-config",
+		"namespace": "default",
+		"labels": map[string]string{
+			"hello": "world",
+		},
+		"annotations": map[string]string{
+			"kcp.io/cluster": "root",
+		},
+	}
+
+	// Test the JSONString scalar serialization
+	result := schema.JSONStringScalarForTest.Serialize(testObject)
+
+	if result == nil {
+		t.Fatal("JSONStringScalar.Serialize returned nil")
+	}
+
+	resultStr, ok := result.(string)
+	if !ok {
+		t.Fatalf("JSONStringScalar.Serialize returned %T, expected string", result)
+	}
+
+	// Verify it's valid JSON
+	var parsed map[string]interface{}
+	err := json.Unmarshal([]byte(resultStr), &parsed)
+	if err != nil {
+		t.Fatalf("Result is not valid JSON: %s\nResult: %s", err, resultStr)
+	}
+
+	// Verify the content is preserved
+	if parsed["name"] != "example-config" {
+		t.Errorf("Name not preserved: got %v, want %v", parsed["name"], "example-config")
+	}
+
+	if parsed["namespace"] != "default" {
+		t.Errorf("Namespace not preserved: got %v, want %v", parsed["namespace"], "default")
+	}
+
+	// Verify it's NOT Go map format
+	if len(resultStr) > 10 && resultStr[:4] == "map[" {
+		t.Errorf("Result is in Go map format, not JSON: %s", resultStr)
+	}
+
+	t.Logf("Proper JSON output: %s", resultStr)
 }
