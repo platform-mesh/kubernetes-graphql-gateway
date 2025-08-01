@@ -29,21 +29,13 @@ var gatewayCmd = &cobra.Command{
 			return fmt.Errorf("failed to setup logger: %w", err)
 		}
 
-		log.Info().Str("LogLevel", log.GetLevel().String()).Msg("Starting server...")
+		log.Info().Str("LogLevel", log.GetLevel().String()).Msg("Starting gateway server...")
 
 		ctx, _, shutdown := openmfpcontext.StartContext(log, appCfg, 1*time.Second)
 		defer shutdown()
 
-		if defaultCfg.Sentry.Dsn != "" {
-			err := sentry.Start(ctx,
-				defaultCfg.Sentry.Dsn, defaultCfg.Environment, defaultCfg.Region,
-				defaultCfg.Image.Name, defaultCfg.Image.Tag,
-			)
-			if err != nil {
-				log.Fatal().Err(err).Msg("Sentry init failed")
-			}
-
-			defer openmfpcontext.Recover(log)
+		if err := initializeSentry(ctx, log); err != nil {
+			return err
 		}
 
 		ctrl.SetLogger(log.Logr())
@@ -54,78 +46,148 @@ var gatewayCmd = &cobra.Command{
 			return fmt.Errorf("failed to create gateway: %w", err)
 		}
 
-		// Initialize tracing provider
-		var providerShutdown func(ctx context.Context) error
-		if defaultCfg.Tracing.Enabled {
-			providerShutdown, err = traces.InitProvider(ctx, defaultCfg.Tracing.Collector)
-			if err != nil {
-				log.Fatal().Err(err).Msg("unable to start gRPC-Sidecar TracerProvider")
-			}
-		} else {
-			providerShutdown, err = traces.InitLocalProvider(ctx, defaultCfg.Tracing.Collector, false)
-			if err != nil {
-				log.Fatal().Err(err).Msg("unable to start local TracerProvider")
-			}
+		tracingShutdown, err := initializeTracing(ctx, log)
+		if err != nil {
+			return err
 		}
-
 		defer func() {
-			if err := providerShutdown(ctx); err != nil {
-				log.Fatal().Err(err).Msg("failed to shutdown TracerProvider")
+			if err := tracingShutdown(ctx); err != nil {
+				log.Error().Err(err).Msg("failed to shutdown TracerProvider")
 			}
 		}()
 
-		defer func() {
-			if err := providerShutdown(ctx); err != nil {
-				log.Fatal().Err(err).Msg("failed to shutdown TracerProvider")
-			}
-		}()
+		return runServers(ctx, log, gatewayInstance)
+	},
+}
 
-		// Set up HTTP handler
-		http.Handle("/", gatewayInstance)
-		http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-		})
-		http.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-		})
+func initializeSentry(ctx context.Context, log *logger.Logger) error {
+	if defaultCfg.Sentry.Dsn == "" {
+		return nil
+	}
 
-		// Replace the /metrics endpoint handler
-		http.Handle("/metrics", promhttp.Handler())
+	err := sentry.Start(ctx,
+		defaultCfg.Sentry.Dsn, defaultCfg.Environment, defaultCfg.Region,
+		defaultCfg.Image.Name, defaultCfg.Image.Tag,
+	)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Sentry init failed")
+		return err
+	}
 
-		// Start HTTP server with context
-		server := &http.Server{
-			Addr:    fmt.Sprintf(":%s", appCfg.Gateway.Port),
-			Handler: nil,
+	defer openmfpcontext.Recover(log)
+	return nil
+}
+
+func initializeTracing(ctx context.Context, log *logger.Logger) (func(ctx context.Context) error, error) {
+	if defaultCfg.Tracing.Enabled {
+		shutdown, err := traces.InitProvider(ctx, defaultCfg.Tracing.Collector)
+		if err != nil {
+			log.Fatal().Err(err).Msg("unable to start gRPC-Sidecar TracerProvider")
+			return nil, err
 		}
+		return shutdown, nil
+	}
 
-		// Start the HTTP server in a goroutine so that we can listen for shutdown signals
-		go func() {
-			err := server.ListenAndServe()
-			if err != nil && !errors.Is(err, http.ErrServerClosed) {
-				log.Error().Err(err).Msg("Error starting HTTP server")
-			}
-		}()
+	shutdown, err := traces.InitLocalProvider(ctx, defaultCfg.Tracing.Collector, false)
+	if err != nil {
+		log.Fatal().Err(err).Msg("unable to start local TracerProvider")
+		return nil, err
+	}
+	return shutdown, nil
+}
 
-		// Wait for shutdown signal via the context
-		<-ctx.Done()
+func createServers(gatewayInstance http.Handler) (*http.Server, *http.Server, *http.Server) {
+	// Main server for GraphQL
+	mainMux := http.NewServeMux()
+	mainMux.Handle("/", gatewayInstance)
+	mainServer := &http.Server{
+		Addr:    fmt.Sprintf(":%s", appCfg.Gateway.Port),
+		Handler: mainMux,
+	}
 
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), defaultCfg.ShutdownTimeout) // ctx is closed, we need a new one
-		defer cancel()
-		log.Info().Msg("Shutting down HTTP server...")
-		if err := server.Shutdown(shutdownCtx); err != nil {
-			log.Fatal().Err(err).Msg("HTTP server shutdown failed")
+	// Metrics server
+	metricsMux := http.NewServeMux()
+	metricsMux.Handle("/metrics", promhttp.Handler())
+	metricsServer := &http.Server{
+		Addr:    defaultCfg.Metrics.BindAddress,
+		Handler: metricsMux,
+	}
+
+	// Health server
+	healthMux := http.NewServeMux()
+	healthMux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	healthMux.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	healthServer := &http.Server{
+		Addr:    defaultCfg.HealthProbeBindAddress,
+		Handler: healthMux,
+	}
+
+	return mainServer, metricsServer, healthServer
+}
+
+func shutdownServers(ctx context.Context, log *logger.Logger, mainServer, metricsServer, healthServer *http.Server) {
+	log.Info().Msg("Shutting down HTTP servers...")
+
+	if err := mainServer.Shutdown(ctx); err != nil {
+		log.Error().Err(err).Msg("Main HTTP server shutdown failed")
+	}
+
+	if err := metricsServer.Shutdown(ctx); err != nil {
+		log.Error().Err(err).Msg("Metrics HTTP server shutdown failed")
+	}
+
+	if err := healthServer.Shutdown(ctx); err != nil {
+		log.Error().Err(err).Msg("Health HTTP server shutdown failed")
+	}
+}
+
+func runServers(ctx context.Context, log *logger.Logger, gatewayInstance http.Handler) error {
+	mainServer, metricsServer, healthServer := createServers(gatewayInstance)
+
+	// Start main server (GraphQL)
+	go func() {
+		log.Info().Str("addr", mainServer.Addr).Msg("Starting main HTTP server")
+		if err := mainServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Error().Err(err).Msg("Error starting main HTTP server")
 		}
+	}()
 
-		if err := gatewayInstance.Close(); err != nil {
+	// Start metrics server
+	go func() {
+		log.Info().Str("addr", metricsServer.Addr).Msg("Starting metrics HTTP server")
+		if err := metricsServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Error().Err(err).Msg("Error starting metrics HTTP server")
+		}
+	}()
+
+	// Start health server
+	go func() {
+		log.Info().Str("addr", healthServer.Addr).Msg("Starting health HTTP server")
+		if err := healthServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Error().Err(err).Msg("Error starting health HTTP server")
+		}
+	}()
+
+	// Wait for shutdown signal
+	<-ctx.Done()
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), defaultCfg.ShutdownTimeout)
+	defer cancel()
+
+	shutdownServers(shutdownCtx, log, mainServer, metricsServer, healthServer)
+
+	if closer, ok := gatewayInstance.(interface{ Close() error }); ok {
+		if err := closer.Close(); err != nil {
 			log.Error().Err(err).Msg("Error closing gateway services")
 		}
+	}
 
-		// Call the shutdown cleanup
-		shutdown()
-
-		log.Info().Msg("Server shut down successfully")
-		return nil
-	},
+	log.Info().Msg("Server shut down successfully")
+	return nil
 }
 
 // setupLogger initializes the logger with the given log level
