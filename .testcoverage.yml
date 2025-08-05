@@ -6,6 +6,8 @@ exclude:
     - common/config/config.go
     - mocks
     - common/apis/*
+    - export_test.go
+    - export_test_integration.go
     # remove it later:
     - listener/reconciler/clusteraccess/subroutines.go
-    - listener/reconciler/singlecluster
+

@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/openmfp/golang-commons/logger"
+	"github.com/openmfp/golang-commons/logger/testlogger"
 	"github.com/openmfp/kubernetes-graphql-gateway/gateway/manager/mocks"
 	"github.com/stretchr/testify/assert"
 )
@@ -18,10 +18,8 @@ func TestService_Close(t *testing.T) {
 		{
 			name: "both_services_nil",
 			setupService: func(t *testing.T) *Service {
-				log, err := logger.New(logger.DefaultConfig())
-				assert.NoError(t, err)
 				return &Service{
-					log:             log,
+					log:             testlogger.New().Logger,
 					clusterRegistry: nil,
 					schemaWatcher:   nil,
 				}
@@ -31,15 +29,10 @@ func TestService_Close(t *testing.T) {
 		{
 			name: "cluster_registry_nil_schema_watcher_present",
 			setupService: func(t *testing.T) *Service {
-				log, err := logger.New(logger.DefaultConfig())
-				assert.NoError(t, err)
-
-				mockSchema := mocks.NewMockSchemaWatcher(t)
-
 				return &Service{
-					log:             log,
+					log:             testlogger.New().Logger,
 					clusterRegistry: nil,
-					schemaWatcher:   mockSchema,
+					schemaWatcher:   mocks.NewMockSchemaWatcher(t),
 				}
 			},
 			expectError: false,
@@ -47,14 +40,11 @@ func TestService_Close(t *testing.T) {
 		{
 			name: "schema_watcher_nil_cluster_registry_present",
 			setupService: func(t *testing.T) *Service {
-				log, err := logger.New(logger.DefaultConfig())
-				assert.NoError(t, err)
-
 				mockCluster := mocks.NewMockClusterManager(t)
 				mockCluster.EXPECT().Close().Return(nil)
 
 				return &Service{
-					log:             log,
+					log:             testlogger.New().Logger,
 					clusterRegistry: mockCluster,
 					schemaWatcher:   nil,
 				}
@@ -64,16 +54,13 @@ func TestService_Close(t *testing.T) {
 		{
 			name: "both_services_present_successful_close",
 			setupService: func(t *testing.T) *Service {
-				log, err := logger.New(logger.DefaultConfig())
-				assert.NoError(t, err)
-
 				mockCluster := mocks.NewMockClusterManager(t)
 				mockCluster.EXPECT().Close().Return(nil)
 
 				mockSchema := mocks.NewMockSchemaWatcher(t)
 
 				return &Service{
-					log:             log,
+					log:             testlogger.New().Logger,
 					clusterRegistry: mockCluster,
 					schemaWatcher:   mockSchema,
 				}
@@ -83,16 +70,13 @@ func TestService_Close(t *testing.T) {
 		{
 			name: "schema_watcher_close_error_cluster_registry_succeeds",
 			setupService: func(t *testing.T) *Service {
-				log, err := logger.New(logger.DefaultConfig())
-				assert.NoError(t, err)
-
 				mockCluster := mocks.NewMockClusterManager(t)
 				mockCluster.EXPECT().Close().Return(nil)
 
 				mockSchema := mocks.NewMockSchemaWatcher(t)
 
 				return &Service{
-					log:             log,
+					log:             testlogger.New().Logger,
 					clusterRegistry: mockCluster,
 					schemaWatcher:   mockSchema,
 				}
@@ -102,16 +86,13 @@ func TestService_Close(t *testing.T) {
 		{
 			name: "cluster_registry_close_error_schema_watcher_succeeds",
 			setupService: func(t *testing.T) *Service {
-				log, err := logger.New(logger.DefaultConfig())
-				assert.NoError(t, err)
-
 				mockCluster := mocks.NewMockClusterManager(t)
 				mockCluster.EXPECT().Close().Return(errors.New("cluster registry close error"))
 
 				mockSchema := mocks.NewMockSchemaWatcher(t)
 
 				return &Service{
-					log:             log,
+					log:             testlogger.New().Logger,
 					clusterRegistry: mockCluster,
 					schemaWatcher:   mockSchema,
 				}
@@ -121,16 +102,13 @@ func TestService_Close(t *testing.T) {
 		{
 			name: "both_services_close_with_errors",
 			setupService: func(t *testing.T) *Service {
-				log, err := logger.New(logger.DefaultConfig())
-				assert.NoError(t, err)
-
 				mockCluster := mocks.NewMockClusterManager(t)
 				mockCluster.EXPECT().Close().Return(errors.New("cluster registry close error"))
 
 				mockSchema := mocks.NewMockSchemaWatcher(t)
 
 				return &Service{
-					log:             log,
+					log:             testlogger.New().Logger,
 					clusterRegistry: mockCluster,
 					schemaWatcher:   mockSchema,
 				}

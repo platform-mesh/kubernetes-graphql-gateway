@@ -19,13 +19,11 @@ import (
 	"github.com/openmfp/kubernetes-graphql-gateway/listener/reconciler"
 )
 
-// Package-specific errors
 var (
 	ErrCRDNotRegistered = errors.New("ClusterAccess CRD not registered")
 	ErrCRDCheckFailed   = errors.New("failed to check ClusterAccess CRD status")
 )
 
-// CRDStatus represents the status of ClusterAccess CRD
 type CRDStatus int
 
 const (
@@ -33,38 +31,31 @@ const (
 	CRDRegistered
 )
 
-// CreateMultiClusterReconciler creates a multi-cluster reconciler using ClusterAccess CRDs
-func CreateMultiClusterReconciler(
+func NewClusterAccessReconciler(
+	ctx context.Context,
 	appCfg config.Config,
 	opts reconciler.ReconcilerOpts,
+	ioHandler workspacefile.IOHandler,
+	schemaResolver apischema.Resolver,
 	log *logger.Logger,
 ) (reconciler.CustomReconciler, error) {
-	log.Info().Msg("Using multi-cluster reconciler")
+	// Validate required dependencies
+	if ioHandler == nil {
+		return nil, fmt.Errorf("ioHandler is required")
+	}
+	if schemaResolver == nil {
+		return nil, fmt.Errorf("schemaResolver is required")
+	}
 
-	// Check if ClusterAccess CRD is available
-	caStatus, err := CheckClusterAccessCRDStatus(context.Background(), opts.Client, log)
+	// Check if ClusterAccess CRD is registered
+	crdStatus, err := CheckClusterAccessCRDStatus(ctx, opts.Client, log)
 	if err != nil {
-		if errors.Is(err, ErrCRDNotRegistered) {
-			log.Error().Msg("Multi-cluster mode enabled but ClusterAccess CRD not registered")
-			return nil, errors.New("multi-cluster mode enabled but ClusterAccess CRD not registered")
-		}
-		log.Error().Err(err).Msg("Multi-cluster mode enabled but failed to check ClusterAccess CRD status")
-		return nil, err
+		return nil, fmt.Errorf("failed to check ClusterAccess CRD status: %w", err)
 	}
 
-	if caStatus != CRDRegistered {
-		log.Error().Msg("Multi-cluster mode enabled but ClusterAccess CRD not available")
-		return nil, errors.New("multi-cluster mode enabled but ClusterAccess CRD not available")
+	if crdStatus != CRDRegistered {
+		return nil, ErrCRDNotRegistered
 	}
-
-	// Create IO handler
-	ioHandler, err := workspacefile.NewIOHandler(appCfg.OpenApiDefinitionsPath)
-	if err != nil {
-		return nil, errors.Join(reconciler.ErrCreateIOHandler, err)
-	}
-
-	// Create schema resolver
-	schemaResolver := apischema.NewResolver()
 
 	log.Info().Msg("ClusterAccess CRD registered, creating ClusterAccess reconciler")
 	return NewReconciler(opts, ioHandler, schemaResolver, log)
@@ -90,13 +81,13 @@ func CheckClusterAccessCRDStatus(ctx context.Context, k8sClient client.Client, l
 
 // ClusterAccessReconciler handles reconciliation for ClusterAccess resources
 type ClusterAccessReconciler struct {
-	lifecycleManager *lifecycle.LifecycleManager
-	opts             reconciler.ReconcilerOpts
 	restCfg          *rest.Config
-	mgr              ctrl.Manager
 	ioHandler        workspacefile.IOHandler
 	schemaResolver   apischema.Resolver
 	log              *logger.Logger
+	mgr              ctrl.Manager
+	opts             reconciler.ReconcilerOpts
+	lifecycleManager *lifecycle.LifecycleManager
 }
 
 func NewReconciler(

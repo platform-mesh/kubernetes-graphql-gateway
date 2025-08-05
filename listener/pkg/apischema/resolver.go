@@ -4,6 +4,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/discovery"
 	"k8s.io/kube-openapi/pkg/validation/spec"
+
+	"github.com/openmfp/golang-commons/logger"
 )
 
 const (
@@ -23,12 +25,14 @@ type Resolver interface {
 }
 
 type ResolverProvider struct {
+	log *logger.Logger
 }
 
-func NewResolver() *ResolverProvider {
-	return &ResolverProvider{}
+func NewResolver(log *logger.Logger) *ResolverProvider {
+	return &ResolverProvider{log: log}
 }
 
 func (r *ResolverProvider) Resolve(dc discovery.DiscoveryInterface, rm meta.RESTMapper) ([]byte, error) {
-	return resolveSchema(dc, rm)
+	crdResolver := NewCRDResolver(dc, rm, r.log)
+	return crdResolver.resolveSchema(dc, rm)
 }

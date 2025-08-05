@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/openmfp/golang-commons/logger"
+	"github.com/openmfp/golang-commons/logger/testlogger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -71,16 +71,13 @@ func TestRoundTripper_RoundTrip(t *testing.T) {
 
 			tt.setupMocks(mockAdmin, mockUnauthorized)
 
-			log, err := logger.New(logger.DefaultConfig())
-			require.NoError(t, err)
-
 			appCfg := appConfig.Config{
 				LocalDevelopment: tt.localDevelopment,
 			}
 			appCfg.Gateway.ShouldImpersonate = tt.shouldImpersonate
 			appCfg.Gateway.UsernameClaim = "sub"
 
-			rt := roundtripper.New(log, appCfg, mockAdmin, mockUnauthorized)
+			rt := roundtripper.New(testlogger.New().Logger, appCfg, mockAdmin, mockUnauthorized)
 
 			req := httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/pods", nil)
 			if tt.token != "" {
@@ -259,16 +256,13 @@ func TestRoundTripper_DiscoveryRequests(t *testing.T) {
 				mockUnauthorized.EXPECT().RoundTrip(mock.Anything).Return(&http.Response{StatusCode: http.StatusUnauthorized}, nil)
 			}
 
-			log, err := logger.New(logger.DefaultConfig())
-			require.NoError(t, err)
-
 			appCfg := appConfig.Config{
 				LocalDevelopment: false,
 			}
 			appCfg.Gateway.ShouldImpersonate = false
 			appCfg.Gateway.UsernameClaim = "sub"
 
-			rt := roundtripper.New(log, appCfg, mockAdmin, mockUnauthorized)
+			rt := roundtripper.New(testlogger.New().Logger, appCfg, mockAdmin, mockUnauthorized)
 
 			req := httptest.NewRequest(tt.method, "http://example.com"+tt.path, nil)
 
@@ -376,16 +370,13 @@ func TestRoundTripper_ComprehensiveFunctionality(t *testing.T) {
 
 			tt.setupMocks(mockAdmin, mockUnauthorized)
 
-			log, err := logger.New(logger.DefaultConfig())
-			require.NoError(t, err)
-
 			appCfg := appConfig.Config{
 				LocalDevelopment: tt.localDevelopment,
 			}
 			appCfg.Gateway.ShouldImpersonate = tt.shouldImpersonate
 			appCfg.Gateway.UsernameClaim = tt.usernameClaim
 
-			rt := roundtripper.New(log, appCfg, mockAdmin, mockUnauthorized)
+			rt := roundtripper.New(testlogger.New().Logger, appCfg, mockAdmin, mockUnauthorized)
 
 			req := httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/pods", nil)
 			if tt.token != "" {
@@ -454,16 +445,13 @@ func TestRoundTripper_KCPDiscoveryRequests(t *testing.T) {
 				mockUnauthorized.EXPECT().RoundTrip(mock.Anything).Return(&http.Response{StatusCode: http.StatusUnauthorized}, nil)
 			}
 
-			log, err := logger.New(logger.DefaultConfig())
-			require.NoError(t, err)
-
 			appCfg := appConfig.Config{
 				LocalDevelopment: false,
 			}
 			appCfg.Gateway.ShouldImpersonate = false
 			appCfg.Gateway.UsernameClaim = "sub"
 
-			rt := roundtripper.New(log, appCfg, mockAdmin, mockUnauthorized)
+			rt := roundtripper.New(testlogger.New().Logger, appCfg, mockAdmin, mockUnauthorized)
 
 			req := httptest.NewRequest(http.MethodGet, "http://example.com"+tt.path, nil)
 
@@ -508,14 +496,11 @@ func TestRoundTripper_InvalidTokenSecurityFix(t *testing.T) {
 	// The unauthorizedRT should be called since we have no token
 	mockUnauthorized.EXPECT().RoundTrip(mock.Anything).Return(&http.Response{StatusCode: http.StatusUnauthorized}, nil)
 
-	log, err := logger.New(logger.DefaultConfig())
-	require.NoError(t, err)
-
 	appCfg := appConfig.Config{}
 	appCfg.Gateway.ShouldImpersonate = false
 	appCfg.Gateway.UsernameClaim = "sub"
 
-	rt := roundtripper.New(log, appCfg, mockAdmin, mockUnauthorized)
+	rt := roundtripper.New(testlogger.New().Logger, appCfg, mockAdmin, mockUnauthorized)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/pods", nil)
 	// Don't set a token to simulate the invalid token case
@@ -538,14 +523,11 @@ func TestRoundTripper_ExistingAuthHeadersAreCleanedBeforeTokenAuth(t *testing.T)
 		capturedRequest = req
 	})
 
-	log, err := logger.New(logger.DefaultConfig())
-	require.NoError(t, err)
-
 	appCfg := appConfig.Config{}
 	appCfg.Gateway.ShouldImpersonate = false
 	appCfg.Gateway.UsernameClaim = "sub"
 
-	rt := roundtripper.New(log, appCfg, mockAdmin, mockUnauthorized)
+	rt := roundtripper.New(testlogger.New().Logger, appCfg, mockAdmin, mockUnauthorized)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/pods", nil)
 
@@ -581,14 +563,11 @@ func TestRoundTripper_ExistingAuthHeadersAreCleanedBeforeImpersonation(t *testin
 		capturedRequest = req
 	})
 
-	log, err := logger.New(logger.DefaultConfig())
-	require.NoError(t, err)
-
 	appCfg := appConfig.Config{}
 	appCfg.Gateway.ShouldImpersonate = true
 	appCfg.Gateway.UsernameClaim = "sub"
 
-	rt := roundtripper.New(log, appCfg, mockAdmin, mockUnauthorized)
+	rt := roundtripper.New(testlogger.New().Logger, appCfg, mockAdmin, mockUnauthorized)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/pods", nil)
 

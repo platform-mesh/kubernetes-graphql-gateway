@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/graphql-go/graphql"
-	"github.com/openmfp/golang-commons/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -15,15 +14,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/openmfp/golang-commons/logger/testlogger"
 	"github.com/openmfp/kubernetes-graphql-gateway/common/mocks"
 	"github.com/openmfp/kubernetes-graphql-gateway/gateway/resolver"
 )
-
-func getResolver(runtimeClientMock client.WithWatch) (*resolver.Service, error) {
-	log, err := logger.New(logger.DefaultConfig())
-
-	return resolver.New(log, runtimeClientMock), err
-}
 
 func TestListItems(t *testing.T) {
 	tests := []struct {
@@ -85,9 +79,7 @@ func TestListItems(t *testing.T) {
 				tt.mockSetup(runtimeClientMock)
 			}
 
-			r, err := getResolver(runtimeClientMock)
-			require.NoError(t, err)
-
+			r := resolver.New(testlogger.New().Logger, runtimeClientMock)
 			result, err := r.ListItems(schema.GroupVersionKind{
 				Group:   "group",
 				Version: "version",
@@ -176,8 +168,7 @@ func TestGetItem(t *testing.T) {
 				tt.mockSetup(runtimeClientMock)
 			}
 
-			r, err := getResolver(runtimeClientMock)
-			require.NoError(t, err)
+			r := resolver.New(testlogger.New().Logger, runtimeClientMock)
 
 			result, err := r.GetItem(schema.GroupVersionKind{
 				Group:   "group",
@@ -247,8 +238,7 @@ func TestGetItemAsYAML(t *testing.T) {
 				tt.mockSetup(runtimeClientMock)
 			}
 
-			r, err := getResolver(runtimeClientMock)
-			require.NoError(t, err)
+			r := resolver.New(testlogger.New().Logger, runtimeClientMock)
 
 			result, err := r.GetItemAsYAML(schema.GroupVersionKind{
 				Group:   "group",
@@ -381,8 +371,7 @@ func TestCreateItem(t *testing.T) {
 				tt.mockSetup(runtimeClientMock)
 			}
 
-			r, err := getResolver(runtimeClientMock)
-			require.NoError(t, err)
+			r := resolver.New(testlogger.New().Logger, runtimeClientMock)
 
 			result, err := r.CreateItem(schema.GroupVersionKind{
 				Group:   "group",
@@ -564,8 +553,7 @@ func TestUpdateItem(t *testing.T) {
 				tt.mockSetup(runtimeClientMock)
 			}
 
-			r, err := getResolver(runtimeClientMock)
-			require.NoError(t, err)
+			r := resolver.New(testlogger.New().Logger, runtimeClientMock)
 
 			result, err := r.UpdateItem(schema.GroupVersionKind{
 				Group:   "group",
@@ -649,8 +637,7 @@ func TestDeleteItem(t *testing.T) {
 				tt.mockSetup(runtimeClientMock)
 			}
 
-			r, err := getResolver(runtimeClientMock)
-			require.NoError(t, err)
+			r := resolver.New(testlogger.New().Logger, runtimeClientMock)
 
 			result, err := r.DeleteItem(schema.GroupVersionKind{
 				Group:   "group",

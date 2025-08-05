@@ -7,6 +7,9 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/openapi"
 	"k8s.io/kube-openapi/pkg/validation/spec"
+
+	"github.com/openmfp/golang-commons/logger"
+	"github.com/openmfp/golang-commons/logger/testlogger"
 )
 
 func GetCRDGroupKindVersions(spec apiextensionsv1.CustomResourceDefinitionSpec) *GroupKindVersions {
@@ -18,15 +21,17 @@ func IsCRDKindIncluded(gkv *GroupKindVersions, apiList *metav1.APIResourceList) 
 }
 
 func ErrorIfCRDNotInPreferredApiGroups(gkv *GroupKindVersions, lists []*metav1.APIResourceList) ([]string, error) {
-	return errorIfCRDNotInPreferredApiGroups(gkv, lists, nil)
+	crdResolver := NewCRDResolver(nil, nil, testlogger.New().Logger)
+	return crdResolver.errorIfCRDNotInPreferredApiGroups(gkv, lists)
 }
 
 func GetSchemaForPath(preferred []string, path string, gv openapi.GroupVersion) (map[string]*spec.Schema, error) {
 	return getSchemaForPath(preferred, path, gv)
 }
 
-func ResolveSchema(dc discovery.DiscoveryInterface, rm meta.RESTMapper) ([]byte, error) {
-	return resolveSchema(dc, rm)
+func ResolveSchema(dc discovery.DiscoveryInterface, rm meta.RESTMapper, log *logger.Logger) ([]byte, error) {
+	crdResolver := NewCRDResolver(dc, rm, log)
+	return crdResolver.resolveSchema(dc, rm)
 }
 
 func GetOpenAPISchemaKey(gvk metav1.GroupVersionKind) string {

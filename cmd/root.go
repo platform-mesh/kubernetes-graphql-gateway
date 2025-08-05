@@ -81,6 +81,14 @@ func initConfig() {
 	v.SetDefault("gateway-url-graphql-suffix", "graphql")
 }
 
+// setupLogger initializes the logger with the given log level
+func setupLogger(logLevel string) (*logger.Logger, error) {
+	loggerCfg := logger.DefaultConfig()
+	loggerCfg.Name = "crdGateway"
+	loggerCfg.Level = logLevel
+	return logger.New(loggerCfg)
+}
+
 func Execute() {
 	cobra.CheckErr(rootCmd.Execute())
 }

@@ -4,22 +4,21 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"maps"
 	"slices"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/api/meta"
-	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
-
 	"github.com/hashicorp/go-multierror"
-	"github.com/openmfp/golang-commons/logger"
-	"github.com/openmfp/kubernetes-graphql-gateway/common"
+	"golang.org/x/exp/maps"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	k8sschema "k8s.io/apimachinery/pkg/runtime/schema"
 	runtimeSchema "k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/openapi"
 	"k8s.io/kube-openapi/pkg/validation/spec"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
+
+	"github.com/openmfp/golang-commons/logger"
+	"github.com/openmfp/kubernetes-graphql-gateway/common"
 )
 
 var (
@@ -33,18 +32,13 @@ var (
 	ErrUnmarshalGVK         = errors.New("failed to unmarshal GVK extension")
 )
 
-// SchemaBuilder helps construct GraphQL field config arguments
 type SchemaBuilder struct {
 	schemas map[string]*spec.Schema
 	err     *multierror.Error
 	log     *logger.Logger
 }
 
-func NewSchemaBuilder(oc openapi.Client, preferredApiGroups []string) *SchemaBuilder {
-	return NewSchemaBuilderWithLogger(oc, preferredApiGroups, nil)
-}
-
-func NewSchemaBuilderWithLogger(oc openapi.Client, preferredApiGroups []string, log *logger.Logger) *SchemaBuilder {
+func NewSchemaBuilder(oc openapi.Client, preferredApiGroups []string, log *logger.Logger) *SchemaBuilder {
 	b := &SchemaBuilder{
 		schemas: make(map[string]*spec.Schema),
 		log:     log,
@@ -59,9 +53,7 @@ func NewSchemaBuilderWithLogger(oc openapi.Client, preferredApiGroups []string, 
 	for path, gv := range apiv3Paths {
 		schema, err := getSchemaForPath(preferredApiGroups, path, gv)
 		if err != nil {
-			if b.log != nil {
-				b.log.Debug().Err(err).Str("path", path).Msg("skipping schema path")
-			}
+			b.log.Debug().Err(err).Str("path", path).Msg("skipping schema path")
 			continue
 		}
 		maps.Copy(b.schemas, schema)
@@ -100,26 +92,22 @@ func (b *SchemaBuilder) WithScope(rm meta.RESTMapper) *SchemaBuilder {
 		}
 
 		if len(gvks) != 1 {
-			if b.log != nil {
-				b.log.Debug().Int("gvkCount", len(gvks)).Msg("skipping schema with unexpected GVK count")
-			}
+			b.log.Debug().Int("gvkCount", len(gvks)).Msg("skipping schema with unexpected GVK count")
 			continue
 		}
 
-		namespaced, err := apiutil.IsGVKNamespaced(k8sschema.GroupVersionKind{
+		namespaced, err := apiutil.IsGVKNamespaced(runtimeSchema.GroupVersionKind{
 			Group:   gvks[0].Group,
 			Version: gvks[0].Version,
 			Kind:    gvks[0].Kind,
 		}, rm)
 
 		if err != nil {
-			if b.log != nil {
-				b.log.Debug().Err(err).
-					Str("group", gvks[0].Group).
-					Str("version", gvks[0].Version).
-					Str("kind", gvks[0].Kind).
-					Msg("failed to determine if GVK is namespaced")
-			}
+			b.log.Debug().Err(err).
+				Str("group", gvks[0].Group).
+				Str("version", gvks[0].Version).
+				Str("kind", gvks[0].Kind).
+				Msg("failed to determine if GVK is namespaced")
 			continue
 		}
 

@@ -7,6 +7,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/openapi"
 
+	"github.com/openmfp/golang-commons/logger/testlogger"
 	apischemaMocks "github.com/openmfp/kubernetes-graphql-gateway/listener/pkg/apischema/mocks"
 )
 
@@ -16,7 +17,7 @@ var _ Resolver = (*ResolverProvider)(nil)
 // TestNewResolverNotNil checks if NewResolver() returns a non-nil *ResolverProvider
 // instance. This is a runtime check to ensure that the function behaves as expected.
 func TestNewResolverNotNil(t *testing.T) {
-	r := NewResolver()
+	r := NewResolver(testlogger.New().Logger)
 	assert.NotNil(t, r, "NewResolver() should return non-nil *ResolverProvider")
 }
 
@@ -61,7 +62,7 @@ func TestResolverProvider_Resolve(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			resolver := NewResolver()
+			resolver := NewResolver(testlogger.New().Logger)
 			dc := apischemaMocks.NewMockDiscoveryInterface(t)
 			rm := apischemaMocks.NewMockRESTMapper(t)
 

@@ -7,27 +7,22 @@ import (
 
 	"github.com/go-openapi/spec"
 	"github.com/graphql-go/graphql"
-	"github.com/openmfp/golang-commons/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/openmfp/golang-commons/logger/testlogger"
 	"github.com/openmfp/kubernetes-graphql-gateway/gateway/resolver"
 	"github.com/openmfp/kubernetes-graphql-gateway/gateway/schema"
 )
 
 func getGateway() (*schema.Gateway, error) {
-	log, err := logger.New(logger.DefaultConfig())
-	if err != nil {
-		return nil, err
-	}
-
 	// Read the schema file and extract definitions
 	definitions, err := readDefinitionFromFile("./testdata/kubernetes")
 	if err != nil {
 		return nil, err
 	}
 
-	return schema.New(log, definitions, resolver.New(log, nil))
+	return schema.New(testlogger.New().Logger, definitions, resolver.New(testlogger.New().Logger, nil))
 }
 
 // readDefinitionFromFile reads OpenAPI definitions from a schema file

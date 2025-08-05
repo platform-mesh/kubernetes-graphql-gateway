@@ -17,7 +17,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/graphql-go/graphql"
-	"github.com/openmfp/golang-commons/logger"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -29,6 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/openmfp/account-operator/api/v1alpha1"
+	"github.com/openmfp/golang-commons/logger"
 	appConfig "github.com/openmfp/kubernetes-graphql-gateway/common/config"
 	"github.com/openmfp/kubernetes-graphql-gateway/gateway/manager"
 	"github.com/openmfp/kubernetes-graphql-gateway/gateway/resolver"
@@ -135,10 +135,13 @@ func (suite *CommonTestSuite) SetupTest() {
 	})
 	require.NoError(suite.T(), err)
 
+	// Create resolver service with the logger pointer
+	resolverService := resolver.New(suite.log, suite.runtimeClient)
+
 	definitions, err := readDefinitionFromFile("./testdata/kubernetes")
 	require.NoError(suite.T(), err)
 
-	g, err := schema.New(suite.log, definitions, resolver.New(suite.log, suite.runtimeClient))
+	g, err := schema.New(suite.log, definitions, resolverService)
 	require.NoError(suite.T(), err)
 
 	suite.graphqlSchema = *g.GetSchema()

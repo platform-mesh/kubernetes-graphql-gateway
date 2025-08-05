@@ -4,18 +4,14 @@ import (
 	"encoding/base64"
 	"testing"
 
-	"github.com/openmfp/golang-commons/logger"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"k8s.io/client-go/rest"
 
+	"github.com/openmfp/golang-commons/logger/testlogger"
 	"github.com/openmfp/kubernetes-graphql-gateway/gateway/manager/targetcluster"
 )
 
 func TestBuildConfigFromMetadata(t *testing.T) {
-	log, err := logger.New(logger.DefaultConfig())
-	require.NoError(t, err)
-
 	// Valid base64 encoded test data
 	validCA := base64.StdEncoding.EncodeToString([]byte("-----BEGIN CERTIFICATE-----\nMIICyDCCAbCgAwIBAgIBADANBgkqhkiG9w0BAQsFADA=\n-----END CERTIFICATE-----"))
 	validToken := base64.StdEncoding.EncodeToString([]byte("test-token-123"))
@@ -341,7 +337,7 @@ users:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			config, err := targetcluster.BuildConfigFromMetadata(tt.metadata, log)
+			config, err := targetcluster.BuildConfigFromMetadata(tt.metadata, testlogger.New().Logger)
 
 			if tt.expectError {
 				assert.Error(t, err)

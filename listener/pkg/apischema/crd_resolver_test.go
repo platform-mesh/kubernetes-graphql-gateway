@@ -9,6 +9,7 @@ import (
 	"k8s.io/client-go/openapi"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 
+	"github.com/openmfp/golang-commons/logger/testlogger"
 	apischema "github.com/openmfp/kubernetes-graphql-gateway/listener/pkg/apischema"
 	apischemaMocks "github.com/openmfp/kubernetes-graphql-gateway/listener/pkg/apischema/mocks"
 	"github.com/stretchr/testify/assert"
@@ -317,7 +318,7 @@ func TestResolveSchema(t *testing.T) {
 				dc.EXPECT().OpenAPIV3().Return(openAPIClient)
 			}
 
-			got, err := apischema.ResolveSchema(dc, rm)
+			got, err := apischema.ResolveSchema(dc, rm, testlogger.New().Logger)
 			if tc.wantErr != nil {
 				assert.ErrorIs(t, err, tc.wantErr)
 				return

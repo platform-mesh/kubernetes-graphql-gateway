@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"crypto/tls"
-	"os"
 
 	kcpapis "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
 	kcpcore "github.com/kcp-dev/kcp/sdk/apis/core/v1alpha1"
@@ -21,6 +20,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	gatewayv1alpha1 "github.com/openmfp/kubernetes-graphql-gateway/common/apis/v1alpha1"
+	"github.com/openmfp/kubernetes-graphql-gateway/listener/pkg/apischema"
+	"github.com/openmfp/kubernetes-graphql-gateway/listener/pkg/workspacefile"
 	"github.com/openmfp/kubernetes-graphql-gateway/listener/reconciler"
 	"github.com/openmfp/kubernetes-graphql-gateway/listener/reconciler/clusteraccess"
 	"github.com/openmfp/kubernetes-graphql-gateway/listener/reconciler/kcp"
@@ -74,6 +75,8 @@ var listenCmd = &cobra.Command{
 		}
 	},
 	Run: func(cmd *cobra.Command, args []string) {
+		log.Info().Str("LogLevel", log.GetLevel().String()).Msg("Starting the Listener...")
+
 		ctx := ctrl.SetupSignalHandler()
 		restCfg := ctrl.GetConfigOrDie()
 
@@ -90,8 +93,7 @@ var listenCmd = &cobra.Command{
 			Scheme: scheme,
 		})
 		if err != nil {
-			log.Error().Err(err).Msg("failed to create client from config")
-			os.Exit(1)
+			log.Fatal().Err(err).Msg("failed to create client from config")
 		}
 
 		reconcilerOpts := reconciler.ReconcilerOpts{
@@ -107,32 +109,34 @@ var listenCmd = &cobra.Command{
 		if appCfg.EnableKcp {
 			kcpReconciler, err := kcp.NewKCPReconciler(appCfg, reconcilerOpts, log)
 			if err != nil {
-				log.Error().Err(err).Msg("unable to create KCP reconciler")
-				os.Exit(1)
+				log.Fatal().Err(err).Msg("unable to create KCP reconciler")
 			}
 
 			// Start virtual workspace watching if path is configured
 			if appCfg.Listener.VirtualWorkspacesConfigPath != "" {
 				go func() {
 					if err := kcpReconciler.StartVirtualWorkspaceWatching(ctx, appCfg.Listener.VirtualWorkspacesConfigPath); err != nil {
-						log.Error().Err(err).Msg("failed to start virtual workspace watching")
-						os.Exit(1)
+						log.Fatal().Err(err).Msg("failed to start virtual workspace watching")
 					}
 				}()
 			}
 
 			reconcilerInstance = kcpReconciler
 		} else {
-			reconcilerInstance, err = clusteraccess.CreateMultiClusterReconciler(appCfg, reconcilerOpts, log)
+			ioHandler, err := workspacefile.NewIOHandler(appCfg.OpenApiDefinitionsPath)
 			if err != nil {
-				log.Error().Err(err).Msg("unable to create cluster access reconciler")
-				os.Exit(1)
+				log.Fatal().Err(err).Msg("unable to create IO handler")
+			}
+
+			reconcilerInstance, err = clusteraccess.NewClusterAccessReconciler(ctx, appCfg, reconcilerOpts, ioHandler, apischema.NewResolver(log), log)
+			if err != nil {
+				log.Fatal().Err(err).Msg("unable to create cluster access reconciler")
 			}
 		}
 
 		// Setup reconciler with its own manager and start everything
 		if err := startManagerWithReconciler(ctx, reconcilerInstance); err != nil {
-			os.Exit(1)
+			log.Fatal().Err(err).Msg("failed to start manager with reconciler")
 		}
 	},
 }

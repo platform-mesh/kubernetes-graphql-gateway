@@ -253,7 +253,8 @@ func TestInjectClusterMetadata(t *testing.T) {
 }
 
 func TestInjectClusterMetadata_PathLogic(t *testing.T) {
-	mockLogger, _ := logger.New(logger.DefaultConfig())
+	mockLogger, err := logger.New(logger.DefaultConfig())
+	require.NoError(t, err)
 	mockClient := mocks.NewMockClient(t)
 	schemaJSON := []byte(`{"openapi": "3.0.0", "info": {"title": "Test"}}`)
 

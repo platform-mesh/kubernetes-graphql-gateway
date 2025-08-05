@@ -13,7 +13,7 @@ import (
 	"github.com/kcp-dev/logicalcluster/v3"
 	"sigs.k8s.io/controller-runtime/pkg/kontext"
 
-	"github.com/openmfp/golang-commons/logger"
+	"github.com/openmfp/golang-commons/logger/testlogger"
 	"github.com/openmfp/kubernetes-graphql-gateway/common"
 	appConfig "github.com/openmfp/kubernetes-graphql-gateway/common/config"
 	"github.com/openmfp/kubernetes-graphql-gateway/gateway/manager/roundtripper"
@@ -110,13 +110,9 @@ func TestIsIntrospectionQuery(t *testing.T) {
 }
 
 func TestNewGraphQLServer(t *testing.T) {
-	log, err := logger.New(logger.DefaultConfig())
-	if err != nil {
-		t.Fatalf("failed to create logger: %v", err)
-	}
 	appCfg := appConfig.Config{}
 
-	server := targetcluster.NewGraphQLServer(log, appCfg)
+	server := targetcluster.NewGraphQLServer(testlogger.New().Logger, appCfg)
 
 	if server == nil {
 		t.Error("expected non-nil server")
@@ -124,16 +120,12 @@ func TestNewGraphQLServer(t *testing.T) {
 }
 
 func TestCreateHandler(t *testing.T) {
-	log, err := logger.New(logger.DefaultConfig())
-	if err != nil {
-		t.Fatalf("failed to create logger: %v", err)
-	}
 	appCfg := appConfig.Config{}
 	appCfg.Gateway.HandlerCfg.Pretty = true
 	appCfg.Gateway.HandlerCfg.Playground = false
 	appCfg.Gateway.HandlerCfg.GraphiQL = true
 
-	server := targetcluster.NewGraphQLServer(log, appCfg)
+	server := targetcluster.NewGraphQLServer(testlogger.New().Logger, appCfg)
 
 	// Create a simple test schema
 	schema, err := graphql.NewSchema(graphql.SchemaConfig{
@@ -215,12 +207,8 @@ func TestSetContexts(t *testing.T) {
 }
 
 func TestHandleSubscription_ErrorCases(t *testing.T) {
-	log, err := logger.New(logger.DefaultConfig())
-	if err != nil {
-		t.Fatalf("failed to create logger: %v", err)
-	}
 	appCfg := appConfig.Config{}
-	server := targetcluster.NewGraphQLServer(log, appCfg)
+	server := targetcluster.NewGraphQLServer(testlogger.New().Logger, appCfg)
 
 	// Create a simple test schema
 	schema, err := graphql.NewSchema(graphql.SchemaConfig{
@@ -274,12 +262,8 @@ func TestHandleSubscription_ErrorCases(t *testing.T) {
 }
 
 func TestHandleSubscription_Headers(t *testing.T) {
-	log, err := logger.New(logger.DefaultConfig())
-	if err != nil {
-		t.Fatalf("failed to create logger: %v", err)
-	}
 	appCfg := appConfig.Config{}
-	server := targetcluster.NewGraphQLServer(log, appCfg)
+	server := targetcluster.NewGraphQLServer(testlogger.New().Logger, appCfg)
 
 	// Create a simple test schema
 	schema, err := graphql.NewSchema(graphql.SchemaConfig{
@@ -338,12 +322,8 @@ func TestHandleSubscription_Headers(t *testing.T) {
 }
 
 func TestHandleSubscription_SubscriptionLoop(t *testing.T) {
-	log, err := logger.New(logger.DefaultConfig())
-	if err != nil {
-		t.Fatalf("failed to create logger: %v", err)
-	}
 	appCfg := appConfig.Config{}
-	server := targetcluster.NewGraphQLServer(log, appCfg)
+	server := targetcluster.NewGraphQLServer(testlogger.New().Logger, appCfg)
 
 	// Create schema with subscription that returns data
 	schema, err := graphql.NewSchema(graphql.SchemaConfig{

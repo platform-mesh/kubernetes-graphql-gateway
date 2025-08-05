@@ -14,6 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	gatewayv1alpha1 "github.com/openmfp/kubernetes-graphql-gateway/common/apis/v1alpha1"
+	"github.com/openmfp/kubernetes-graphql-gateway/common/auth"
 	"github.com/openmfp/kubernetes-graphql-gateway/common/mocks"
 	"github.com/openmfp/kubernetes-graphql-gateway/listener/reconciler/clusteraccess"
 )
@@ -304,7 +305,7 @@ func TestExtractCAData(t *testing.T) {
 			mockClient := mocks.NewMockClient(t)
 			tt.mockSetup(mockClient)
 
-			got, err := clusteraccess.ExtractCAData(t.Context(), tt.ca, mockClient)
+			got, err := auth.ExtractCAData(t.Context(), tt.ca, mockClient)
 
 			if tt.wantErr {
 				assert.Error(t, err)

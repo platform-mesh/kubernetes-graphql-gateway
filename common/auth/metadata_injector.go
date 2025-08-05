@@ -28,9 +28,23 @@ type MetadataInjectionConfig struct {
 	HostOverride string // For virtual workspaces
 }
 
+// MetadataInjector provides metadata injection services with structured logging
+type MetadataInjector struct {
+	log    *logger.Logger
+	client client.Client
+}
+
+// NewMetadataInjector creates a new MetadataInjector service
+func NewMetadataInjector(log *logger.Logger, client client.Client) *MetadataInjector {
+	return &MetadataInjector{
+		log:    log,
+		client: client,
+	}
+}
+
 // InjectClusterMetadata injects cluster metadata into schema JSON
 // This unified function handles both KCP and ClusterAccess use cases
-func InjectClusterMetadata(ctx context.Context, schemaJSON []byte, config MetadataInjectionConfig, k8sClient client.Client, log *logger.Logger) ([]byte, error) {
+func (m *MetadataInjector) InjectClusterMetadata(ctx context.Context, schemaJSON []byte, config MetadataInjectionConfig) ([]byte, error) {
 	// Parse the existing schema JSON
 	var schemaData map[string]interface{}
 	if err := json.Unmarshal(schemaJSON, &schemaData); err != nil {
@@ -38,7 +52,7 @@ func InjectClusterMetadata(ctx context.Context, schemaJSON []byte, config Metada
 	}
 
 	// Determine the host to use
-	host := determineHost(config.Host, config.HostOverride, log)
+	host := m.determineHost(config.Host, config.HostOverride)
 
 	// Create cluster metadata
 	metadata := map[string]interface{}{
@@ -48,9 +62,9 @@ func InjectClusterMetadata(ctx context.Context, schemaJSON []byte, config Metada
 
 	// Add auth data if configured
 	if config.Auth != nil {
-		authMetadata, err := extractAuthDataForMetadata(ctx, config.Auth, k8sClient)
+		authMetadata, err := m.extractAuthDataForMetadata(ctx, config.Auth)
 		if err != nil {
-			log.Warn().Err(err).Msg("failed to extract auth data for metadata")
+			m.log.Warn().Err(err).Msg("failed to extract auth data for metadata")
 		} else if authMetadata != nil {
 			metadata["auth"] = authMetadata
 		}
@@ -58,26 +72,26 @@ func InjectClusterMetadata(ctx context.Context, schemaJSON []byte, config Metada
 
 	// Add CA data - prefer explicit CA config, fallback to kubeconfig CA
 	if config.CA != nil {
-		caData, err := ExtractCAData(ctx, config.CA, k8sClient)
+		caData, err := ExtractCAData(ctx, config.CA, m.client)
 		if err != nil {
-			log.Warn().Err(err).Msg("failed to extract CA data for metadata")
+			m.log.Warn().Err(err).Msg("failed to extract CA data for metadata")
 		} else if caData != nil {
 			metadata["ca"] = map[string]interface{}{
 				"data": base64.StdEncoding.EncodeToString(caData),
 			}
 		}
 	} else if config.Auth != nil {
-		tryExtractKubeconfigCA(ctx, config.Auth, k8sClient, metadata, log)
+		m.tryExtractKubeconfigCA(ctx, config.Auth, metadata)
 	}
 
-	return finalizeSchemaInjection(schemaData, metadata, host, config.Path, config.CA != nil || config.Auth != nil, log)
+	return m.finalizeSchemaInjection(schemaData, metadata, host, config.Path, config.CA != nil || config.Auth != nil)
 }
 
 // InjectKCPMetadataFromEnv injects KCP metadata using kubeconfig from environment
 // This is a convenience function for KCP use cases
-func InjectKCPMetadataFromEnv(schemaJSON []byte, clusterPath string, log *logger.Logger, hostOverride ...string) ([]byte, error) {
+func (m *MetadataInjector) InjectKCPMetadataFromEnv(schemaJSON []byte, clusterPath string, hostOverride ...string) ([]byte, error) {
 	// Get kubeconfig from environment (same sources as ctrl.GetConfig())
-	kubeconfigData, kubeconfigHost, err := extractKubeconfigFromEnv(log)
+	kubeconfigData, kubeconfigHost, err := m.extractKubeconfigFromEnv()
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract kubeconfig data: %w", err)
 	}
@@ -95,7 +109,7 @@ func InjectKCPMetadataFromEnv(schemaJSON []byte, clusterPath string, log *logger
 	}
 
 	// Determine which host to use
-	host := determineKCPHost(kubeconfigHost, override, clusterPath, log)
+	host := m.determineKCPHost(kubeconfigHost, override, clusterPath)
 
 	// Create cluster metadata with environment kubeconfig
 	metadata := map[string]interface{}{
@@ -108,40 +122,40 @@ func InjectKCPMetadataFromEnv(schemaJSON []byte, clusterPath string, log *logger
 	}
 
 	// Extract CA data from kubeconfig if available
-	caData := extractCAFromKubeconfigData(kubeconfigData, log)
+	caData := m.extractCAFromKubeconfigData(kubeconfigData)
 	if caData != nil {
 		metadata["ca"] = map[string]interface{}{
 			"data": base64.StdEncoding.EncodeToString(caData),
 		}
 	}
 
-	return finalizeSchemaInjection(schemaData, metadata, host, clusterPath, caData != nil, log)
+	return m.finalizeSchemaInjection(schemaData, metadata, host, clusterPath, caData != nil)
 }
 
 // extractAuthDataForMetadata extracts auth data from AuthConfig for metadata injection
-func extractAuthDataForMetadata(ctx context.Context, auth *gatewayv1alpha1.AuthConfig, k8sClient client.Client) (map[string]interface{}, error) {
+func (m *MetadataInjector) extractAuthDataForMetadata(ctx context.Context, auth *gatewayv1alpha1.AuthConfig) (map[string]interface{}, error) {
 	if auth == nil {
 		return nil, nil
 	}
 
 	if auth.SecretRef != nil {
-		return extractTokenAuth(ctx, auth.SecretRef, k8sClient)
+		return m.extractTokenAuth(ctx, auth.SecretRef)
 	}
 
 	if auth.KubeconfigSecretRef != nil {
-		return extractKubeconfigAuth(ctx, auth.KubeconfigSecretRef, k8sClient)
+		return m.extractKubeconfigAuth(ctx, auth.KubeconfigSecretRef)
 	}
 
 	if auth.ClientCertificateRef != nil {
-		return extractClientCertAuth(ctx, auth.ClientCertificateRef, k8sClient)
+		return m.extractClientCertAuth(ctx, auth.ClientCertificateRef)
 	}
 
 	return nil, nil // No auth configured
 }
 
 // extractTokenAuth handles token-based authentication from SecretRef
-func extractTokenAuth(ctx context.Context, secretRef *gatewayv1alpha1.SecretRef, k8sClient client.Client) (map[string]interface{}, error) {
-	secret, err := getSecret(ctx, secretRef.Name, secretRef.Namespace, k8sClient)
+func (m *MetadataInjector) extractTokenAuth(ctx context.Context, secretRef *gatewayv1alpha1.SecretRef) (map[string]interface{}, error) {
+	secret, err := m.getSecret(ctx, secretRef.Name, secretRef.Namespace)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get auth secret: %w", err)
 	}
@@ -158,8 +172,8 @@ func extractTokenAuth(ctx context.Context, secretRef *gatewayv1alpha1.SecretRef,
 }
 
 // extractKubeconfigAuth handles kubeconfig-based authentication from KubeconfigSecretRef
-func extractKubeconfigAuth(ctx context.Context, kubeconfigRef *gatewayv1alpha1.KubeconfigSecretRef, k8sClient client.Client) (map[string]interface{}, error) {
-	secret, err := getSecret(ctx, kubeconfigRef.Name, kubeconfigRef.Namespace, k8sClient)
+func (m *MetadataInjector) extractKubeconfigAuth(ctx context.Context, kubeconfigRef *gatewayv1alpha1.KubeconfigSecretRef) (map[string]interface{}, error) {
+	secret, err := m.getSecret(ctx, kubeconfigRef.Name, kubeconfigRef.Namespace)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get kubeconfig secret: %w", err)
 	}
@@ -176,8 +190,8 @@ func extractKubeconfigAuth(ctx context.Context, kubeconfigRef *gatewayv1alpha1.K
 }
 
 // extractClientCertAuth handles client certificate authentication from ClientCertificateRef
-func extractClientCertAuth(ctx context.Context, certRef *gatewayv1alpha1.ClientCertificateRef, k8sClient client.Client) (map[string]interface{}, error) {
-	secret, err := getSecret(ctx, certRef.Name, certRef.Namespace, k8sClient)
+func (m *MetadataInjector) extractClientCertAuth(ctx context.Context, certRef *gatewayv1alpha1.ClientCertificateRef) (map[string]interface{}, error) {
+	secret, err := m.getSecret(ctx, certRef.Name, certRef.Namespace)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get client certificate secret: %w", err)
 	}
@@ -197,13 +211,13 @@ func extractClientCertAuth(ctx context.Context, certRef *gatewayv1alpha1.ClientC
 }
 
 // getSecret is a helper function to retrieve secrets with namespace defaulting
-func getSecret(ctx context.Context, name, namespace string, k8sClient client.Client) (*corev1.Secret, error) {
+func (m *MetadataInjector) getSecret(ctx context.Context, name, namespace string) (*corev1.Secret, error) {
 	if namespace == "" {
 		namespace = "default"
 	}
 
 	secret := &corev1.Secret{}
-	err := k8sClient.Get(ctx, types.NamespacedName{
+	err := m.client.Get(ctx, types.NamespacedName{
 		Name:      name,
 		Namespace: namespace,
 	}, secret)
@@ -215,11 +229,11 @@ func getSecret(ctx context.Context, name, namespace string, k8sClient client.Cli
 }
 
 // extractKubeconfigFromEnv gets kubeconfig data from the same sources as ctrl.GetConfig()
-func extractKubeconfigFromEnv(log *logger.Logger) ([]byte, string, error) {
+func (m *MetadataInjector) extractKubeconfigFromEnv() ([]byte, string, error) {
 	// Check KUBECONFIG environment variable first
 	kubeconfigPath := os.Getenv("KUBECONFIG")
 	if kubeconfigPath != "" {
-		log.Debug().Str("source", "KUBECONFIG env var").Str("path", kubeconfigPath).Msg("using kubeconfig from environment variable")
+		m.log.Debug().Str("source", "KUBECONFIG env var").Str("path", kubeconfigPath).Msg("using kubeconfig from environment variable")
 	}
 
 	// Fall back to default kubeconfig location if not set
@@ -229,7 +243,7 @@ func extractKubeconfigFromEnv(log *logger.Logger) ([]byte, string, error) {
 			return nil, "", fmt.Errorf("failed to determine kubeconfig location: %w", err)
 		}
 		kubeconfigPath = home + "/.kube/config"
-		log.Debug().Str("source", "default location").Str("path", kubeconfigPath).Msg("using default kubeconfig location")
+		m.log.Debug().Str("source", "default location").Str("path", kubeconfigPath).Msg("using default kubeconfig location")
 	}
 
 	// Check if file exists
@@ -301,32 +315,32 @@ func stripVirtualWorkspacePath(hostURL string) string {
 }
 
 // extractCAFromKubeconfigData extracts CA certificate data from raw kubeconfig bytes
-func extractCAFromKubeconfigData(kubeconfigData []byte, log *logger.Logger) []byte {
+func (m *MetadataInjector) extractCAFromKubeconfigData(kubeconfigData []byte) []byte {
 	config, err := clientcmd.Load(kubeconfigData)
 	if err != nil {
-		log.Warn().Err(err).Msg("failed to parse kubeconfig for CA extraction")
+		m.log.Warn().Err(err).Msg("failed to parse kubeconfig for CA extraction")
 		return nil
 	}
 
 	if config.CurrentContext == "" {
-		log.Warn().Msg("no current context in kubeconfig for CA extraction")
+		m.log.Warn().Msg("no current context in kubeconfig for CA extraction")
 		return nil
 	}
 
 	context, exists := config.Contexts[config.CurrentContext]
 	if !exists {
-		log.Warn().Str("context", config.CurrentContext).Msg("current context not found in kubeconfig for CA extraction")
+		m.log.Warn().Str("context", config.CurrentContext).Msg("current context not found in kubeconfig for CA extraction")
 		return nil
 	}
 
 	cluster, exists := config.Clusters[context.Cluster]
 	if !exists {
-		log.Warn().Str("cluster", context.Cluster).Msg("cluster not found in kubeconfig for CA extraction")
+		m.log.Warn().Str("cluster", context.Cluster).Msg("cluster not found in kubeconfig for CA extraction")
 		return nil
 	}
 
 	if len(cluster.CertificateAuthorityData) == 0 {
-		log.Debug().Msg("no CA data found in kubeconfig")
+		m.log.Debug().Msg("no CA data found in kubeconfig")
 		return nil
 	}
 
@@ -334,21 +348,21 @@ func extractCAFromKubeconfigData(kubeconfigData []byte, log *logger.Logger) []by
 }
 
 // extractCAFromKubeconfigB64 extracts CA certificate data from base64-encoded kubeconfig
-func extractCAFromKubeconfigB64(kubeconfigB64 string, log *logger.Logger) []byte {
+func (m *MetadataInjector) extractCAFromKubeconfigB64(kubeconfigB64 string) []byte {
 	kubeconfigData, err := base64.StdEncoding.DecodeString(kubeconfigB64)
 	if err != nil {
-		log.Warn().Err(err).Msg("failed to decode kubeconfig for CA extraction")
+		m.log.Warn().Err(err).Msg("failed to decode kubeconfig for CA extraction")
 		return nil
 	}
 
-	return extractCAFromKubeconfigData(kubeconfigData, log)
+	return m.extractCAFromKubeconfigData(kubeconfigData)
 }
 
 // tryExtractKubeconfigCA attempts to extract CA data from kubeconfig auth and adds it to metadata
-func tryExtractKubeconfigCA(ctx context.Context, auth *gatewayv1alpha1.AuthConfig, k8sClient client.Client, metadata map[string]interface{}, log *logger.Logger) {
-	authMetadata, err := extractAuthDataForMetadata(ctx, auth, k8sClient)
+func (m *MetadataInjector) tryExtractKubeconfigCA(ctx context.Context, auth *gatewayv1alpha1.AuthConfig, metadata map[string]interface{}) {
+	authMetadata, err := m.extractAuthDataForMetadata(ctx, auth)
 	if err != nil {
-		log.Warn().Err(err).Msg("failed to extract auth data for CA extraction")
+		m.log.Warn().Err(err).Msg("failed to extract auth data for CA extraction")
 		return
 	}
 
@@ -366,7 +380,7 @@ func tryExtractKubeconfigCA(ctx context.Context, auth *gatewayv1alpha1.AuthConfi
 		return
 	}
 
-	kubeconfigCAData := extractCAFromKubeconfigB64(kubeconfigB64, log)
+	kubeconfigCAData := m.extractCAFromKubeconfigB64(kubeconfigB64)
 	if kubeconfigCAData == nil {
 		return
 	}
@@ -374,13 +388,13 @@ func tryExtractKubeconfigCA(ctx context.Context, auth *gatewayv1alpha1.AuthConfi
 	metadata["ca"] = map[string]interface{}{
 		"data": base64.StdEncoding.EncodeToString(kubeconfigCAData),
 	}
-	log.Info().Msg("extracted CA data from kubeconfig")
+	m.log.Info().Msg("extracted CA data from kubeconfig")
 }
 
 // determineHost determines which host to use based on configuration
-func determineHost(originalHost, hostOverride string, log *logger.Logger) string {
+func (m *MetadataInjector) determineHost(originalHost, hostOverride string) string {
 	if hostOverride != "" {
-		log.Info().
+		m.log.Info().
 			Str("originalHost", originalHost).
 			Str("overrideHost", hostOverride).
 			Msg("using host override for virtual workspace")
@@ -390,7 +404,7 @@ func determineHost(originalHost, hostOverride string, log *logger.Logger) string
 	// For normal workspaces, ensure we use a clean host by stripping any virtual workspace paths
 	cleanedHost := stripVirtualWorkspacePath(originalHost)
 	if cleanedHost != originalHost {
-		log.Info().
+		m.log.Info().
 			Str("originalHost", originalHost).
 			Str("cleanedHost", cleanedHost).
 			Msg("cleaned virtual workspace path from host for normal workspace")
@@ -399,9 +413,9 @@ func determineHost(originalHost, hostOverride string, log *logger.Logger) string
 }
 
 // determineKCPHost determines which host to use for KCP metadata injection
-func determineKCPHost(kubeconfigHost, override, clusterPath string, log *logger.Logger) string {
+func (m *MetadataInjector) determineKCPHost(kubeconfigHost, override, clusterPath string) string {
 	if override != "" {
-		log.Info().
+		m.log.Info().
 			Str("clusterPath", clusterPath).
 			Str("originalHost", kubeconfigHost).
 			Str("overrideHost", override).
@@ -412,7 +426,7 @@ func determineKCPHost(kubeconfigHost, override, clusterPath string, log *logger.
 	// For normal workspaces, ensure we use a clean KCP host by stripping any virtual workspace paths
 	host := stripVirtualWorkspacePath(kubeconfigHost)
 	if host != kubeconfigHost {
-		log.Info().
+		m.log.Info().
 			Str("clusterPath", clusterPath).
 			Str("originalHost", kubeconfigHost).
 			Str("cleanedHost", host).
@@ -422,7 +436,7 @@ func determineKCPHost(kubeconfigHost, override, clusterPath string, log *logger.
 }
 
 // finalizeSchemaInjection finalizes the schema injection process
-func finalizeSchemaInjection(schemaData map[string]interface{}, metadata map[string]interface{}, host, path string, hasCA bool, log *logger.Logger) ([]byte, error) {
+func (m *MetadataInjector) finalizeSchemaInjection(schemaData map[string]interface{}, metadata map[string]interface{}, host, path string, hasCA bool) ([]byte, error) {
 	// Inject the metadata into the schema
 	schemaData["x-cluster-metadata"] = metadata
 
@@ -432,11 +446,40 @@ func finalizeSchemaInjection(schemaData map[string]interface{}, metadata map[str
 		return nil, fmt.Errorf("failed to marshal modified schema: %w", err)
 	}
 
-	log.Info().
+	m.log.Info().
 		Str("host", host).
 		Str("path", path).
 		Bool("hasCA", hasCA).
 		Msg("successfully injected cluster metadata into schema")
 
 	return modifiedJSON, nil
+}
+
+// Legacy function wrappers for backward compatibility
+// These can be removed after updating all callers
+
+// InjectClusterMetadata is a legacy wrapper for backward compatibility
+func InjectClusterMetadata(ctx context.Context, schemaJSON []byte, config MetadataInjectionConfig, k8sClient client.Client, log *logger.Logger) ([]byte, error) {
+	injector := NewMetadataInjector(log, k8sClient)
+	return injector.InjectClusterMetadata(ctx, schemaJSON, config)
+}
+
+// InjectKCPMetadataFromEnv is a legacy wrapper for backward compatibility
+func InjectKCPMetadataFromEnv(schemaJSON []byte, clusterPath string, log *logger.Logger, hostOverride ...string) ([]byte, error) {
+	injector := NewMetadataInjector(log, nil)
+	return injector.InjectKCPMetadataFromEnv(schemaJSON, clusterPath, hostOverride...)
+}
+
+// Test exports for internal testing - these expose internal methods for unit tests
+
+// extractKubeconfigFromEnv is exported for testing
+func extractKubeconfigFromEnv(log *logger.Logger) ([]byte, string, error) {
+	injector := NewMetadataInjector(log, nil)
+	return injector.extractKubeconfigFromEnv()
+}
+
+// extractAuthDataForMetadata is exported for testing
+func extractAuthDataForMetadata(ctx context.Context, auth *gatewayv1alpha1.AuthConfig, k8sClient client.Client) (map[string]interface{}, error) {
+	injector := NewMetadataInjector(nil, k8sClient)
+	return injector.extractAuthDataForMetadata(ctx, auth)
 }

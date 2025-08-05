@@ -1,15 +1,8 @@
 package clusteraccess
 
-// Integration testing exports for cross-package access
-// Unit tests within this package should use export_test.go instead
+// This file exports internal functions for integration testing
 
-// ClusterAccessReconcilerPublic exposes the reconciler for integration testing
-type ClusterAccessReconcilerPublic = ClusterAccessReconciler
-
-// GenerateSchemaSubroutinePublic exposes the subroutine for integration testing
-type GenerateSchemaSubroutinePublic = generateSchemaSubroutine
-
-// NewGenerateSchemaSubroutineForTesting creates a new subroutine for integration testing
-func NewGenerateSchemaSubroutineForTesting(reconciler *ClusterAccessReconciler) *GenerateSchemaSubroutinePublic {
+// NewGenerateSchemaSubroutineForTesting creates a generateSchemaSubroutine for testing
+func NewGenerateSchemaSubroutineForTesting(reconciler *ClusterAccessReconciler) *generateSchemaSubroutine {
 	return &generateSchemaSubroutine{reconciler: reconciler}
 }

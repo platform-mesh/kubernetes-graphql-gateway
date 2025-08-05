@@ -16,12 +16,10 @@ import (
 
 type KCPReconciler struct {
 	mgr                        ctrl.Manager
-	log                        *logger.Logger
+	apiBindingReconciler       *APIBindingReconciler
 	virtualWorkspaceReconciler *VirtualWorkspaceReconciler
 	configWatcher              *ConfigWatcher
-
-	// Components for controller setup (moved from constructor)
-	apiBindingReconciler *APIBindingReconciler
+	log                        *logger.Logger
 }
 
 func NewKCPReconciler(
@@ -46,7 +44,7 @@ func NewKCPReconciler(
 	}
 
 	// Create schema resolver
-	schemaResolver := apischema.NewResolver()
+	schemaResolver := apischema.NewResolver(log)
 
 	// Create cluster path resolver
 	clusterPathResolver, err := NewClusterPathResolver(opts.Config, opts.Scheme)
@@ -89,15 +87,16 @@ func NewKCPReconciler(
 		return nil, err
 	}
 
-	log.Info().Msg("Successfully configured KCP reconciler with workspace discovery")
-
-	return &KCPReconciler{
+	reconcilerInstance := &KCPReconciler{
 		mgr:                        mgr,
-		log:                        log,
+		apiBindingReconciler:       apiBindingReconciler,
 		virtualWorkspaceReconciler: virtualWorkspaceReconciler,
 		configWatcher:              configWatcher,
-		apiBindingReconciler:       apiBindingReconciler,
-	}, nil
+		log:                        log,
+	}
+
+	log.Info().Msg("Successfully configured KCP reconciler with workspace discovery")
+	return reconcilerInstance, nil
 }
 
 func (r *KCPReconciler) GetManager() ctrl.Manager {
@@ -114,9 +113,6 @@ func (r *KCPReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 func (r *KCPReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	// Handle cases where the reconciler wasn't properly initialized (e.g., in tests)
 	if r.apiBindingReconciler == nil {
-		if r.log != nil {
-			r.log.Debug().Msg("APIBinding reconciler not initialized, skipping controller setup")
-		}
 		return nil
 	}
 

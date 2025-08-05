@@ -23,7 +23,7 @@ import (
 
 // APIBindingReconciler reconciles an APIBinding object
 type APIBindingReconciler struct {
-	client.Client
+	Client              client.Client
 	Scheme              *runtime.Scheme
 	RestConfig          *rest.Config
 	IOHandler           workspacefile.IOHandler

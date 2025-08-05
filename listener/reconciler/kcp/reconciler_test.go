@@ -95,18 +95,18 @@ func TestNewKCPReconciler(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := kcp.NewKCPReconciler(tt.appCfg, tt.opts, mockLogger)
+			reconciler, err := kcp.NewKCPReconciler(tt.appCfg, tt.opts, mockLogger)
 
 			if tt.wantErr {
 				assert.Error(t, err)
 				if tt.errContains != "" {
 					assert.Contains(t, err.Error(), tt.errContains)
 				}
-				assert.Nil(t, got)
+				assert.Nil(t, reconciler)
 			} else {
 				assert.NoError(t, err)
-				assert.NotNil(t, got)
-				assert.NotNil(t, got.GetManager())
+				assert.NotNil(t, reconciler)
+				assert.NotNil(t, reconciler.GetManager())
 			}
 		})
 	}

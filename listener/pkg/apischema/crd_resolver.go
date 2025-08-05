@@ -35,10 +35,20 @@ type GroupKindVersions struct {
 type CRDResolver struct {
 	discovery.DiscoveryInterface
 	meta.RESTMapper
+	log *logger.Logger
+}
+
+// NewCRDResolver creates a new CRDResolver with proper logger setup
+func NewCRDResolver(discovery discovery.DiscoveryInterface, restMapper meta.RESTMapper, log *logger.Logger) *CRDResolver {
+	return &CRDResolver{
+		DiscoveryInterface: discovery,
+		RESTMapper:         restMapper,
+		log:                log,
+	}
 }
 
 func (cr *CRDResolver) Resolve(dc discovery.DiscoveryInterface, rm meta.RESTMapper) ([]byte, error) {
-	return resolveSchema(dc, rm)
+	return cr.resolveSchema(dc, rm)
 }
 
 func (cr *CRDResolver) ResolveApiSchema(crd *apiextensionsv1.CustomResourceDefinition) ([]byte, error) {
@@ -46,41 +56,93 @@ func (cr *CRDResolver) ResolveApiSchema(crd *apiextensionsv1.CustomResourceDefin
 
 	apiResLists, err := cr.ServerPreferredResources()
 	if err != nil {
+		cr.log.Error().Err(err).
+			Str("crdName", crd.Name).
+			Str("group", gkv.Group).
+			Str("kind", gkv.Kind).
+			Msg("failed to get server preferred resources")
 		return nil, errors.Join(ErrGetServerPreferred, err)
 	}
 
-	preferredApiGroups, err := errorIfCRDNotInPreferredApiGroups(gkv, apiResLists, nil)
+	preferredApiGroups, err := cr.errorIfCRDNotInPreferredApiGroups(gkv, apiResLists)
 	if err != nil {
+		cr.log.Error().Err(err).
+			Str("crdName", crd.Name).
+			Str("group", gkv.Group).
+			Str("kind", gkv.Kind).
+			Msg("failed to filter preferred resources")
 		return nil, errors.Join(ErrFilterPreferredResources, err)
 	}
 
-	return NewSchemaBuilder(cr.OpenAPIV3(), preferredApiGroups).
+	result, err := NewSchemaBuilder(cr.OpenAPIV3(), preferredApiGroups, cr.log).
 		WithScope(cr.RESTMapper).
 		WithCRDCategories(crd).
 		Complete()
+
+	if err != nil {
+		cr.log.Error().Err(err).
+			Str("crdName", crd.Name).
+			Int("preferredApiGroupsCount", len(preferredApiGroups)).
+			Msg("failed to complete schema building")
+		return nil, err
+	}
+
+	cr.log.Debug().
+		Str("crdName", crd.Name).
+		Str("group", gkv.Group).
+		Str("kind", gkv.Kind).
+		Msg("successfully resolved API schema")
+
+	return result, nil
 }
 
-func errorIfCRDNotInPreferredApiGroups(gkv *GroupKindVersions, apiResLists []*metav1.APIResourceList, log *logger.Logger) ([]string, error) {
+func (cr *CRDResolver) errorIfCRDNotInPreferredApiGroups(gkv *GroupKindVersions, apiResLists []*metav1.APIResourceList) ([]string, error) {
 	isKindFound := false
 	preferredApiGroups := make([]string, 0, len(apiResLists))
+
 	for _, apiResources := range apiResLists {
 		gv, err := schema.ParseGroupVersion(apiResources.GroupVersion)
 		if err != nil {
-			if log != nil {
-				log.Error().Err(err).Str("groupVersion", apiResources.GroupVersion).Msg("failed to parse group version")
-			}
+			cr.log.Error().Err(err).
+				Str("groupVersion", apiResources.GroupVersion).
+				Str("targetGroup", gkv.Group).
+				Str("targetKind", gkv.Kind).
+				Msg("failed to parse group version")
 			continue
 		}
+
 		isGroupFound := gkv.Group == gv.Group
 		isVersionFound := slices.Contains(gkv.Versions, gv.Version)
+
 		if isGroupFound && isVersionFound && !isKindFound {
 			isKindFound = isCRDKindIncluded(gkv, apiResources)
+			cr.log.Debug().
+				Str("groupVersion", apiResources.GroupVersion).
+				Str("targetGroup", gkv.Group).
+				Str("targetKind", gkv.Kind).
+				Bool("kindFound", isKindFound).
+				Msg("checking if CRD kind is included in preferred APIs")
 		}
+
 		preferredApiGroups = append(preferredApiGroups, apiResources.GroupVersion)
 	}
+
 	if !isKindFound {
+		cr.log.Warn().
+			Str("group", gkv.Group).
+			Str("kind", gkv.Kind).
+			Strs("versions", gkv.Versions).
+			Int("checkedApiGroups", len(preferredApiGroups)).
+			Msg("CRD kind not found in preferred API resources")
 		return nil, ErrGVKNotPreferred
 	}
+
+	cr.log.Debug().
+		Str("group", gkv.Group).
+		Str("kind", gkv.Kind).
+		Int("preferredApiGroupsCount", len(preferredApiGroups)).
+		Msg("successfully found CRD in preferred API groups")
+
 	return preferredApiGroups, nil
 }
 
@@ -130,9 +192,10 @@ func getSchemaForPath(preferredApiGroups []string, path string, gv openapi.Group
 	return resp.Components.Schemas, nil
 }
 
-func resolveSchema(dc discovery.DiscoveryInterface, rm meta.RESTMapper) ([]byte, error) {
+func (cr *CRDResolver) resolveSchema(dc discovery.DiscoveryInterface, rm meta.RESTMapper) ([]byte, error) {
 	apiResList, err := dc.ServerPreferredResources()
 	if err != nil {
+		cr.log.Error().Err(err).Msg("failed to get server preferred resources")
 		return nil, errors.Join(ErrGetServerPreferred, err)
 	}
 
@@ -141,8 +204,23 @@ func resolveSchema(dc discovery.DiscoveryInterface, rm meta.RESTMapper) ([]byte,
 		preferredApiGroups = append(preferredApiGroups, apiRes.GroupVersion)
 	}
 
-	return NewSchemaBuilder(dc.OpenAPIV3(), preferredApiGroups).
+	result, err := NewSchemaBuilder(dc.OpenAPIV3(), preferredApiGroups, cr.log).
 		WithScope(rm).
 		WithApiResourceCategories(apiResList).
 		Complete()
+
+	if err != nil {
+		cr.log.Error().Err(err).
+			Int("preferredApiGroupsCount", len(preferredApiGroups)).
+			Int("apiResourceListsCount", len(apiResList)).
+			Msg("failed to build schema")
+		return nil, err
+	}
+
+	cr.log.Debug().
+		Int("preferredApiGroupsCount", len(preferredApiGroups)).
+		Int("apiResourceListsCount", len(apiResList)).
+		Msg("successfully resolved schema")
+
+	return result, nil
 }
