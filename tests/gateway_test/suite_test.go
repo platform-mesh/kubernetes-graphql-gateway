@@ -268,3 +268,8 @@ func (suite *CommonTestSuite) writeToFileWithClusterMetadata(from, to string) er
 func (suite *CommonTestSuite) sendAuthenticatedRequest(url, query string) (*GraphQLResponse, int, error) {
 	return sendRequestWithAuth(url, query, suite.staticToken)
 }
+
+// sendAuthenticatedRequestWithVariables is a helper method to send authenticated GraphQL requests with variables using the test token
+func (suite *CommonTestSuite) sendAuthenticatedRequestWithVariables(url, query string, variables map[string]interface{}) (*GraphQLResponse, int, error) {
+	return sendRequestWithAuthAndVariables(url, query, suite.staticToken, variables)
+}

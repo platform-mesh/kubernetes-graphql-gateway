@@ -69,3 +69,46 @@ When using the GraphQL playground, you can add the header in the `Headers` secti
   "Authorization": "YOUR_TOKEN"
 }
 ```
+
+## Working with Dotted Keys (Labels, Annotations, NodeSelector, MatchLabels)
+
+Kubernetes extensively uses dotted keys (e.g., `app.kubernetes.io/name`) in labels, annotations, and other fields. Since GraphQL doesn't support dots in field names, the gateway provides a special `StringMapInput` scalar.
+
+**Key Points:**
+- **Input**: Use variables with arrays of `{key, value}` objects  
+- **Output**: Returns direct maps like `{"app.kubernetes.io/name": "my-app"}`
+- **Supported fields**: `metadata.labels`, `metadata.annotations`, `spec.nodeSelector`, `spec.selector.matchLabels`, and their nested equivalents in templates
+
+**Quick Example:**
+```graphql
+mutation createPodWithLabels($labels: StringMapInput) {
+  core {
+    createPod(
+      namespace: "default"
+      object: {
+        metadata: {
+          name: "my-pod"
+          labels: $labels
+        }
+        spec: {
+          containers: [...]
+        }
+      }
+    ) {
+      metadata {
+        labels  # Returns: {"app.kubernetes.io/name": "my-app"}
+      }
+    }
+  }
+}
+```
+
+**Variables:**
+```json
+{
+  "labels": [
+    {"key": "app.kubernetes.io/name", "value": "my-app"},
+    {"key": "environment", "value": "production"}
+  ]
+}
+```

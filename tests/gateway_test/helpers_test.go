@@ -27,6 +27,7 @@ type GraphQLResponse struct {
 }
 
 type graphQLData struct {
+	Apps                   *apps                   `json:"apps,omitempty"`
 	Core                   *core                   `json:"core,omitempty"`
 	CoreOpenmfpOrg         *coreOpenmfpOrg         `json:"core_openmfp_org,omitempty"`
 	RbacAuthorizationK8sIO *RbacAuthorizationK8sIO `json:"rbac_authorization_k8s_io,omitempty"`
@@ -50,6 +51,49 @@ func sendRequest(url, query string) (*GraphQLResponse, int, error) {
 func sendRequestWithAuth(url, query, token string) (*GraphQLResponse, int, error) {
 	reqBody := map[string]string{
 		"query": query,
+	}
+	reqBodyBytes, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	req, err := http.NewRequest("POST", url, bytes.NewReader(reqBodyBytes))
+	if err != nil {
+		return nil, 0, err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	// Add Authorization header if token is provided
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer resp.Body.Close()
+
+	respBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	var bodyResp GraphQLResponse
+	err = json.Unmarshal(respBytes, &bodyResp)
+	if err != nil {
+		return nil, resp.StatusCode, fmt.Errorf("response body is not json, but %s", respBytes)
+	}
+
+	return &bodyResp, resp.StatusCode, err
+}
+
+func sendRequestWithAuthAndVariables(url, query, token string, variables map[string]interface{}) (*GraphQLResponse, int, error) {
+	reqBody := map[string]interface{}{
+		"query":     query,
+		"variables": variables,
 	}
 	reqBodyBytes, err := json.Marshal(reqBody)
 	if err != nil {
