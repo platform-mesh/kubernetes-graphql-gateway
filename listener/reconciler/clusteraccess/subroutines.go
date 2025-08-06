@@ -56,10 +56,7 @@ func (s *generateSchemaSubroutine) Process(ctx context.Context, instance lifecyc
 	}
 
 	// Create schema resolver for target cluster
-	targetResolver := &apischema.CRDResolver{
-		DiscoveryInterface: targetDiscovery,
-		RESTMapper:         targetRM,
-	}
+	targetResolver := apischema.NewCRDResolver(targetDiscovery, targetRM, s.reconciler.log)
 
 	// Generate schema for target cluster
 	JSON, err := targetResolver.Resolve(targetDiscovery, targetRM)
