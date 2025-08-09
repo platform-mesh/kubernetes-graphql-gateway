@@ -7,8 +7,8 @@ replace (
 	// this PR introduces newer version of graphiQL that supports headers
 	// https://github.com/graphql-go/handler/pull/93
 	github.com/graphql-go/handler => github.com/vertex451/handler v0.0.0-20250124125145-ed328e3cf42a
-	k8s.io/api => k8s.io/api v0.32.4
-	k8s.io/apimachinery => k8s.io/apimachinery v0.32.4
+	k8s.io/api => k8s.io/api v0.33.3
+	k8s.io/apimachinery => k8s.io/apimachinery v0.33.3
 	k8s.io/client-go => k8s.io/client-go v0.32.4
 	sigs.k8s.io/controller-runtime => github.com/kcp-dev/controller-runtime v0.19.0-kcp.1.0.20250129100209-5eaf4c7b6056
 )
@@ -36,10 +36,10 @@ require (
 	go.opentelemetry.io/otel/trace v1.37.0
 	golang.org/x/exp v0.0.0-20250808145144-a408d31f581a
 	gopkg.in/yaml.v3 v3.0.1
-	k8s.io/api v0.33.2
-	k8s.io/apiextensions-apiserver v0.32.4
-	k8s.io/apimachinery v0.33.2
-	k8s.io/client-go v0.33.2
+	k8s.io/api v0.33.3
+	k8s.io/apiextensions-apiserver v0.33.3
+	k8s.io/apimachinery v0.33.3
+	k8s.io/client-go v0.33.3
 	k8s.io/kube-openapi v0.0.0-20250701173324-9bd5c66d9911
 	sigs.k8s.io/controller-runtime v0.21.0
 )
@@ -48,7 +48,6 @@ require (
 	cel.dev/expr v0.23.1 // indirect
 	github.com/99designs/gqlgen v0.17.76 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
-	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.2 // indirect
@@ -72,7 +71,6 @@ require (
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/cel-go v0.25.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
-	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.1 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
@@ -131,11 +129,11 @@ require (
 	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
-	k8s.io/apiserver v0.32.4 // indirect
-	k8s.io/component-base v0.32.4 // indirect
+	k8s.io/apiserver v0.33.3 // indirect
+	k8s.io/component-base v0.33.3 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/utils v0.0.0-20250604170112-4c0f3b243397 // indirect
-	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.31.1 // indirect
+	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.31.2 // indirect
 	sigs.k8s.io/json v0.0.0-20241014173422-cfa47c3a1cc8 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.6.0 // indirect
