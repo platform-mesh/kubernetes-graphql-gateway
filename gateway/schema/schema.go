@@ -22,16 +22,13 @@ type Provider interface {
 }
 
 type Gateway struct {
-	log           *logger.Logger
-	resolver      resolver.Provider
-	graphqlSchema graphql.Schema
-
-	definitions spec.Definitions
-
-	// typesCache stores generated GraphQL object types(fields) to prevent redundant repeated generation.
-	typesCache map[string]*graphql.Object
-	// inputTypesCache stores generated GraphQL input object types(input fields) to prevent redundant repeated generation.
-	inputTypesCache map[string]*graphql.InputObject
+	log                *logger.Logger
+	resolver           resolver.Provider
+	graphqlSchema      graphql.Schema
+	definitions        spec.Definitions
+	typesCache         map[string]*graphql.Object
+	inputTypesCache    map[string]*graphql.InputObject
+	enhancedTypesCache map[string]*graphql.Object // Cache for enhanced *Ref types
 	// Prevents naming conflict in case of the same Kind name in different groups/versions
 	typeNameRegistry map[string]string // map[Kind]GroupVersion
 
@@ -41,13 +38,14 @@ type Gateway struct {
 
 func New(log *logger.Logger, definitions spec.Definitions, resolverProvider resolver.Provider) (*Gateway, error) {
 	g := &Gateway{
-		log:              log,
-		resolver:         resolverProvider,
-		definitions:      definitions,
-		typesCache:       make(map[string]*graphql.Object),
-		inputTypesCache:  make(map[string]*graphql.InputObject),
-		typeNameRegistry: make(map[string]string),
-		typeByCategory:   make(map[string][]resolver.TypeByCategory),
+		log:                log,
+		resolver:           resolverProvider,
+		definitions:        definitions,
+		typesCache:         make(map[string]*graphql.Object),
+		inputTypesCache:    make(map[string]*graphql.InputObject),
+		enhancedTypesCache: make(map[string]*graphql.Object),
+		typeNameRegistry:   make(map[string]string),
+		typeByCategory:     make(map[string][]resolver.TypeByCategory),
 	}
 
 	err := g.generateGraphqlSchema()
@@ -335,6 +333,9 @@ func (g *Gateway) generateGraphQLFields(resourceScheme *spec.Schema, typePrefix 
 			Type: inputFieldType,
 		}
 	}
+
+	// Add relation fields for any *Ref fields in this schema
+	g.addRelationFields(fields, resourceScheme.Properties)
 
 	return fields, inputFields, nil
 }

@@ -25,11 +25,23 @@ import (
 	"github.com/openmfp/golang-commons/logger"
 )
 
+const (
+	LIST_ITEMS       = "ListItems"
+	GET_ITEM         = "GetItem"
+	GET_ITEM_AS_YAML = "GetItemAsYAML"
+	CREATE_ITEM      = "CreateItem"
+	UPDATE_ITEM      = "UpdateItem"
+	DELETE_ITEM      = "DeleteItem"
+	SUBSCRIBE_ITEM   = "SubscribeItem"
+	SUBSCRIBE_ITEMS  = "SubscribeItems"
+)
+
 type Provider interface {
 	CrudProvider
 	CustomQueriesProvider
 	CommonResolver() graphql.FieldResolveFn
 	SanitizeGroupName(string) string
+	RelationResolver(fieldName string, gvk schema.GroupVersionKind) graphql.FieldResolveFn
 }
 
 type CrudProvider interface {
@@ -65,7 +77,7 @@ func New(log *logger.Logger, runtimeClient client.WithWatch) *Service {
 // ListItems returns a GraphQL CommonResolver function that lists Kubernetes resources of the given GroupVersionKind.
 func (r *Service) ListItems(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
 	return func(p graphql.ResolveParams) (interface{}, error) {
-		ctx, span := otel.Tracer("").Start(p.Context, "ListItems", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
+		ctx, span := otel.Tracer("").Start(p.Context, LIST_ITEMS, trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
 
 		gvk.Group = r.getOriginalGroupName(gvk.Group)
@@ -87,6 +99,7 @@ func (r *Service) ListItems(gvk schema.GroupVersionKind, scope v1.ResourceScope)
 		list.SetGroupVersionKind(gvk)
 
 		var opts []client.ListOption
+
 		// Handle label selector argument
 		if labelSelector, ok := p.Args[LabelSelectorArg].(string); ok && labelSelector != "" {
 			selector, err := labels.Parse(labelSelector)
@@ -117,15 +130,15 @@ func (r *Service) ListItems(gvk schema.GroupVersionKind, scope v1.ResourceScope)
 			return nil, err
 		}
 
-		err = validateSortBy(list.Items, sortBy)
-		if err != nil {
-			log.Error().Err(err).Str(SortByArg, sortBy).Msg("Invalid sortBy field path")
-			return nil, err
+		if sortBy != "" {
+			if err := validateSortBy(list.Items, sortBy); err != nil {
+				log.Error().Err(err).Str(SortByArg, sortBy).Msg("Invalid sortBy field path")
+				return nil, err
+			}
+			sort.Slice(list.Items, func(i, j int) bool {
+				return compareUnstructured(list.Items[i], list.Items[j], sortBy) < 0
+			})
 		}
-
-		sort.Slice(list.Items, func(i, j int) bool {
-			return compareUnstructured(list.Items[i], list.Items[j], sortBy) < 0
-		})
 
 		items := make([]map[string]any, len(list.Items))
 		for i, item := range list.Items {

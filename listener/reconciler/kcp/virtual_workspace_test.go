@@ -695,8 +695,13 @@ func TestVirtualWorkspaceReconciler_ProcessVirtualWorkspace(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set up test environment where KUBECONFIG is not available
 			oldKubeconfig := os.Getenv("KUBECONFIG")
-			defer os.Setenv("KUBECONFIG", oldKubeconfig)
+			oldHome := os.Getenv("HOME")
+			defer func() {
+				os.Setenv("KUBECONFIG", oldKubeconfig)
+				os.Setenv("HOME", oldHome)
+			}()
 			os.Unsetenv("KUBECONFIG")
+			os.Setenv("HOME", "/nonexistent") // Force metadata injection to fail consistently
 
 			appCfg := config.Config{}
 			appCfg.Url.VirtualWorkspacePrefix = "virtual-workspace"
