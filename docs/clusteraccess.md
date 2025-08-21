@@ -102,7 +102,7 @@ stringData:
 
 ---
 # ClusterAccess resource for target-cluster
-apiVersion: gateway.openmfp.org/v1alpha1
+apiVersion: gateway.platform-mesh.org/v1alpha1
 kind: ClusterAccess
 metadata:
   name: my-target-cluster

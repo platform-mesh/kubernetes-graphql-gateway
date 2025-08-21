@@ -18,10 +18,10 @@ jobs:
     with:
       useTask: true
       useLocalCoverageConfig: true
-      imageTagName: ghcr.io/openmfp/kubernetes-graphql-gateway
+      imageTagName: ghcr.io/platform-mesh/kubernetes-graphql-gateway
       coverageThresholdFile: 49
       coverageThresholdPackage: 63
       coverageThresholdTotal: 81
-      repoVersionUpdate: openmfp/helm-charts
+      repoVersionUpdate: platform-mesh/helm-charts
 
 

@@ -86,7 +86,7 @@ var listenCmd = &cobra.Command{
 			WebhookServer:          webhookServer,
 			HealthProbeBindAddress: defaultCfg.HealthProbeBindAddress,
 			LeaderElection:         defaultCfg.LeaderElection.Enabled,
-			LeaderElectionID:       "72231e1f.openmfp.io",
+			LeaderElectionID:       "72231e1f.platform-mesh.io",
 		}
 
 		clt, err := client.New(restCfg, client.Options{

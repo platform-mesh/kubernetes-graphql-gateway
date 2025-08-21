@@ -22,10 +22,10 @@ tasks:
     cmds:
       - test -s {{.LOCAL_BIN}}/controller-gen || GOBIN=$(pwd)/{{.LOCAL_BIN}} go install sigs.k8s.io/controller-tools/cmd/controller-gen@{{.CONTROLLER_GEN_VERSION}}
   update:crd:
-    desc: "Download the latest CRD from OpenMFP"
+    desc: "Download the latest CRDs"
     cmds:
       - mkdir -p tests/gateway_test/testdata/crd
-      - curl -sSLo tests/gateway_test/testdata/crd/core.openmfp.org_accounts.yaml https://raw.githubusercontent.com/openmfp/account-operator/main/config/crd/core.openmfp.org_accounts.yaml
+      - curl -sSLo tests/gateway_test/testdata/crd/core.platform-mesh.io_accounts.yaml https://raw.githubusercontent.com/platform-mesh/account-operator/main/config/crd/core.platform-mesh.io_accounts.yaml
       - echo "CRD updated successfully."
   setup:golangci-lint:
     internal: true
@@ -62,7 +62,7 @@ tasks:
       - "{{.LOCAL_BIN}}/mockery"
   docker:
     cmds:
-      - docker build -t ghcr.io/openmfp/kubernetes-graphql-gateway .
+      - docker build -t ghcr.io/platform-mesh/kubernetes-graphql-gateway .
   ## Testing
   fmt:
     cmds:

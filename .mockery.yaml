@@ -31,28 +31,28 @@ packages:
     interfaces:
       RoundTripper:
 
-  github.com/openmfp/kubernetes-graphql-gateway/listener/pkg/workspacefile:
+  github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/workspacefile:
     config:
       dir: listener/pkg/workspacefile/mocks
       outpkg: mocks
     interfaces:
       IOHandler:
 
-  github.com/openmfp/kubernetes-graphql-gateway/listener/reconciler/kcp/discoveryclient:
+  github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler/kcp/discoveryclient:
     config:
       dir: listener/reconciler/kcp/discoveryclient/mocks
       outpkg: mocks
     interfaces:
       Factory:
 
-  github.com/openmfp/kubernetes-graphql-gateway/listener/pkg/apischema:
+  github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema:
     config:
       dir: listener/pkg/apischema/mocks
       outpkg: mocks
     interfaces:
       Resolver:
 
-  github.com/openmfp/kubernetes-graphql-gateway/listener/reconciler/kcp/clusterpath:
+  github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler/kcp/clusterpath:
     config:
       dir: listener/reconciler/kcp/clusterpath/mocks
       outpkg: mocks
@@ -67,7 +67,7 @@ packages:
       GroupVersion:
       Client:
 
-  github.com/openmfp/kubernetes-graphql-gateway/gateway/manager:
+  github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager:
     config:
       dir: gateway/manager/mocks
       outpkg: mocks
