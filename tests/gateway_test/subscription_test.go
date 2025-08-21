@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/openmfp/kubernetes-graphql-gateway/gateway/manager"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager"
 )
 
 func (suite *CommonTestSuite) TestSchemaSubscribe() {

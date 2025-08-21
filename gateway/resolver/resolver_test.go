@@ -15,8 +15,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/openmfp/golang-commons/logger/testlogger"
-	"github.com/openmfp/kubernetes-graphql-gateway/common/mocks"
-	"github.com/openmfp/kubernetes-graphql-gateway/gateway/resolver"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/common/mocks"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/resolver"
 )
 
 func TestListItems(t *testing.T) {

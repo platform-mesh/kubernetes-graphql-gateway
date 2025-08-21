@@ -16,8 +16,8 @@ import (
 
 	"github.com/openmfp/golang-commons/logger"
 
-	appConfig "github.com/openmfp/kubernetes-graphql-gateway/common/config"
-	"github.com/openmfp/kubernetes-graphql-gateway/gateway/manager/roundtripper"
+	appConfig "github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/roundtripper"
 )
 
 // GraphQLHandler wraps a GraphQL schema and HTTP handler

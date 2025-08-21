@@ -8,7 +8,7 @@ import (
 	"k8s.io/client-go/rest"
 
 	"github.com/openmfp/golang-commons/logger/testlogger"
-	"github.com/openmfp/kubernetes-graphql-gateway/gateway/manager/targetcluster"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/targetcluster"
 )
 
 func TestBuildConfigFromMetadata(t *testing.T) {

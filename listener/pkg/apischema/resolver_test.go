@@ -8,7 +8,7 @@ import (
 	"k8s.io/client-go/openapi"
 
 	"github.com/openmfp/golang-commons/logger/testlogger"
-	apischemaMocks "github.com/openmfp/kubernetes-graphql-gateway/listener/pkg/apischema/mocks"
+	apischemaMocks "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema/mocks"
 )
 
 // Compile-time check that ResolverProvider implements Resolver interface

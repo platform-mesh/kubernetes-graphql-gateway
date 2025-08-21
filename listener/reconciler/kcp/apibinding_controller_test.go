@@ -20,11 +20,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/openmfp/golang-commons/logger"
-	"github.com/openmfp/kubernetes-graphql-gateway/common/mocks"
-	apschemamocks "github.com/openmfp/kubernetes-graphql-gateway/listener/pkg/apischema/mocks"
-	workspacefilemocks "github.com/openmfp/kubernetes-graphql-gateway/listener/pkg/workspacefile/mocks"
-	"github.com/openmfp/kubernetes-graphql-gateway/listener/reconciler/kcp"
-	kcpmocks "github.com/openmfp/kubernetes-graphql-gateway/listener/reconciler/kcp/mocks"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/common/mocks"
+	apschemamocks "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema/mocks"
+	workspacefilemocks "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/workspacefile/mocks"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler/kcp"
+	kcpmocks "github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler/kcp/mocks"
 )
 
 func TestAPIBindingReconciler_Reconcile(t *testing.T) {

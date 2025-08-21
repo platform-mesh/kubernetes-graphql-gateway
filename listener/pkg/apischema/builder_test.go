@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	"github.com/openmfp/golang-commons/logger/testlogger"
-	"github.com/openmfp/kubernetes-graphql-gateway/common"
-	apischema "github.com/openmfp/kubernetes-graphql-gateway/listener/pkg/apischema"
-	apischemaMocks "github.com/openmfp/kubernetes-graphql-gateway/listener/pkg/apischema/mocks"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/common"
+	apischema "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
+	apischemaMocks "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema/mocks"
 	"github.com/stretchr/testify/assert"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/meta"

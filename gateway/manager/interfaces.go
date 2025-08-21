@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/openmfp/kubernetes-graphql-gateway/gateway/manager/targetcluster"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/targetcluster"
 )
 
 // ClusterManager manages target clusters and their lifecycle

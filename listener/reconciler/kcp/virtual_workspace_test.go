@@ -13,7 +13,7 @@ import (
 	"k8s.io/client-go/discovery"
 
 	"github.com/openmfp/golang-commons/logger/testlogger"
-	"github.com/openmfp/kubernetes-graphql-gateway/common/config"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
 )
 
 // Mock implementations for testing

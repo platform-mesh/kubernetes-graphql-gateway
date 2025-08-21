@@ -7,8 +7,8 @@ import (
 	"k8s.io/client-go/discovery"
 
 	"github.com/openmfp/golang-commons/logger"
-	"github.com/openmfp/kubernetes-graphql-gateway/common/auth"
-	"github.com/openmfp/kubernetes-graphql-gateway/listener/pkg/apischema"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/common/auth"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
 )
 
 // SchemaGenerationParams contains parameters for schema generation

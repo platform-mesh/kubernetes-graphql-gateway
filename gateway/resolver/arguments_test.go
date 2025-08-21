@@ -2,7 +2,7 @@ package resolver_test
 
 import (
 	"errors"
-	"github.com/openmfp/kubernetes-graphql-gateway/gateway/resolver"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/resolver"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
