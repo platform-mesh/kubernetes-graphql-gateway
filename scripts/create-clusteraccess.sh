@@ -193,7 +193,7 @@ KUBECONFIG="$MANAGEMENT_KUBECONFIG" kubectl apply -f -
 # Create ClusterAccess resource with kubeconfig authentication
 log_info "Creating ClusterAccess resource with admin kubeconfig..."
 cat <<EOF | KUBECONFIG="$MANAGEMENT_KUBECONFIG" kubectl apply -f -
-apiVersion: gateway.openmfp.org/v1alpha1
+apiVersion: gateway.platform-mesh.io/v1alpha1
 kind: ClusterAccess
 metadata:
   name: $CLUSTER_NAME

@@ -27,6 +27,7 @@ require (
 	github.com/openmfp/account-operator v0.170.23
 	github.com/openmfp/golang-commons v0.150.11
 	github.com/pkg/errors v0.9.1
+	github.com/platform-mesh/account-operator v0.1.20
 	github.com/prometheus/client_golang v1.23.0
 	github.com/rs/zerolog v1.34.0
 	github.com/spf13/cobra v1.9.1

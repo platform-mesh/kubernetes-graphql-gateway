@@ -54,7 +54,7 @@ All information about authorization can be found in the [authorization](./docs/a
 If you want to get started quickly, you can follow the [quickstart guide](./docs/quickstart.md).
 
 ## Contributing
-Please refer to the [contributing](./docs/contributing.md) section for instructions on how to contribute to Platform-mesh.
+Please refer to the [contributing](./docs/contributing.md) section for instructions on how to contribute to platform-mesh.
 
 ## Releasing
 
@@ -63,8 +63,8 @@ All the released versions will be available through access to GitHub (as any oth
 
 ## Security / Disclosure
 
-If you find any bug that may be a security problem, please follow our instructions at [in our security policy](https://github.com/platform-mesh/community/blob/main/SECURITY.md) on how to report it. Please do not create GitHub issues for security-related doubts or problems.
+If you find any bug that may be a security problem, please follow our instructions [in our security policy](https://github.com/platform-mesh/.github/blob/main/SECURITY.md) on how to report it. Please do not create GitHub issues for security-related doubts or problems.
 
 ## Licensing
 
-Copyright 2025 SAP SE or an SAP affiliate company and PlatformMesh contributors. Please see our [LICENSE](https://github.com/platform-mesh/community/blob/main/LICENSE) for copyright and license information. Detailed information including third-party components and their licensing/copyright information is available [via the REUSE tool](https://api.reuse.software/info/github.com/PlatformMesh/account-operator).
+Copyright 2025 SAP SE or an SAP affiliate company and platform-mesh contributors. Please see our [LICENSE](LICENSE) for copyright and license information. Detailed information including third-party components and their licensing/copyright information is available [via the REUSE tool](https://api.reuse.software/info/github.com/platform-mesh/kubernetes-graphql-gateway).

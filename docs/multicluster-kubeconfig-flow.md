@@ -15,7 +15,7 @@ The system is designed to work in the following way:
 ### 1. ClusterAccess Resource Creation
 
 ```yaml
-apiVersion: gateway.openmfp.org/v1alpha1
+apiVersion: gateway.platform-mesh.io/v1alpha1
 kind: ClusterAccess
 metadata:
   name: my-target-cluster

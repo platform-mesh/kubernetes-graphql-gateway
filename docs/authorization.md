@@ -25,7 +25,7 @@ export INTROSPECTION_AUTHENTICATION=true
 
 When GraphiQL page is loaded, it makes a request to fetch the GraphQL schema and there is no way to add the `Authorization` header to that request.
 
-We have this [issue](https://github.com/platform-mesh/kubernetes-graphql-gateway/issues/217) open to fix this.
+We have this [issue](https://github.com/openmfp/kubernetes-graphql-gateway/issues/217) open to fix this.
 
 But for now, you can use the following workaround:
 1. Open the GraphiQL page in your browser.

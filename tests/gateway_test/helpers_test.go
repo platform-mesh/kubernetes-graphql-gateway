@@ -29,7 +29,7 @@ type GraphQLResponse struct {
 type graphQLData struct {
 	Apps                   *apps                   `json:"apps,omitempty"`
 	Core                   *core                   `json:"core,omitempty"`
-	CoreOpenmfpOrg         *coreOpenmfpOrg         `json:"core_openmfp_org,omitempty"`
+	CorePlatformMeshIo     *corePlatformMeshIo     `json:"core_platform_mesh_io,omitempty"`
 	RbacAuthorizationK8sIO *RbacAuthorizationK8sIO `json:"rbac_authorization_k8s_io,omitempty"`
 }
 

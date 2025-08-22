@@ -1,6 +1,6 @@
 // Package v1alpha1 contains API Schema definitions for the gateway v1alpha1 API group
 // +kubebuilder:object:generate=true
-// +groupName=gateway.openmfp.org
+// +groupName=gateway.platform-mesh.io
 package v1alpha1
 
 import (
@@ -10,7 +10,7 @@ import (
 
 var (
 	// GroupVersion is group version used to register these objects
-	GroupVersion = schema.GroupVersion{Group: "gateway.openmfp.org", Version: "v1alpha1"}
+	GroupVersion = schema.GroupVersion{Group: "gateway.platform-mesh.io", Version: "v1alpha1"}
 
 	// SchemeBuilder is used to add go types to the GroupVersionKind scheme
 	SchemeBuilder = &scheme.Builder{GroupVersion: GroupVersion}

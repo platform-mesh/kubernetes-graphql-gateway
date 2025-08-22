@@ -1,4 +1,4 @@
-# Contributing to Platform-mesh
+# Contributing to platform-mesh
 
 [Back to the Main Readme](../README.md)
 
@@ -51,7 +51,7 @@ We use GitHub issues to track bugs. Please ensure your description is
 clear and includes sufficient instructions to reproduce the issue.
 
 ## License
-By contributing to Platform-mesh, you agree that your contributions will be licensed
+By contributing to platform-mesh, you agree that your contributions will be licensed
 under its [Apache-2.0 license](../LICENSE).
 
 

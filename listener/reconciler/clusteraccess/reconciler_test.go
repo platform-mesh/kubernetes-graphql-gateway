@@ -61,7 +61,7 @@ func TestCheckClusterAccessCRDStatus(t *testing.T) {
 				m.EXPECT().List(mock.Anything, mock.AnythingOfType("*v1alpha1.ClusterAccessList")).
 					Return(&meta.NoResourceMatchError{
 						PartialResource: schema.GroupVersionResource{
-							Group:    "gateway.openmfp.org",
+							Group:    "gateway.platform-mesh.io",
 							Version:  "v1alpha1",
 							Resource: "clusteraccesses",
 						},

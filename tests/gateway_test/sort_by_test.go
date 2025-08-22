@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/openmfp/account-operator/api/v1alpha1"
+	"github.com/platform-mesh/account-operator/api/v1alpha1"
 )
 
 // TestSortBy tests the sorting functionality of accounts by displayName
@@ -33,7 +33,7 @@ func (suite *CommonTestSuite) TestSortByListItems() {
 		require.Equal(t, http.StatusOK, statusCode, "Expected status code 200")
 		require.Nil(t, listResp.Errors, "GraphQL errors: %v", listResp.Errors)
 
-		accounts := listResp.Data.CoreOpenmfpOrg.Accounts
+		accounts := listResp.Data.CorePlatformMeshIo.Accounts
 		require.Len(t, accounts, 4, "Expected 4 accounts")
 
 		expectedOrder := []string{"account-a", "account-b", "account-c", "account-d"}
@@ -52,7 +52,7 @@ func (suite *CommonTestSuite) TestSortByListItems() {
 		require.Equal(t, http.StatusOK, statusCode, "Expected status code 200")
 		require.Nil(t, listResp.Errors, "GraphQL errors: %v", listResp.Errors)
 
-		accounts := listResp.Data.CoreOpenmfpOrg.Accounts
+		accounts := listResp.Data.CorePlatformMeshIo.Accounts
 		require.Len(t, accounts, 4, "Expected 4 accounts")
 
 		expectedOrder := []string{"account-d", "account-c", "account-b", "account-a"}
@@ -85,7 +85,7 @@ func (suite *CommonTestSuite) TestSortBySubscription() {
 				return
 			}
 
-			accountList := rawRes.Data.(map[string]interface{})["core_openmfp_org_accounts"].([]interface{})
+			accountList := rawRes.Data.(map[string]interface{})["core_platform_mesh_io_accounts"].([]interface{})
 			if len(accountList) == 4 { // we have 4 accounts in total
 				require.Equal(suite.T(), "account-d", accountList[0].(map[string]interface{})["metadata"].(map[string]interface{})["name"])
 			}
@@ -106,7 +106,7 @@ func (suite *CommonTestSuite) createAccountsForSorting(ctx context.Context) {
 	}
 
 	for name, displayName := range accounts {
-		err := suite.runtimeClient.Create(ctx, &v1alpha1.Account{
+		account := &v1alpha1.Account{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: name,
 			},
@@ -114,7 +114,9 @@ func (suite *CommonTestSuite) createAccountsForSorting(ctx context.Context) {
 				Type:        v1alpha1.AccountTypeAccount,
 				DisplayName: displayName,
 			},
-		})
+		}
+
+		err := suite.runtimeClient.Create(ctx, account)
 		require.NoError(suite.T(), err)
 	}
 	time.Sleep(sleepTime)
