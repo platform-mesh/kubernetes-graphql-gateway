@@ -10,8 +10,8 @@ import (
 	"k8s.io/kube-openapi/pkg/validation/spec"
 
 	"github.com/openmfp/golang-commons/logger/testlogger"
-	apischema "github.com/openmfp/kubernetes-graphql-gateway/listener/pkg/apischema"
-	apischemaMocks "github.com/openmfp/kubernetes-graphql-gateway/listener/pkg/apischema/mocks"
+	apischema "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
+	apischemaMocks "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema/mocks"
 	"github.com/stretchr/testify/assert"
 )
 

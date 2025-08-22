@@ -13,9 +13,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	"github.com/openmfp/golang-commons/logger"
-	"github.com/openmfp/kubernetes-graphql-gateway/common/config"
-	"github.com/openmfp/kubernetes-graphql-gateway/listener/reconciler"
-	"github.com/openmfp/kubernetes-graphql-gateway/listener/reconciler/kcp"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler/kcp"
 )
 
 func TestNewKCPReconciler(t *testing.T) {

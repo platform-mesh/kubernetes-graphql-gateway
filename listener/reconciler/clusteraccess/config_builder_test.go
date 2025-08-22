@@ -13,10 +13,10 @@ import (
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	gatewayv1alpha1 "github.com/openmfp/kubernetes-graphql-gateway/common/apis/v1alpha1"
-	"github.com/openmfp/kubernetes-graphql-gateway/common/auth"
-	"github.com/openmfp/kubernetes-graphql-gateway/common/mocks"
-	"github.com/openmfp/kubernetes-graphql-gateway/listener/reconciler/clusteraccess"
+	gatewayv1alpha1 "github.com/platform-mesh/kubernetes-graphql-gateway/common/apis/v1alpha1"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/common/auth"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/common/mocks"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler/clusteraccess"
 )
 
 func TestBuildTargetClusterConfigFromTyped(t *testing.T) {

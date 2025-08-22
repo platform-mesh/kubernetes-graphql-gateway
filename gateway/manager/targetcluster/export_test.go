@@ -4,7 +4,7 @@ import (
 	"github.com/openmfp/golang-commons/logger"
 	"k8s.io/client-go/rest"
 
-	appConfig "github.com/openmfp/kubernetes-graphql-gateway/common/config"
+	appConfig "github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
 )
 
 // BuildConfigFromMetadata exposes the internal buildConfigFromMetadata function for testing

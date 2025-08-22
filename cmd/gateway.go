@@ -15,7 +15,7 @@ import (
 	"github.com/spf13/cobra"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	"github.com/openmfp/kubernetes-graphql-gateway/gateway/manager"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager"
 )
 
 var gatewayCmd = &cobra.Command{

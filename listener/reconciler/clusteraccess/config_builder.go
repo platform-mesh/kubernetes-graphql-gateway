@@ -7,8 +7,8 @@ import (
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/openmfp/kubernetes-graphql-gateway/common/apis/v1alpha1"
-	"github.com/openmfp/kubernetes-graphql-gateway/common/auth"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/common/apis/v1alpha1"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/common/auth"
 )
 
 // BuildTargetClusterConfigFromTyped extracts connection info from ClusterAccess and builds rest.Config

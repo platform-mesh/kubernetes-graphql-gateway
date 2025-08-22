@@ -12,9 +12,9 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	appConfig "github.com/openmfp/kubernetes-graphql-gateway/common/config"
-	"github.com/openmfp/kubernetes-graphql-gateway/gateway/manager/mocks"
-	"github.com/openmfp/kubernetes-graphql-gateway/gateway/manager/roundtripper"
+	appConfig "github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/mocks"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/roundtripper"
 )
 
 func TestRoundTripper_RoundTrip(t *testing.T) {

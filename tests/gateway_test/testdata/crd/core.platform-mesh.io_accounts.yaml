@@ -4,9 +4,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.14.0
-  name: accounts.core.openmfp.org
+  name: accounts.core.platform-mesh.io
 spec:
-  group: core.openmfp.org
+  group: core.platform-mesh.io
   names:
     kind: Account
     listKind: AccountList

@@ -9,9 +9,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/openmfp/golang-commons/logger"
-	gatewayv1alpha1 "github.com/openmfp/kubernetes-graphql-gateway/common/apis/v1alpha1"
-	"github.com/openmfp/kubernetes-graphql-gateway/common/mocks"
-	"github.com/openmfp/kubernetes-graphql-gateway/listener/reconciler/clusteraccess"
+	gatewayv1alpha1 "github.com/platform-mesh/kubernetes-graphql-gateway/common/apis/v1alpha1"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/common/mocks"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler/clusteraccess"
 )
 
 func TestInjectClusterMetadata(t *testing.T) {

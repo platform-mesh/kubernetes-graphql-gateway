@@ -1,4 +1,4 @@
-module github.com/openmfp/kubernetes-graphql-gateway
+module github.com/platform-mesh/kubernetes-graphql-gateway
 
 go 1.24.3
 
@@ -27,6 +27,7 @@ require (
 	github.com/openmfp/account-operator v0.170.23
 	github.com/openmfp/golang-commons v0.150.11
 	github.com/pkg/errors v0.9.1
+	github.com/platform-mesh/account-operator v0.1.20
 	github.com/prometheus/client_golang v1.23.0
 	github.com/rs/zerolog v1.34.0
 	github.com/spf13/cobra v1.9.1
@@ -35,6 +36,7 @@ require (
 	go.opentelemetry.io/otel v1.37.0
 	go.opentelemetry.io/otel/trace v1.37.0
 	golang.org/x/exp v0.0.0-20250819193227-8b4c13bb791b
+	golang.org/x/text v0.26.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.33.3
 	k8s.io/apiextensions-apiserver v0.33.3
@@ -120,7 +122,6 @@ require (
 	golang.org/x/sync v0.16.0 // indirect
 	golang.org/x/sys v0.35.0 // indirect
 	golang.org/x/term v0.32.0 // indirect
-	golang.org/x/text v0.26.0 // indirect
 	golang.org/x/time v0.11.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250707201910-8d1bb00bc6a7 // indirect

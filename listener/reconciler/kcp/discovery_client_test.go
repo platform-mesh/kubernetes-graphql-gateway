@@ -9,8 +9,8 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
 
-	"github.com/openmfp/kubernetes-graphql-gateway/listener/reconciler/kcp"
-	kcpmocks "github.com/openmfp/kubernetes-graphql-gateway/listener/reconciler/kcp/mocks"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler/kcp"
+	kcpmocks "github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler/kcp/mocks"
 )
 
 func TestNewDiscoveryFactory(t *testing.T) {

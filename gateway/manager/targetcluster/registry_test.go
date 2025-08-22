@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/openmfp/golang-commons/logger/testlogger"
-	appConfig "github.com/openmfp/kubernetes-graphql-gateway/common/config"
-	"github.com/openmfp/kubernetes-graphql-gateway/gateway/manager/roundtripper"
+	appConfig "github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/roundtripper"
 )
 
 func TestExtractClusterNameWithKCPWorkspace(t *testing.T) {

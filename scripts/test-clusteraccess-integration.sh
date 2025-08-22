@@ -77,7 +77,7 @@ log_info "Server URL: $SERVER_URL"
 log_step "4. Creating ClusterAccess resource with kubeconfig authentication"
 
 cat <<EOF | kubectl --kubeconfig="$MANAGEMENT_KUBECONFIG" apply -f -
-apiVersion: gateway.openmfp.org/v1alpha1
+apiVersion: gateway.platform-mesh.io/v1alpha1
 kind: ClusterAccess
 metadata:
   name: ${TEST_CLUSTER_NAME}

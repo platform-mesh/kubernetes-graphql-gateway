@@ -14,10 +14,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/kontext"
 
 	"github.com/openmfp/golang-commons/logger/testlogger"
-	"github.com/openmfp/kubernetes-graphql-gateway/common"
-	appConfig "github.com/openmfp/kubernetes-graphql-gateway/common/config"
-	"github.com/openmfp/kubernetes-graphql-gateway/gateway/manager/roundtripper"
-	"github.com/openmfp/kubernetes-graphql-gateway/gateway/manager/targetcluster"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/common"
+	appConfig "github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/roundtripper"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/targetcluster"
 )
 
 func TestGetToken(t *testing.T) {

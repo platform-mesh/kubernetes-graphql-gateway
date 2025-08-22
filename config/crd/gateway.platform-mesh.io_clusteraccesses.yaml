@@ -4,9 +4,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.18.0
-  name: clusteraccesses.gateway.openmfp.org
+  name: clusteraccesses.gateway.platform-mesh.io
 spec:
-  group: gateway.openmfp.org
+  group: gateway.platform-mesh.io
   names:
     kind: ClusterAccess
     listKind: ClusterAccessList

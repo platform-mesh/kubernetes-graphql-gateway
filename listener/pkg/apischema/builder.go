@@ -18,7 +18,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	"github.com/openmfp/golang-commons/logger"
-	"github.com/openmfp/kubernetes-graphql-gateway/common"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/common"
 )
 
 var (

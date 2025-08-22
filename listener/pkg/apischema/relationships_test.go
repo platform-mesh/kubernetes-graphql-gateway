@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/openmfp/golang-commons/logger/testlogger"
-	apischema "github.com/openmfp/kubernetes-graphql-gateway/listener/pkg/apischema"
-	apimocks "github.com/openmfp/kubernetes-graphql-gateway/listener/pkg/apischema/mocks"
+	apischema "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
+	apimocks "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema/mocks"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/openapi"

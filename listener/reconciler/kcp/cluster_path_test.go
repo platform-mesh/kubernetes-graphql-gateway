@@ -13,8 +13,8 @@ import (
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/openmfp/kubernetes-graphql-gateway/common/mocks"
-	"github.com/openmfp/kubernetes-graphql-gateway/listener/reconciler/kcp"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/common/mocks"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler/kcp"
 )
 
 func TestConfigForKCPCluster(t *testing.T) {

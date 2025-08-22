@@ -9,7 +9,7 @@ import (
 
 	"github.com/openmfp/golang-commons/logger"
 	"github.com/openmfp/golang-commons/sentry"
-	"github.com/openmfp/kubernetes-graphql-gateway/common/watcher"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/common/watcher"
 )
 
 // ClusterRegistryInterface defines the minimal interface needed from ClusterRegistry

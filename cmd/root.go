@@ -6,7 +6,7 @@ import (
 
 	openmfpconfig "github.com/openmfp/golang-commons/config"
 	"github.com/openmfp/golang-commons/logger"
-	"github.com/openmfp/kubernetes-graphql-gateway/common/config"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
 )
 
 var (

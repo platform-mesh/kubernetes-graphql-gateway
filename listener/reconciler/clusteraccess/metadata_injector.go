@@ -6,8 +6,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/openmfp/golang-commons/logger"
-	gatewayv1alpha1 "github.com/openmfp/kubernetes-graphql-gateway/common/apis/v1alpha1"
-	"github.com/openmfp/kubernetes-graphql-gateway/common/auth"
+	gatewayv1alpha1 "github.com/platform-mesh/kubernetes-graphql-gateway/common/apis/v1alpha1"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/common/auth"
 )
 
 func injectClusterMetadata(ctx context.Context, schemaJSON []byte, clusterAccess gatewayv1alpha1.ClusterAccess, k8sClient client.Client, log *logger.Logger) ([]byte, error) {

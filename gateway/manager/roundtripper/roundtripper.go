@@ -8,7 +8,7 @@ import (
 	"github.com/openmfp/golang-commons/logger"
 	"k8s.io/client-go/transport"
 
-	"github.com/openmfp/kubernetes-graphql-gateway/common/config"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
 )
 
 type TokenKey struct{}

@@ -1,6 +1,7 @@
 package gateway_test
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -15,6 +16,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/graphql-go/graphql"
 	"github.com/stretchr/testify/require"
@@ -24,15 +27,15 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
-	"sigs.k8s.io/controller-runtime/pkg/kcp"
+
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	"github.com/openmfp/account-operator/api/v1alpha1"
 	"github.com/openmfp/golang-commons/logger"
-	appConfig "github.com/openmfp/kubernetes-graphql-gateway/common/config"
-	"github.com/openmfp/kubernetes-graphql-gateway/gateway/manager"
-	"github.com/openmfp/kubernetes-graphql-gateway/gateway/resolver"
-	"github.com/openmfp/kubernetes-graphql-gateway/gateway/schema"
+	"github.com/platform-mesh/account-operator/api/v1alpha1"
+	appConfig "github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/resolver"
+	gatewaySchema "github.com/platform-mesh/kubernetes-graphql-gateway/gateway/schema"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -130,9 +133,14 @@ func (suite *CommonTestSuite) SetupTest() {
 	suite.log, err = logger.New(logger.DefaultConfig())
 	require.NoError(suite.T(), err)
 
-	suite.runtimeClient, err = kcp.NewClusterAwareClientWithWatch(suite.restCfg, client.Options{
+	suite.runtimeClient, err = client.NewWithWatch(suite.restCfg, client.Options{
 		Scheme: runtimeScheme,
 	})
+	require.NoError(suite.T(), err)
+
+	// Wait for CRDs to be available in the API server
+	// This ensures the discovery cache is updated before tests run
+	err = suite.waitForCRDsToBeReady(runtimeScheme)
 	require.NoError(suite.T(), err)
 
 	// Create resolver service with the logger pointer
@@ -141,7 +149,7 @@ func (suite *CommonTestSuite) SetupTest() {
 	definitions, err := readDefinitionFromFile("./testdata/kubernetes")
 	require.NoError(suite.T(), err)
 
-	g, err := schema.New(suite.log, definitions, resolverService)
+	g, err := gatewaySchema.New(suite.log, definitions, resolverService)
 	require.NoError(suite.T(), err)
 
 	suite.graphqlSchema = *g.GetSchema()
@@ -272,4 +280,35 @@ func (suite *CommonTestSuite) sendAuthenticatedRequest(url, query string) (*Grap
 // sendAuthenticatedRequestWithVariables is a helper method to send authenticated GraphQL requests with variables using the test token
 func (suite *CommonTestSuite) sendAuthenticatedRequestWithVariables(url, query string, variables map[string]interface{}) (*GraphQLResponse, int, error) {
 	return sendRequestWithAuthAndVariables(url, query, suite.staticToken, variables)
+}
+
+// waitForCRDsToBeReady waits for the CRDs to be available in the API server
+// This ensures that the discovery cache is updated and the types are recognized
+func (suite *CommonTestSuite) waitForCRDsToBeReady(scheme *runtime.Scheme) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Check that the Account type is discoverable through the client
+	return wait.PollUntilContextTimeout(ctx, time.Second, 30*time.Second, true, func(ctx context.Context) (done bool, err error) {
+		// Try to create a dummy Account object to verify the type is recognized
+		gvk := schema.GroupVersionKind{
+			Group:   "core.platform-mesh.io",
+			Version: "v1alpha1",
+			Kind:    "Account",
+		}
+
+		// Check if the scheme recognizes this GVK
+		_, err = scheme.New(gvk)
+		if err != nil {
+			return false, nil // Keep retrying
+		}
+
+		// Try a simple List operation to verify API server recognizes the type
+		accountList := &v1alpha1.AccountList{}
+		err = suite.runtimeClient.List(ctx, accountList)
+		if err != nil {
+			return false, nil // Keep retrying
+		}
+		return true, nil
+	})
 }

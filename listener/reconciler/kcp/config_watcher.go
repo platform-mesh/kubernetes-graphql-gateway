@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/openmfp/golang-commons/logger"
-	"github.com/openmfp/kubernetes-graphql-gateway/common/watcher"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/common/watcher"
 )
 
 // VirtualWorkspaceConfigManager interface for loading virtual workspace configurations

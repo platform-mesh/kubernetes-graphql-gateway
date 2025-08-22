@@ -9,10 +9,10 @@ import (
 	"github.com/pkg/errors"
 	"k8s.io/client-go/rest"
 
-	appConfig "github.com/openmfp/kubernetes-graphql-gateway/common/config"
-	"github.com/openmfp/kubernetes-graphql-gateway/gateway/manager/roundtripper"
-	"github.com/openmfp/kubernetes-graphql-gateway/gateway/manager/targetcluster"
-	"github.com/openmfp/kubernetes-graphql-gateway/gateway/manager/watcher"
+	appConfig "github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/roundtripper"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/targetcluster"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/watcher"
 )
 
 // Service orchestrates the domain-driven architecture with target clusters

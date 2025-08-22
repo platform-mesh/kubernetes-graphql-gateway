@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/openmfp/kubernetes-graphql-gateway/gateway/schema"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/schema"
 
 	"github.com/graphql-go/graphql/language/ast"
 	"github.com/graphql-go/graphql/language/kinds"

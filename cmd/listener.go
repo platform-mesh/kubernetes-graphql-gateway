@@ -19,12 +19,12 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	gatewayv1alpha1 "github.com/openmfp/kubernetes-graphql-gateway/common/apis/v1alpha1"
-	"github.com/openmfp/kubernetes-graphql-gateway/listener/pkg/apischema"
-	"github.com/openmfp/kubernetes-graphql-gateway/listener/pkg/workspacefile"
-	"github.com/openmfp/kubernetes-graphql-gateway/listener/reconciler"
-	"github.com/openmfp/kubernetes-graphql-gateway/listener/reconciler/clusteraccess"
-	"github.com/openmfp/kubernetes-graphql-gateway/listener/reconciler/kcp"
+	gatewayv1alpha1 "github.com/platform-mesh/kubernetes-graphql-gateway/common/apis/v1alpha1"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/workspacefile"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler/clusteraccess"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler/kcp"
 )
 
 var (
@@ -86,7 +86,7 @@ var listenCmd = &cobra.Command{
 			WebhookServer:          webhookServer,
 			HealthProbeBindAddress: defaultCfg.HealthProbeBindAddress,
 			LeaderElection:         defaultCfg.LeaderElection.Enabled,
-			LeaderElectionID:       "72231e1f.openmfp.io",
+			LeaderElectionID:       "72231e1f.platform-mesh.io",
 		}
 
 		clt, err := client.New(restCfg, client.Options{

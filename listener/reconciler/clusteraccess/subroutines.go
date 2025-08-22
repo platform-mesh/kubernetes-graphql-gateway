@@ -12,9 +12,9 @@ import (
 
 	"github.com/openmfp/golang-commons/controller/lifecycle"
 	commonserrors "github.com/openmfp/golang-commons/errors"
-	gatewayv1alpha1 "github.com/openmfp/kubernetes-graphql-gateway/common/apis/v1alpha1"
-	"github.com/openmfp/kubernetes-graphql-gateway/listener/pkg/apischema"
-	"github.com/openmfp/kubernetes-graphql-gateway/listener/reconciler"
+	gatewayv1alpha1 "github.com/platform-mesh/kubernetes-graphql-gateway/common/apis/v1alpha1"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler"
 )
 
 // generateSchemaSubroutine processes ClusterAccess resources and generates schemas

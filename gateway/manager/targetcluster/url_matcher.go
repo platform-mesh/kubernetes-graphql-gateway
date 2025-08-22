@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/openmfp/kubernetes-graphql-gateway/common/config"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
 )
 
 // MatchURL attempts to match the given path against known patterns and extract variables

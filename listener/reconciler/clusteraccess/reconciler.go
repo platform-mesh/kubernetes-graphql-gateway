@@ -12,11 +12,11 @@ import (
 
 	"github.com/openmfp/golang-commons/controller/lifecycle"
 	"github.com/openmfp/golang-commons/logger"
-	gatewayv1alpha1 "github.com/openmfp/kubernetes-graphql-gateway/common/apis/v1alpha1"
-	"github.com/openmfp/kubernetes-graphql-gateway/common/config"
-	"github.com/openmfp/kubernetes-graphql-gateway/listener/pkg/apischema"
-	"github.com/openmfp/kubernetes-graphql-gateway/listener/pkg/workspacefile"
-	"github.com/openmfp/kubernetes-graphql-gateway/listener/reconciler"
+	gatewayv1alpha1 "github.com/platform-mesh/kubernetes-graphql-gateway/common/apis/v1alpha1"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/workspacefile"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler"
 )
 
 var (

@@ -1,6 +1,6 @@
 package gateway_test
 
-type coreOpenmfpOrg struct {
+type corePlatformMeshIo struct {
 	Account       *account   `json:"Account,omitempty"`
 	Accounts      []*account `json:"Accounts,omitempty"`
 	CreateAccount *account   `json:"createAccount,omitempty"`
@@ -20,7 +20,7 @@ type accountSpec struct {
 func createAccountMutation() string {
 	return `
 mutation {
-  core_openmfp_org {
+  core_platform_mesh_io {
     createAccount(
       object:  {
         metadata: {
@@ -48,7 +48,7 @@ mutation {
 func getAccountQuery() string {
 	return `
         query {
-			core_openmfp_org {
+			core_platform_mesh_io {
 			Account(name: "test-account") {
 			  metadata {
 				name
@@ -66,7 +66,7 @@ func getAccountQuery() string {
 func listAccountsQuery(sortByDisplayName bool) string {
 	if sortByDisplayName {
 		return `query {
-			core_openmfp_org {
+			core_platform_mesh_io {
 			Accounts(sortBy: "spec.displayName") {
 			  metadata {
 				name
@@ -78,7 +78,7 @@ func listAccountsQuery(sortByDisplayName bool) string {
 	}
 
 	return `query {
-			core_openmfp_org {
+			core_platform_mesh_io {
 			Accounts {
 			  metadata {
 				name
@@ -92,7 +92,7 @@ func listAccountsQuery(sortByDisplayName bool) string {
 func deleteAccountMutation() string {
 	return `
 		mutation {
-		  core_openmfp_org {
+		  core_platform_mesh_io {
 			deleteAccount(name: "test-account")
 		  }
 		}
@@ -102,7 +102,7 @@ func deleteAccountMutation() string {
 func SubscribeAccounts(sortByDisplayName bool) string {
 	if sortByDisplayName {
 		return `subscription {
-				core_openmfp_org_accounts(sortBy: "spec.displayName") {
+				core_platform_mesh_io_accounts(sortBy: "spec.displayName") {
 					metadata { name }
 					spec { displayName }
 				}
@@ -110,7 +110,7 @@ func SubscribeAccounts(sortByDisplayName bool) string {
 		`
 	}
 	return `subscription {
-			core_openmfp_org_accounts {
+			core_platform_mesh_io_accounts {
 				metadata { name }
 				spec { displayName }
 			}

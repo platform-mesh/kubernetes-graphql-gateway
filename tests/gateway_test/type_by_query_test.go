@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/openmfp/golang-commons/logger/testlogger"
-	"github.com/openmfp/kubernetes-graphql-gateway/gateway/resolver"
-	"github.com/openmfp/kubernetes-graphql-gateway/gateway/schema"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/resolver"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/schema"
 )
 
 func getGateway() (*schema.Gateway, error) {

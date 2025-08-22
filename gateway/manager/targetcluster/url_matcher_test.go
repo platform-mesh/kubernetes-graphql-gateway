@@ -3,8 +3,8 @@ package targetcluster_test
 import (
 	"testing"
 
-	"github.com/openmfp/kubernetes-graphql-gateway/common/config"
-	"github.com/openmfp/kubernetes-graphql-gateway/gateway/manager/targetcluster"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/targetcluster"
 )
 
 func TestMatchURL(t *testing.T) {

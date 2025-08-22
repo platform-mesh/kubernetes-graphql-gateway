@@ -13,13 +13,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/openmfp/golang-commons/logger"
-	gatewayv1alpha1 "github.com/openmfp/kubernetes-graphql-gateway/common/apis/v1alpha1"
-	"github.com/openmfp/kubernetes-graphql-gateway/common/config"
-	"github.com/openmfp/kubernetes-graphql-gateway/common/mocks"
-	apischema_mocks "github.com/openmfp/kubernetes-graphql-gateway/listener/pkg/apischema/mocks"
-	workspacefile_mocks "github.com/openmfp/kubernetes-graphql-gateway/listener/pkg/workspacefile/mocks"
-	"github.com/openmfp/kubernetes-graphql-gateway/listener/reconciler"
-	"github.com/openmfp/kubernetes-graphql-gateway/listener/reconciler/clusteraccess"
+	gatewayv1alpha1 "github.com/platform-mesh/kubernetes-graphql-gateway/common/apis/v1alpha1"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/common/mocks"
+	apischema_mocks "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema/mocks"
+	workspacefile_mocks "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/workspacefile/mocks"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler/clusteraccess"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -61,7 +61,7 @@ func TestCheckClusterAccessCRDStatus(t *testing.T) {
 				m.EXPECT().List(mock.Anything, mock.AnythingOfType("*v1alpha1.ClusterAccessList")).
 					Return(&meta.NoResourceMatchError{
 						PartialResource: schema.GroupVersionResource{
-							Group:    "gateway.openmfp.org",
+							Group:    "gateway.platform-mesh.io",
 							Version:  "v1alpha1",
 							Resource: "clusteraccesses",
 						},

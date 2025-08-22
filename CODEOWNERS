@@ -1,4 +1,5 @@
 # Default code owners
-* @openmfp/frame
+* @platform-mesh/frame
+* @platform-mesh/tsc
 go.mod
 go.sum

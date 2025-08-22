@@ -7,7 +7,7 @@
 1. Create and run a cluster if it is not running yet.
 
 ```shell
-git clone https://github.com/openmfp/helm-charts-priv.git
+git clone https://github.com/platform-mesh/helm-charts-priv.git
 cd helm-charts-priv
 task local-setup
 ```
@@ -25,7 +25,7 @@ If you see only this single line, the problem might be in the container called "
 
 Note the `IMAGE` column, corresponding to the two `kubernetes-...` container. It contains the name and the currently used version of the build, i.e.
 ```
-ghcr.io/openmfp/kubernetes-graphql-gateway:v0.75.1
+ghcr.io/platform-mesh/kubernetes-graphql-gateway:v0.75.1
 ```
 
 4. Build the Docker image:
@@ -35,7 +35,7 @@ task docker
 
 5. Tag the newly built image with the version used in local-setup -- that image is going to be replaced with the one built on step 4.
 ```shell
-docker tag ghcr.io/openmfp/kubernetes-graphql-gateway:latest ghcr.io/openmfp/kubernetes-graphql-gateway:v0.75.1
+docker tag ghcr.io/platform-mesh/kubernetes-graphql-gateway:latest ghcr.io/platform-mesh/kubernetes-graphql-gateway:v0.75.1
 ```
 Use the name you and version got from the `IMAGE` column on step 3. Leave the version number unchanged.
 
@@ -43,29 +43,29 @@ Use the name you and version got from the `IMAGE` column on step 3. Leave the ve
 ```shell
 kind get clusters
 ```
-In this example, the cluster name is `openmfp`.
+In this example, the cluster name is `platform-mesh`.
 
 7. Load the new image into your kind cluster:
 ***Docker-based kind:***
 ```shell
-kind load docker-image ghcr.io/openmfp/kubernetes-graphql-gateway:v0.75.1 -n openmfp
+kind load docker-image ghcr.io/platform-mesh/kubernetes-graphql-gateway:v0.75.1 -n platform-mesh
 ```
-The argument `-n openmfp` is to change the default value of the cluster name, which is `kind`.
+The argument `-n platform-mesh` is to change the default value of the cluster name, which is `kind`.
 
 ***Podman-based kind:***
 - Pull (or build) the image locally with Podman:
 ```shell
-podman pull ghcr.io/openmfp/kubernetes-graphql-gateway:v0.75.1
+podman pull ghcr.io/platform-mesh/kubernetes-graphql-gateway:v0.75.1
 ```
 
 - Save it to a tarball in OCI-archive format:
 ```shell
-podman save --format oci-archive ghcr.io/openmfp/kubernetes-graphql-gateway:v0.75.1 -o kubernetes-graphql-gateway_v0.75.1.tar
+podman save --format oci-archive ghcr.io/platform-mesh/kubernetes-graphql-gateway:v0.75.1 -o kubernetes-graphql-gateway_v0.75.1.tar
 ```
 
 - Load the tarball into your Podman-backed kind cluster:
 ```shell
-kind load image-archive kubernetes-graphql-gateway_v0.75.1.tar -n openmfp
+kind load image-archive kubernetes-graphql-gateway_v0.75.1.tar -n platform-mesh
 ```
 
 8. In k9s, go to `:pods` and delete the pod (not the container) called `kubernetes-graphql-gateway-...`.
