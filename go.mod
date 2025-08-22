@@ -3,7 +3,7 @@ module github.com/platform-mesh/kubernetes-graphql-gateway
 go 1.24.3
 
 replace (
-	github.com/google/cel-go => github.com/google/cel-go v0.22.1
+	github.com/google/cel-go => github.com/google/cel-go v0.26.0
 	// this PR introduces newer version of graphiQL that supports headers
 	// https://github.com/graphql-go/handler/pull/93
 	github.com/graphql-go/handler => github.com/vertex451/handler v0.0.0-20250124125145-ed328e3cf42a
@@ -24,7 +24,6 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/kcp-dev/kcp/sdk v0.28.0
 	github.com/kcp-dev/logicalcluster/v3 v3.0.5
-	github.com/openmfp/account-operator v0.170.23
 	github.com/openmfp/golang-commons v0.150.11
 	github.com/pkg/errors v0.9.1
 	github.com/platform-mesh/account-operator v0.1.20
