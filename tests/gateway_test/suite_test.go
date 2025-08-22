@@ -289,7 +289,7 @@ func (suite *CommonTestSuite) waitForCRDsToBeReady(scheme *runtime.Scheme) error
 	defer cancel()
 
 	// Check that the Account type is discoverable through the client
-	return wait.PollImmediate(time.Second, 30*time.Second, func() (done bool, err error) {
+	return wait.PollUntilContextTimeout(ctx, time.Second, 30*time.Second, true, func(ctx context.Context) (done bool, err error) {
 		// Try to create a dummy Account object to verify the type is recognized
 		gvk := schema.GroupVersionKind{
 			Group:   "core.platform-mesh.io",
