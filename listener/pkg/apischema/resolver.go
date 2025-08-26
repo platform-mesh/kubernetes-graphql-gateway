@@ -5,7 +5,7 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 
-	"github.com/openmfp/golang-commons/logger"
+	"github.com/platform-mesh/golang-commons/logger"
 )
 
 const (

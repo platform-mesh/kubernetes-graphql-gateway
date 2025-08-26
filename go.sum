@@ -139,8 +139,6 @@ github.com/onsi/ginkgo/v2 v2.22.1 h1:QW7tbJAUDyVDVOM5dFa7qaybo+CRfR7bemlQUN6Z8aM
 github.com/onsi/ginkgo/v2 v2.22.1/go.mod h1:S6aTpoRsSq2cZOd+pssHAlKW/Q/jZt6cPrPlnj4a1xM=
 github.com/onsi/gomega v1.36.2 h1:koNYke6TVk6ZmnyHrCXba/T/MoLBXFjeC1PtvYgw0A8=
 github.com/onsi/gomega v1.36.2/go.mod h1:DdwyADRjrc825LhMEkD76cHR5+pUnjhUN8GlHlRPHzY=
-github.com/openmfp/golang-commons v0.150.11 h1:g9NbX75c5GTQkF7qHRDHU4a/En0LVW45nd5Gi1lOV7U=
-github.com/openmfp/golang-commons v0.150.11/go.mod h1:6CUKMI6gmVldZa6HohpOV/g/xC8oNnX87cLT21BabSA=
 github.com/pelletier/go-toml/v2 v2.2.3 h1:YmeHyLY8mFWbdkNWwpr+qIL2bEqT0o95WSdkNHvL12M=
 github.com/pelletier/go-toml/v2 v2.2.3/go.mod h1:MfCQTFTvCcUyyvvwm1+G6H/jORL20Xlb6rzQu9GuUkc=
 github.com/pingcap/errors v0.11.4 h1:lFuQV/oaUMGcD2tqt+01ROSmJs75VG1ToEOkZIZ4nE4=
@@ -149,6 +147,8 @@ github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
 github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/platform-mesh/account-operator v0.1.20 h1:49smmxNzbSpXCz1LVPRZbOCPOLMWM+pJBL9I/Rx3AKg=
 github.com/platform-mesh/account-operator v0.1.20/go.mod h1:Sk6M++H+OucXpJILOYSAzPIWpMNfOi0FsqH/cNO2+rs=
+github.com/platform-mesh/golang-commons v0.0.3 h1:d4uqB0PQUaPjs02RM/5fg7jQs6oUzxzA2pvqbBlXE9s=
+github.com/platform-mesh/golang-commons v0.0.3/go.mod h1:VjBuwAZPgKpvZU94HqcPokyTeHj8g7ZH/Mluc3dA2bM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 h1:Jamvg5psRIccs7FGNTlIRMkT8wgtp5eCXdBlqhYGL6U=
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=

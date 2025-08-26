@@ -7,8 +7,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/openmfp/golang-commons/logger"
-	"github.com/openmfp/golang-commons/sentry"
+	"github.com/platform-mesh/golang-commons/logger"
+	"github.com/platform-mesh/golang-commons/sentry"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/common/watcher"
 )
 

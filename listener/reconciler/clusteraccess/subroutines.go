@@ -10,8 +10,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
-	"github.com/openmfp/golang-commons/controller/lifecycle"
-	commonserrors "github.com/openmfp/golang-commons/errors"
+	"github.com/platform-mesh/golang-commons/controller/lifecycle"
+	commonserrors "github.com/platform-mesh/golang-commons/errors"
 	gatewayv1alpha1 "github.com/platform-mesh/kubernetes-graphql-gateway/common/apis/v1alpha1"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler"

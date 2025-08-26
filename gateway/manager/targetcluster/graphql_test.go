@@ -13,7 +13,7 @@ import (
 	"github.com/kcp-dev/logicalcluster/v3"
 	"sigs.k8s.io/controller-runtime/pkg/kontext"
 
-	"github.com/openmfp/golang-commons/logger/testlogger"
+	"github.com/platform-mesh/golang-commons/logger/testlogger"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/common"
 	appConfig "github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/roundtripper"

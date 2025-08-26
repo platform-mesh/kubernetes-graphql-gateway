@@ -7,6 +7,8 @@ replace (
 	// this PR introduces newer version of graphiQL that supports headers
 	// https://github.com/graphql-go/handler/pull/93
 	github.com/graphql-go/handler => github.com/vertex451/handler v0.0.0-20250124125145-ed328e3cf42a
+	// Pin golang-commons to v0.0.3
+	github.com/platform-mesh/golang-commons => github.com/platform-mesh/golang-commons v0.0.3
 	k8s.io/api => k8s.io/api v0.33.3
 	k8s.io/apimachinery => k8s.io/apimachinery v0.33.3
 	k8s.io/client-go => k8s.io/client-go v0.32.4
@@ -24,9 +26,9 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/kcp-dev/kcp/sdk v0.28.1
 	github.com/kcp-dev/logicalcluster/v3 v3.0.5
-	github.com/openmfp/golang-commons v0.150.11
 	github.com/pkg/errors v0.9.1
 	github.com/platform-mesh/account-operator v0.1.20
+	github.com/platform-mesh/golang-commons v0.0.21
 	github.com/prometheus/client_golang v1.23.0
 	github.com/rs/zerolog v1.34.0
 	github.com/spf13/cobra v1.9.1

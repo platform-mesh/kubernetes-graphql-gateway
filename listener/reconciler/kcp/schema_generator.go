@@ -6,7 +6,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/discovery"
 
-	"github.com/openmfp/golang-commons/logger"
+	"github.com/platform-mesh/golang-commons/logger"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/common/auth"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
 )

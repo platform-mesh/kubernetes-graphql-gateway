@@ -30,8 +30,8 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	"github.com/openmfp/golang-commons/logger"
 	"github.com/platform-mesh/account-operator/api/v1alpha1"
+	"github.com/platform-mesh/golang-commons/logger"
 	appConfig "github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/resolver"
