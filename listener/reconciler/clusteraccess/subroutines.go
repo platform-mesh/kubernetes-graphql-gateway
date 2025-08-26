@@ -10,7 +10,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
-	"github.com/platform-mesh/golang-commons/controller/lifecycle"
+	"github.com/platform-mesh/golang-commons/controller/lifecycle/runtimeobject"
 	commonserrors "github.com/platform-mesh/golang-commons/errors"
 	gatewayv1alpha1 "github.com/platform-mesh/kubernetes-graphql-gateway/common/apis/v1alpha1"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
@@ -22,7 +22,7 @@ type generateSchemaSubroutine struct {
 	reconciler *ClusterAccessReconciler
 }
 
-func (s *generateSchemaSubroutine) Process(ctx context.Context, instance lifecycle.RuntimeObject) (ctrl.Result, commonserrors.OperatorError) {
+func (s *generateSchemaSubroutine) Process(ctx context.Context, instance runtimeobject.RuntimeObject) (ctrl.Result, commonserrors.OperatorError) {
 	clusterAccess, ok := instance.(*gatewayv1alpha1.ClusterAccess)
 	if !ok {
 		s.reconciler.log.Error().Msg("instance is not a ClusterAccess resource")
@@ -96,7 +96,7 @@ func (s *generateSchemaSubroutine) restMapperFromConfig(cfg *rest.Config) (meta.
 	return rm, nil
 }
 
-func (s *generateSchemaSubroutine) Finalize(ctx context.Context, instance lifecycle.RuntimeObject) (ctrl.Result, commonserrors.OperatorError) {
+func (s *generateSchemaSubroutine) Finalize(ctx context.Context, instance runtimeobject.RuntimeObject) (ctrl.Result, commonserrors.OperatorError) {
 	return ctrl.Result{}, nil
 }
 

@@ -10,7 +10,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/platform-mesh/golang-commons/controller/lifecycle"
+	"github.com/platform-mesh/golang-commons/controller/lifecycle/controllerruntime"
+	"github.com/platform-mesh/golang-commons/controller/lifecycle/subroutine"
 	"github.com/platform-mesh/golang-commons/logger"
 	gatewayv1alpha1 "github.com/platform-mesh/kubernetes-graphql-gateway/common/apis/v1alpha1"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
@@ -87,7 +88,7 @@ type ClusterAccessReconciler struct {
 	log              *logger.Logger
 	mgr              ctrl.Manager
 	opts             reconciler.ReconcilerOpts
-	lifecycleManager *lifecycle.LifecycleManager
+	lifecycleManager *controllerruntime.LifecycleManager
 }
 
 func NewReconciler(
@@ -112,14 +113,14 @@ func NewReconciler(
 	}
 
 	// Create lifecycle manager with subroutines and condition management
-	r.lifecycleManager = lifecycle.NewLifecycleManager(
-		log,
+	r.lifecycleManager = controllerruntime.NewLifecycleManager(
+		[]subroutine.Subroutine{
+			&generateSchemaSubroutine{reconciler: r},
+		},
 		"cluster-access-reconciler",
 		"cluster-access-reconciler",
 		opts.Client,
-		[]lifecycle.Subroutine{
-			&generateSchemaSubroutine{reconciler: r},
-		},
+		log,
 	).WithConditionManagement()
 
 	return r, nil
