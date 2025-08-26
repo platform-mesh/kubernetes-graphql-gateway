@@ -6,8 +6,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/openmfp/golang-commons/sentry"
 	"github.com/pkg/errors"
+	"github.com/platform-mesh/golang-commons/sentry"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"

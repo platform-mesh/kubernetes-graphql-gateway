@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/openmfp/golang-commons/logger/testlogger"
+	"github.com/platform-mesh/golang-commons/logger/testlogger"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/mocks"
 	"github.com/stretchr/testify/assert"
 )

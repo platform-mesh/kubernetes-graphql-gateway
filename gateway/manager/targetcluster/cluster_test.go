@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"k8s.io/client-go/rest"
 
-	"github.com/openmfp/golang-commons/logger/testlogger"
+	"github.com/platform-mesh/golang-commons/logger/testlogger"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/targetcluster"
 )
 

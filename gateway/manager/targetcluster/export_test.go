@@ -1,7 +1,7 @@
 package targetcluster
 
 import (
-	"github.com/openmfp/golang-commons/logger"
+	"github.com/platform-mesh/golang-commons/logger"
 	"k8s.io/client-go/rest"
 
 	appConfig "github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
