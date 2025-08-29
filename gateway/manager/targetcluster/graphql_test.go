@@ -11,7 +11,6 @@ import (
 
 	"github.com/graphql-go/graphql"
 	"github.com/kcp-dev/logicalcluster/v3"
-	"sigs.k8s.io/controller-runtime/pkg/kontext"
 
 	"github.com/platform-mesh/golang-commons/logger/testlogger"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/common"
@@ -197,8 +196,8 @@ func TestSetContexts(t *testing.T) {
 
 			// Check KCP context
 			if tt.expectKcp {
-				clusterFromCtx, _ := kontext.ClusterFrom(result.Context())
-				if clusterFromCtx != logicalcluster.Name(tt.workspace) {
+				clusterFromCtx, ok := result.Context().Value(targetcluster.LogicalClusterKey{}).(logicalcluster.Name)
+				if !ok || clusterFromCtx != logicalcluster.Name(tt.workspace) {
 					t.Errorf("expected cluster %q in context, got %q", tt.workspace, clusterFromCtx)
 				}
 			}

@@ -11,7 +11,6 @@ import (
 	"github.com/platform-mesh/golang-commons/logger"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/kcp"
 
 	"github.com/platform-mesh/kubernetes-graphql-gateway/common/auth"
 	appConfig "github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
@@ -120,12 +119,9 @@ func (tc *TargetCluster) connect(appCfg appConfig.Config, metadata *ClusterMetad
 		})
 	}
 
-	// Create client - use KCP-aware client only for KCP mode, standard client otherwise
-	if appCfg.EnableKcp {
-		tc.client, err = kcp.NewClusterAwareClientWithWatch(tc.restCfg, client.Options{})
-	} else {
-		tc.client, err = client.NewWithWatch(tc.restCfg, client.Options{})
-	}
+	// Create client - with multicluster-provider, we use standard client for all modes
+	// The multicluster-runtime handles cluster awareness when needed
+	tc.client, err = client.NewWithWatch(tc.restCfg, client.Options{})
 	if err != nil {
 		return fmt.Errorf("failed to create cluster client: %w", err)
 	}
