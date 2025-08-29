@@ -45,7 +45,7 @@ type ExportedClusterPathResolver = ClusterPathResolver
 type ExportedClusterPathResolverProvider = ClusterPathResolverProvider
 type ExportedDiscoveryFactory = DiscoveryFactory
 type ExportedDiscoveryFactoryProvider = DiscoveryFactoryProvider
-type ExportedAPIBindingReconciler = APIBindingReconciler
+
 type ExportedKCPReconciler = KCPReconciler
 
 // Helper function to create ClusterPathResolverProvider with custom clientFactory for testing
