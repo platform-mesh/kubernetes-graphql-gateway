@@ -9,6 +9,7 @@ import (
 	"github.com/platform-mesh/golang-commons/logger"
 	"k8s.io/client-go/rest"
 
+	commoncluster "github.com/platform-mesh/kubernetes-graphql-gateway/common/cluster"
 	appConfig "github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/roundtripper"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/targetcluster"
@@ -24,12 +25,26 @@ type Service struct {
 
 // NewGateway creates a new domain-driven Gateway instance
 func NewGateway(ctx context.Context, log *logger.Logger, appCfg appConfig.Config) (*Service, error) {
+	return NewGatewayWithClusterManager(ctx, log, appCfg, nil)
+}
+
+// NewGatewayWithClusterManager creates a new Gateway instance with optional multicluster manager
+func NewGatewayWithClusterManager(ctx context.Context, log *logger.Logger, appCfg appConfig.Config, clusterMgr commoncluster.Manager) (*Service, error) {
 	// Create round tripper factory
 	roundTripperFactory := targetcluster.RoundTripperFactory(func(adminRT http.RoundTripper, tlsConfig rest.TLSClientConfig) http.RoundTripper {
 		return roundtripper.New(log, appCfg, adminRT, roundtripper.NewUnauthorizedRoundTripper())
 	})
 
-	clusterRegistry := targetcluster.NewClusterRegistry(log, appCfg, roundTripperFactory)
+	var clusterRegistry ClusterManager
+	if clusterMgr != nil && clusterMgr.IsMulticluster() {
+		// Use multicluster-aware cluster registry
+		clusterRegistry = targetcluster.NewMulticlusterClusterRegistry(log, appCfg, roundTripperFactory, clusterMgr)
+		log.Info().Msg("Using multicluster-aware cluster registry")
+	} else {
+		// Use traditional file-based cluster registry
+		clusterRegistry = targetcluster.NewClusterRegistry(log, appCfg, roundTripperFactory)
+		log.Info().Msg("Using traditional file-based cluster registry")
+	}
 
 	schemaWatcher, err := watcher.NewFileWatcher(log, clusterRegistry)
 	if err != nil {
