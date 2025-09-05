@@ -13,6 +13,7 @@ import (
 	kcpapis "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
 	"github.com/kcp-dev/multicluster-provider/apiexport"
 	"github.com/platform-mesh/golang-commons/logger"
+	commoncluster "github.com/platform-mesh/kubernetes-graphql-gateway/common/cluster"
 	appconfig "github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/workspacefile"
@@ -23,7 +24,11 @@ import (
 	mcreconcile "sigs.k8s.io/multicluster-runtime/pkg/reconcile"
 )
 
-type KCPReconciler struct {
+// KCPManager manages multicluster KCP components and schema generation.
+// It coordinates the multicluster provider, virtual workspaces, and API binding controllers.
+// Unlike traditional reconcilers, KCPManager acts as a coordinator that sets up multicluster
+// controllers rather than directly reconciling resources.
+type KCPManager struct {
 	mcMgr                      mcmanager.Manager
 	provider                   *apiexport.Provider
 	ioHandler                  workspacefile.IOHandler
@@ -31,14 +36,15 @@ type KCPReconciler struct {
 	virtualWorkspaceReconciler *VirtualWorkspaceReconciler
 	configWatcher              *ConfigWatcher
 	log                        *logger.Logger
-	manager                    ctrl.Manager // Pre-created manager wrapper
+	manager                    ctrl.Manager          // Local controller-runtime manager
+	clusterManager             commoncluster.Manager // Unified cluster manager for gateway integration
 }
 
-func NewKCPReconciler(
+func NewKCPManager(
 	appCfg appconfig.Config,
 	opts reconciler.ReconcilerOpts,
 	log *logger.Logger,
-) (*KCPReconciler, error) {
+) (*KCPManager, error) {
 	// Validate inputs first before using the logger
 	if log == nil {
 		return nil, fmt.Errorf("logger should not be nil")
@@ -90,7 +96,7 @@ func NewKCPReconciler(
 		return nil, err
 	}
 
-	reconcilerInstance := &KCPReconciler{
+	managerInstance := &KCPManager{
 		mcMgr:                      mcMgr,
 		provider:                   provider,
 		ioHandler:                  ioHandler,
@@ -98,49 +104,62 @@ func NewKCPReconciler(
 		virtualWorkspaceReconciler: virtualWorkspaceReconciler,
 		configWatcher:              configWatcher,
 		log:                        log,
+		manager:                    mcMgr.GetLocalManager(),                     // Use the local manager directly
+		clusterManager:             commoncluster.NewMulticlusterManager(mcMgr), // Expose multicluster manager for gateway
 	}
 
-	// Create the manager wrapper that handles KCP-specific startup
-	reconcilerInstance.manager = &kcpManagerWrapper{
-		Manager:    mcMgr.GetLocalManager(),
-		reconciler: reconcilerInstance,
-	}
-
-	log.Info().Msg("Successfully configured KCP reconciler with multicluster-provider")
-	return reconcilerInstance, nil
+	log.Info().Msg("Successfully configured KCP manager with multicluster-provider")
+	return managerInstance, nil
 }
 
-func (r *KCPReconciler) GetManager() ctrl.Manager {
-	return r.manager
+func (m *KCPManager) GetManager() ctrl.Manager {
+	return m.manager
 }
 
-func (r *KCPReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	// This method is required by the reconciler.CustomReconciler interface but is not used directly.
+// GetClusterManager returns the unified cluster manager for gateway integration
+func (m *KCPManager) GetClusterManager() commoncluster.Manager {
+	return m.clusterManager
+}
+
+func (m *KCPManager) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	// This method is required by the reconciler.ControllerProvider interface but is not used directly.
 	// Actual reconciliation is handled by the multicluster controller set up in SetupWithManager().
-	// KCPReconciler acts as a coordinator/manager rather than a direct reconciler.
+	// KCPManager acts as a coordinator/manager rather than a direct reconciler.
 	return ctrl.Result{}, nil
 }
 
-func (r *KCPReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	err := mcbuilder.ControllerManagedBy(r.mcMgr).
+func (m *KCPManager) SetupWithManager(mgr ctrl.Manager) error {
+	// Setup the multicluster APIBinding controller
+	err := mcbuilder.ControllerManagedBy(m.mcMgr).
 		Named("kcp-apibinding-schema-controller").
 		For(&kcpapis.APIBinding{}).
-		Complete(mcreconcile.Func(r.reconcileAPIBinding))
+		Complete(mcreconcile.Func(m.reconcileAPIBinding))
 	if err != nil {
-		r.log.Error().Err(err).Msg("failed to setup multicluster APIBinding controller")
+		m.log.Error().Err(err).Msg("failed to setup multicluster APIBinding controller")
 		return err
 	}
 
-	r.log.Info().Msg("Successfully set up multicluster APIBinding controller")
+	// Add the provider as a runnable to the manager so it starts with the manager
+	err = mgr.Add(&providerRunnable{
+		provider: m.provider,
+		mcMgr:    m.mcMgr,
+		log:      m.log,
+	})
+	if err != nil {
+		m.log.Error().Err(err).Msg("failed to add provider runnable to manager")
+		return err
+	}
+
+	m.log.Info().Msg("Successfully set up multicluster APIBinding controller and provider")
 	return nil
 }
 
 // reconcileAPIBinding handles APIBinding reconciliation across multiple clusters
-func (r *KCPReconciler) reconcileAPIBinding(ctx context.Context, req mcreconcile.Request) (ctrl.Result, error) {
-	logger := r.log.With().Str("cluster", req.ClusterName).Str("name", req.Name).Logger()
+func (m *KCPManager) reconcileAPIBinding(ctx context.Context, req mcreconcile.Request) (ctrl.Result, error) {
+	logger := m.log.With().Str("cluster", req.ClusterName).Str("name", req.Name).Logger()
 
 	// Get the cluster from the multicluster manager
-	cluster, err := r.mcMgr.GetCluster(ctx, req.ClusterName)
+	cluster, err := m.mcMgr.GetCluster(ctx, req.ClusterName)
 	if err != nil {
 		logger.Error().Err(err).Msg("failed to get cluster from multicluster manager")
 		return ctrl.Result{}, fmt.Errorf("failed to get cluster: %w", err)
@@ -158,7 +177,7 @@ func (r *KCPReconciler) reconcileAPIBinding(ctx context.Context, req mcreconcile
 
 	// Generate and write schema for this cluster
 	clusterPath := req.ClusterName
-	err = r.generateAndWriteSchema(ctx, clusterPath, cluster)
+	err = m.generateAndWriteSchema(ctx, clusterPath, cluster)
 	if err != nil {
 		logger.Error().Err(err).Msg("failed to generate and write schema")
 		return ctrl.Result{}, err
@@ -169,7 +188,7 @@ func (r *KCPReconciler) reconcileAPIBinding(ctx context.Context, req mcreconcile
 }
 
 // generateAndWriteSchema generates the OpenAPI schema for a cluster and writes it to disk
-func (r *KCPReconciler) generateAndWriteSchema(ctx context.Context, clusterPath string, clusterObj cluster.Cluster) error {
+func (m *KCPManager) generateAndWriteSchema(ctx context.Context, clusterPath string, clusterObj cluster.Cluster) error {
 	// Create discovery client and REST mapper from the cluster's config
 	discoveryClient, err := discovery.NewDiscoveryClientForConfig(clusterObj.GetConfig())
 	if err != nil {
@@ -183,72 +202,57 @@ func (r *KCPReconciler) generateAndWriteSchema(ctx context.Context, clusterPath 
 			DiscoveryClient: discoveryClient,
 			RESTMapper:      clusterObj.GetRESTMapper(),
 		},
-		r.schemaResolver,
-		r.log,
+		m.schemaResolver,
+		m.log,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to generate schema: %w", err)
 	}
 
 	// Read existing schema (if it exists)
-	savedSchema, err := r.ioHandler.Read(clusterPath)
+	savedSchema, err := m.ioHandler.Read(clusterPath)
 	if err != nil && !strings.Contains(err.Error(), "file does not exist") && !strings.Contains(err.Error(), "no such file") {
 		return fmt.Errorf("failed to read existing schema: %w", err)
 	}
 
 	// Write if file doesn't exist or content has changed
 	if err != nil || !bytes.Equal(currentSchema, savedSchema) {
-		err = r.ioHandler.Write(currentSchema, clusterPath)
+		err = m.ioHandler.Write(currentSchema, clusterPath)
 		if err != nil {
 			return fmt.Errorf("failed to write schema: %w", err)
 		}
-		r.log.Info().Str("clusterPath", clusterPath).Msg("schema file updated")
+		m.log.Info().Str("clusterPath", clusterPath).Msg("schema file updated")
 	}
 
 	return nil
 }
 
 // StartVirtualWorkspaceWatching starts watching virtual workspace configuration
-func (r *KCPReconciler) StartVirtualWorkspaceWatching(ctx context.Context, configPath string) error {
+func (m *KCPManager) StartVirtualWorkspaceWatching(ctx context.Context, configPath string) error {
 	if configPath == "" {
-		r.log.Info().Msg("no virtual workspace config path provided, skipping virtual workspace watching")
+		m.log.Info().Msg("no virtual workspace config path provided, skipping virtual workspace watching")
 		return nil
 	}
 
-	r.log.Info().Str("configPath", configPath).Msg("starting virtual workspace configuration watching")
+	m.log.Info().Str("configPath", configPath).Msg("starting virtual workspace configuration watching")
 
 	// Start config watcher with a wrapper function
 	changeHandler := func(config *VirtualWorkspacesConfig) {
-		if err := r.virtualWorkspaceReconciler.ReconcileConfig(ctx, config); err != nil {
-			r.log.Error().Err(err).Msg("failed to reconcile virtual workspaces config")
+		if err := m.virtualWorkspaceReconciler.ReconcileConfig(ctx, config); err != nil {
+			m.log.Error().Err(err).Msg("failed to reconcile virtual workspaces config")
 		}
 	}
-	return r.configWatcher.Watch(ctx, configPath, changeHandler)
+	return m.configWatcher.Watch(ctx, configPath, changeHandler)
 }
 
-// Start starts the provider and multicluster manager
-func (r *KCPReconciler) Start(ctx context.Context) error {
-	r.log.Info().Msg("Starting KCP reconciler with multicluster-provider")
-
-	// Start the provider
-	go func() {
-		err := r.provider.Run(ctx, r.mcMgr)
-		if err != nil {
-			r.log.Error().Err(err).Msg("provider failed to run")
-		}
-	}()
-
-	// Start the multicluster manager
-	return r.mcMgr.Start(ctx)
+// providerRunnable wraps the apiexport provider to make it compatible with controller-runtime manager
+type providerRunnable struct {
+	provider *apiexport.Provider
+	mcMgr    mcmanager.Manager
+	log      *logger.Logger
 }
 
-// kcpManagerWrapper wraps the local manager and ensures proper startup of KCP components
-type kcpManagerWrapper struct {
-	ctrl.Manager
-	reconciler *KCPReconciler
-}
-
-// Start starts both the provider and the multicluster manager
-func (w *kcpManagerWrapper) Start(ctx context.Context) error {
-	return w.reconciler.Start(ctx)
+func (p *providerRunnable) Start(ctx context.Context) error {
+	p.log.Info().Msg("Starting KCP provider with multicluster manager")
+	return p.provider.Run(ctx, p.mcMgr)
 }

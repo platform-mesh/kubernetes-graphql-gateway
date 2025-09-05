@@ -196,7 +196,7 @@ func TestSetContexts(t *testing.T) {
 
 			// Check KCP context
 			if tt.expectKcp {
-				clusterFromCtx, ok := result.Context().Value(targetcluster.LogicalClusterKey{}).(logicalcluster.Name)
+				clusterFromCtx, ok := result.Context().Value(targetcluster.LogicalClusterKey("cluster")).(logicalcluster.Name)
 				if !ok || clusterFromCtx != logicalcluster.Name(tt.workspace) {
 					t.Errorf("expected cluster %q in context, got %q", tt.workspace, clusterFromCtx)
 				}

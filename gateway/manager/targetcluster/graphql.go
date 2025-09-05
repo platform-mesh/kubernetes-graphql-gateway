@@ -19,8 +19,9 @@ import (
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/roundtripper"
 )
 
-// Context key types to avoid collisions
-type LogicalClusterKey struct{}
+// LogicalClusterKey is the context key for storing logical cluster information
+// Using logicalcluster.Name as the key type to be compatible with KCP ecosystem
+type LogicalClusterKey = logicalcluster.Name
 
 // GraphQLHandler wraps a GraphQL schema and HTTP handler
 type GraphQLHandler struct {
@@ -65,8 +66,8 @@ func SetContexts(r *http.Request, workspace, token string, enableKcp bool) *http
 		if kcpWorkspace, ok := r.Context().Value(kcpWorkspaceKey).(string); ok && kcpWorkspace != "" {
 			kcpWorkspaceName = kcpWorkspace
 		}
-		// Store the logical cluster name in context without using KCP-specific kontext
-		r = r.WithContext(context.WithValue(r.Context(), LogicalClusterKey{}, logicalcluster.Name(kcpWorkspaceName)))
+		// Store the logical cluster name in context using logicalcluster.Name as key
+		r = r.WithContext(context.WithValue(r.Context(), LogicalClusterKey("cluster"), logicalcluster.Name(kcpWorkspaceName)))
 	}
 	return r.WithContext(context.WithValue(r.Context(), roundtripper.TokenKey{}, token))
 }

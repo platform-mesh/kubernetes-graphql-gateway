@@ -107,21 +107,21 @@ var listenCmd = &cobra.Command{
 		// Create the appropriate reconciler based on configuration
 		var reconcilerInstance reconciler.CustomReconciler
 		if appCfg.EnableKcp {
-			kcpReconciler, err := kcp.NewKCPReconciler(appCfg, reconcilerOpts, log)
+			kcpManager, err := kcp.NewKCPManager(appCfg, reconcilerOpts, log)
 			if err != nil {
-				log.Fatal().Err(err).Msg("unable to create KCP reconciler")
+				log.Fatal().Err(err).Msg("unable to create KCP manager")
 			}
 
 			// Start virtual workspace watching if path is configured
 			if appCfg.Listener.VirtualWorkspacesConfigPath != "" {
 				go func() {
-					if err := kcpReconciler.StartVirtualWorkspaceWatching(ctx, appCfg.Listener.VirtualWorkspacesConfigPath); err != nil {
+					if err := kcpManager.StartVirtualWorkspaceWatching(ctx, appCfg.Listener.VirtualWorkspacesConfigPath); err != nil {
 						log.Fatal().Err(err).Msg("failed to start virtual workspace watching")
 					}
 				}()
 			}
 
-			reconcilerInstance = kcpReconciler
+			reconcilerInstance = kcpManager
 		} else {
 			ioHandler, err := workspacefile.NewIOHandler(appCfg.OpenApiDefinitionsPath)
 			if err != nil {
