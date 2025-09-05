@@ -2,12 +2,9 @@ module github.com/platform-mesh/kubernetes-graphql-gateway
 
 go 1.24.3
 
-replace (
-	github.com/google/cel-go => github.com/google/cel-go v0.26.0
-	// this PR introduces newer version of graphiQL that supports headers
-	// https://github.com/graphql-go/handler/pull/93
-	github.com/graphql-go/handler => github.com/vertex451/handler v0.0.0-20250124125145-ed328e3cf42a
-)
+// this PR introduces newer version of graphiQL that supports headers
+// https://github.com/graphql-go/handler/pull/93
+replace github.com/graphql-go/handler => github.com/vertex451/handler v0.0.0-20250124125145-ed328e3cf42a
 
 require (
 	github.com/fsnotify/fsnotify v1.9.0
