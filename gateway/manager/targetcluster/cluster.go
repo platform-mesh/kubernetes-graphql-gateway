@@ -13,7 +13,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/platform-mesh/kubernetes-graphql-gateway/common/auth"
-	commoncluster "github.com/platform-mesh/kubernetes-graphql-gateway/common/cluster"
 	appConfig "github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/resolver"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/schema"
@@ -91,56 +90,6 @@ func NewTargetCluster(
 		Str("cluster", name).
 		Str("endpoint", cluster.GetEndpoint(appCfg)).
 		Msg("Registered endpoint")
-
-	return cluster, nil
-}
-
-// NewTargetClusterFromMulticluster creates a new TargetCluster using multicluster runtime cluster
-func NewTargetClusterFromMulticluster(
-	name string,
-	schemaFilePath string,
-	mcCluster commoncluster.Cluster,
-	log *logger.Logger,
-	appCfg appConfig.Config,
-	roundTripperFactory RoundTripperFactory,
-) (*TargetCluster, error) {
-	log.Info().
-		Str("cluster", name).
-		Str("file", schemaFilePath).
-		Msg("Creating target cluster from multicluster runtime")
-
-	cluster := &TargetCluster{
-		appCfg: appCfg,
-		name:   name,
-		log:    log,
-	}
-
-	// Use multicluster runtime cluster directly
-	// Note: multicluster runtime client may not implement WithWatch, so we create a new one
-	cluster.restCfg = mcCluster.GetConfig()
-
-	// Create a new WithWatch client using the multicluster runtime config
-	var err error
-	cluster.client, err = client.NewWithWatch(cluster.restCfg, client.Options{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create WithWatch client from multicluster config: %w", err)
-	}
-
-	// Apply round tripper factory if provided
-	if roundTripperFactory != nil {
-		cluster.restCfg.Wrap(func(rt http.RoundTripper) http.RoundTripper {
-			return roundTripperFactory(rt, cluster.restCfg.TLSClientConfig)
-		})
-	}
-
-	// Load schema from file (still needed for GraphQL schema generation)
-	if err = cluster.loadSchemaFromFile(schemaFilePath); err != nil {
-		return nil, fmt.Errorf("failed to load schema from file: %w", err)
-	}
-
-	log.Info().
-		Str("cluster", name).
-		Msg("Successfully created target cluster from multicluster runtime")
 
 	return cluster, nil
 }

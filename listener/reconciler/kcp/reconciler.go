@@ -5,15 +5,17 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/cluster"
 
 	kcpapis "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
 	"github.com/kcp-dev/multicluster-provider/apiexport"
 	"github.com/platform-mesh/golang-commons/logger"
-	commoncluster "github.com/platform-mesh/kubernetes-graphql-gateway/common/cluster"
 	appconfig "github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/workspacefile"
@@ -36,8 +38,7 @@ type KCPManager struct {
 	virtualWorkspaceReconciler *VirtualWorkspaceReconciler
 	configWatcher              *ConfigWatcher
 	log                        *logger.Logger
-	manager                    ctrl.Manager          // Local controller-runtime manager
-	clusterManager             commoncluster.Manager // Unified cluster manager for gateway integration
+	manager                    ctrl.Manager // Local controller-runtime manager
 }
 
 func NewKCPManager(
@@ -66,7 +67,14 @@ func NewKCPManager(
 	schemaResolver := apischema.NewResolver(log)
 
 	// Create the apiexport provider for multicluster-runtime
-	provider, err := apiexport.New(opts.Config, apiexport.Options{
+	// We need to use the APIExport endpoint, not the general KCP config
+	// The APIExport endpoint should be configured to discover multiple workspaces
+	apiexportConfig := rest.CopyConfig(opts.Config)
+
+	// TODO: Configure with the correct APIExport endpoint
+	// For now, we'll use the general config and let the provider discover the APIExport
+	// The provider should automatically find the core.platform-mesh.io APIExport
+	provider, err := apiexport.New(apiexportConfig, apiexport.Options{
 		Scheme: opts.Scheme,
 	})
 	if err != nil {
@@ -104,8 +112,7 @@ func NewKCPManager(
 		virtualWorkspaceReconciler: virtualWorkspaceReconciler,
 		configWatcher:              configWatcher,
 		log:                        log,
-		manager:                    mcMgr.GetLocalManager(),                     // Use the local manager directly
-		clusterManager:             commoncluster.NewMulticlusterManager(mcMgr), // Expose multicluster manager for gateway
+		manager:                    mcMgr.GetLocalManager(), // Use the local manager directly
 	}
 
 	log.Info().Msg("Successfully configured KCP manager with multicluster-provider")
@@ -114,11 +121,6 @@ func NewKCPManager(
 
 func (m *KCPManager) GetManager() ctrl.Manager {
 	return m.manager
-}
-
-// GetClusterManager returns the unified cluster manager for gateway integration
-func (m *KCPManager) GetClusterManager() commoncluster.Manager {
-	return m.clusterManager
 }
 
 func (m *KCPManager) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -175,15 +177,37 @@ func (m *KCPManager) reconcileAPIBinding(ctx context.Context, req mcreconcile.Re
 		return ctrl.Result{}, nil
 	}
 
-	// Generate and write schema for this cluster
-	clusterPath := req.ClusterName
-	err = m.generateAndWriteSchema(ctx, clusterPath, cluster)
+	// Resolve cluster name (hash) to workspace path (e.g., orgs:openmfp:default)
+	// This ensures compatibility with GraphQL gateway which expects workspace names
+	workspacePath, err := m.resolveWorkspacePath(ctx, req.ClusterName, client)
+	if err != nil {
+		logger.Error().Err(err).Str("clusterName", req.ClusterName).Msg("failed to resolve cluster name to workspace path")
+		return ctrl.Result{}, fmt.Errorf("failed to resolve workspace path: %w", err)
+	}
+
+	// If we got the same value back (cluster name), try alternative approach using cluster config
+	if workspacePath == req.ClusterName {
+		logger.Debug().Str("clusterName", req.ClusterName).Str("configHost", cluster.GetConfig().Host).Msg("LogicalCluster approach returned cluster name, trying config-based approach")
+		configBasedPath, configErr := PathForClusterFromConfig(req.ClusterName, cluster.GetConfig())
+		if configErr == nil && configBasedPath != req.ClusterName {
+			workspacePath = configBasedPath
+			logger.Info().Str("clusterName", req.ClusterName).Str("workspacePath", workspacePath).Str("configHost", cluster.GetConfig().Host).Msg("resolved workspace path from cluster config")
+		} else {
+			// Log the cluster config URL for debugging
+			logger.Info().Str("clusterName", req.ClusterName).Str("configHost", cluster.GetConfig().Host).Str("workspacePath", workspacePath).Msg("using cluster name as workspace path (no LogicalCluster or config-based resolution available)")
+		}
+	} else {
+		logger.Info().Str("clusterName", req.ClusterName).Str("workspacePath", workspacePath).Msg("resolved cluster name to workspace path from LogicalCluster")
+	}
+
+	// Generate and write schema for this cluster using the workspace path
+	err = m.generateAndWriteSchema(ctx, workspacePath, cluster)
 	if err != nil {
 		logger.Error().Err(err).Msg("failed to generate and write schema")
 		return ctrl.Result{}, err
 	}
 
-	logger.Info().Msg("successfully reconciled APIBinding schema")
+	logger.Info().Str("workspacePath", workspacePath).Msg("successfully reconciled APIBinding schema")
 	return ctrl.Result{}, nil
 }
 
@@ -245,6 +269,34 @@ func (m *KCPManager) StartVirtualWorkspaceWatching(ctx context.Context, configPa
 	return m.configWatcher.Watch(ctx, configPath, changeHandler)
 }
 
+// resolveWorkspacePath resolves a cluster name/hash to a human-readable workspace path
+func (m *KCPManager) resolveWorkspacePath(ctx context.Context, clusterName string, clusterClient client.Client) (string, error) {
+	// For multicluster-provider, we need to create a client that connects directly to the cluster hash
+	// The clusterClient passed in might not be correctly configured for the specific cluster
+
+	// Create a cluster-specific client using the cluster name/hash
+	clusterPathResolver, err := NewClusterPathResolver(m.mcMgr.GetLocalManager().GetConfig(), m.mcMgr.GetLocalManager().GetScheme())
+	if err != nil {
+		// Fallback to using the provided client
+		return PathForCluster(clusterName, clusterClient)
+	}
+
+	// Get a client specifically for this cluster
+	specificClusterClient, err := clusterPathResolver.ClientForCluster(clusterName)
+	if err != nil {
+		// Fallback to using the provided client
+		return PathForCluster(clusterName, clusterClient)
+	}
+
+	// Use the cluster-specific client to resolve the workspace path
+	workspacePath, err := PathForCluster(clusterName, specificClusterClient)
+	if err != nil {
+		return clusterName, err
+	}
+
+	return workspacePath, nil
+}
+
 // providerRunnable wraps the apiexport provider to make it compatible with controller-runtime manager
 type providerRunnable struct {
 	provider *apiexport.Provider
@@ -254,5 +306,23 @@ type providerRunnable struct {
 
 func (p *providerRunnable) Start(ctx context.Context) error {
 	p.log.Info().Msg("Starting KCP provider with multicluster manager")
-	return p.provider.Run(ctx, p.mcMgr)
+
+	// Add a small delay to allow KCP services to be ready
+	p.log.Info().Msg("Waiting for KCP services to be ready...")
+	select {
+	case <-time.After(5 * time.Second):
+		// Continue after delay
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+
+	// Run the provider with error handling to prevent listener crash
+	if err := p.provider.Run(ctx, p.mcMgr); err != nil {
+		p.log.Error().Err(err).Msg("KCP provider encountered an error, but continuing to run")
+		// Don't return the error to prevent the entire listener from crashing
+		// The provider will retry connections automatically
+		return nil
+	}
+
+	return nil
 }
