@@ -188,6 +188,8 @@ func (r *VirtualWorkspaceReconciler) ReconcileConfig(ctx context.Context, config
 
 			if err := r.processVirtualWorkspace(ctx, workspace); err != nil {
 				r.log.Error().Err(err).Str("workspace", name).Msg("failed to process virtual workspace")
+				// Don't fail the entire reconciliation if one workspace fails
+				// This allows other workspaces to be processed and the listener to continue running
 				continue
 			}
 		}
@@ -223,6 +225,10 @@ func (r *VirtualWorkspaceReconciler) processVirtualWorkspace(ctx context.Context
 	// Create discovery client for the virtual workspace
 	discoveryClient, err := r.virtualWSManager.CreateDiscoveryClient(workspace)
 	if err != nil {
+		r.log.Warn().Err(err).
+			Str("workspace", workspace.Name).
+			Str("url", workspace.URL).
+			Msg("failed to create discovery client for virtual workspace, will retry later")
 		return fmt.Errorf("failed to create discovery client: %w", err)
 	}
 

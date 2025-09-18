@@ -19,6 +19,14 @@ func PathForClusterExported(name string, clt client.Client) (string, error) {
 	return PathForCluster(name, clt)
 }
 
+func PathForClusterFromConfigExported(clusterName string, cfg *rest.Config) (string, error) {
+	return PathForClusterFromConfig(clusterName, cfg)
+}
+
+func PathForClusterFromWorkspacesExported(clusterHash string, clt client.Client) (string, error) {
+	return PathForClusterFromWorkspaces(clusterHash, clt)
+}
+
 // Discovery factory exports
 func NewDiscoveryFactoryExported(cfg *rest.Config) (*DiscoveryFactoryProvider, error) {
 	return NewDiscoveryFactory(cfg)
@@ -45,8 +53,8 @@ type ExportedClusterPathResolver = ClusterPathResolver
 type ExportedClusterPathResolverProvider = ClusterPathResolverProvider
 type ExportedDiscoveryFactory = DiscoveryFactory
 type ExportedDiscoveryFactoryProvider = DiscoveryFactoryProvider
-type ExportedAPIBindingReconciler = APIBindingReconciler
-type ExportedKCPReconciler = KCPReconciler
+
+type ExportedKCPManager = KCPManager
 
 // Helper function to create ClusterPathResolverProvider with custom clientFactory for testing
 func NewClusterPathResolverProviderWithFactory(cfg *rest.Config, scheme *runtime.Scheme, factory func(config *rest.Config, options client.Options) (client.Client, error)) *ClusterPathResolverProvider {
