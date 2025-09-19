@@ -19,6 +19,14 @@ func PathForClusterExported(name string, clt client.Client) (string, error) {
 	return PathForCluster(name, clt)
 }
 
+func PathForClusterFromConfigExported(clusterName string, cfg *rest.Config) (string, error) {
+	return PathForClusterFromConfig(clusterName, cfg)
+}
+
+func PathForClusterFromWorkspacesExported(clusterHash string, clt client.Client) (string, error) {
+	return PathForClusterFromWorkspaces(clusterHash, clt)
+}
+
 // Discovery factory exports
 func NewDiscoveryFactoryExported(cfg *rest.Config) (*DiscoveryFactoryProvider, error) {
 	return NewDiscoveryFactory(cfg)

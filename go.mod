@@ -3,11 +3,23 @@ module github.com/platform-mesh/kubernetes-graphql-gateway
 go 1.24.3
 
 replace (
-	github.com/google/cel-go => github.com/google/cel-go v0.26.0
 	// this PR introduces newer version of graphiQL that supports headers
 	// https://github.com/graphql-go/handler/pull/93
 	github.com/graphql-go/handler => github.com/vertex451/handler v0.0.0-20250124125145-ed328e3cf42a
-	// Pin controller-runtime to v0.21.0 to avoid compatibility issues
+
+	// Pin golang.org/x/net to match multicluster-provider (prevents HTTP/2 incompatibility)
+	golang.org/x/net => golang.org/x/net v0.40.0
+
+	// Pin Kubernetes versions to match main branch (prevents KCP front proxy HTTP/2 panics)
+	k8s.io/api => k8s.io/api v0.33.3
+	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.33.3
+	k8s.io/apimachinery => k8s.io/apimachinery v0.33.3
+	k8s.io/apiserver => k8s.io/apiserver v0.33.3
+	k8s.io/client-go => k8s.io/client-go v0.33.3
+	k8s.io/component-base => k8s.io/component-base v0.33.3
+	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20250701173324-9bd5c66d9911
+
+	// Pin controller-runtime to compatible version with k8s v0.33.3
 	sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.21.0
 )
 
@@ -24,25 +36,25 @@ require (
 	github.com/kcp-dev/logicalcluster/v3 v3.0.5
 	github.com/kcp-dev/multicluster-provider v0.0.0-20250827085327-2b5ca378b7b4
 	github.com/pkg/errors v0.9.1
-	github.com/platform-mesh/account-operator v0.1.24
-	github.com/platform-mesh/golang-commons v0.1.24
-	github.com/prometheus/client_golang v1.23.0
+	github.com/platform-mesh/account-operator v0.1.28
+	github.com/platform-mesh/golang-commons v0.1.29
+	github.com/prometheus/client_golang v1.23.2
 	github.com/rs/zerolog v1.34.0
-	github.com/spf13/cobra v1.9.1
-	github.com/spf13/viper v1.20.1
+	github.com/spf13/cobra v1.10.1
+	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.11.1
 	go.opentelemetry.io/otel v1.38.0
 	go.opentelemetry.io/otel/trace v1.38.0
 	golang.org/x/exp v0.0.0-20250819193227-8b4c13bb791b
-	golang.org/x/text v0.28.0
+	golang.org/x/text v0.29.0
 	gopkg.in/yaml.v3 v3.0.1
-	k8s.io/api v0.34.0
-	k8s.io/apiextensions-apiserver v0.34.0
-	k8s.io/apimachinery v0.34.0
-	k8s.io/client-go v0.34.0
-	k8s.io/kube-openapi v0.0.0-20250710124328-f3f2b991d03b
-	sigs.k8s.io/controller-runtime v0.22.0
-	sigs.k8s.io/multicluster-runtime v0.21.0-alpha.8
+	k8s.io/api v0.33.3
+	k8s.io/apiextensions-apiserver v0.33.3
+	k8s.io/apimachinery v0.33.3
+	k8s.io/client-go v0.33.3
+	k8s.io/kube-openapi v0.0.0-20250701173324-9bd5c66d9911
+	sigs.k8s.io/controller-runtime v0.22.1
+	sigs.k8s.io/multicluster-runtime v0.21.0-alpha.9
 )
 
 require (
@@ -86,17 +98,17 @@ require (
 	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/onsi/gomega v1.36.2 // indirect
-	github.com/pelletier/go-toml/v2 v2.2.3 // indirect
+	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
-	github.com/prometheus/common v0.65.0 // indirect
+	github.com/prometheus/common v0.66.1 // indirect
 	github.com/prometheus/procfs v0.16.1 // indirect
-	github.com/sagikazarmark/locafero v0.7.0 // indirect
+	github.com/sagikazarmark/locafero v0.11.0 // indirect
 	github.com/sosodev/duration v1.3.1 // indirect
-	github.com/sourcegraph/conc v0.3.0 // indirect
-	github.com/spf13/afero v1.12.0 // indirect
-	github.com/spf13/cast v1.7.1 // indirect
-	github.com/spf13/pflag v1.0.7 // indirect
+	github.com/sourcegraph/conc v0.3.1-0.20240121214520-5f936abd7ae8 // indirect
+	github.com/spf13/afero v1.15.0 // indirect
+	github.com/spf13/cast v1.10.0 // indirect
+	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/stoewer/go-strcase v1.3.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
@@ -109,16 +121,16 @@ require (
 	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.38.0 // indirect
 	go.opentelemetry.io/otel/metric v1.38.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.38.0 // indirect
-	go.opentelemetry.io/proto/otlp v1.7.1 // indirect
+	go.opentelemetry.io/proto/otlp v1.8.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/crypto v0.41.0 // indirect
 	golang.org/x/net v0.43.0 // indirect
-	golang.org/x/oauth2 v0.30.0 // indirect
-	golang.org/x/sync v0.16.0 // indirect
-	golang.org/x/sys v0.35.0 // indirect
+	golang.org/x/oauth2 v0.31.0 // indirect
+	golang.org/x/sync v0.17.0 // indirect
+	golang.org/x/sys v0.36.0 // indirect
 	golang.org/x/term v0.34.0 // indirect
 	golang.org/x/time v0.11.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
@@ -135,6 +147,6 @@ require (
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.31.2 // indirect
 	sigs.k8s.io/json v0.0.0-20241014173422-cfa47c3a1cc8 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
-	sigs.k8s.io/structured-merge-diff/v6 v6.3.0 // indirect
+	sigs.k8s.io/structured-merge-diff/v4 v4.6.0 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
 )

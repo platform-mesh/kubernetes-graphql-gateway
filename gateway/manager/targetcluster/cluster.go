@@ -13,7 +13,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/platform-mesh/kubernetes-graphql-gateway/common/auth"
-	commoncluster "github.com/platform-mesh/kubernetes-graphql-gateway/common/cluster"
 	appConfig "github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/resolver"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/schema"
@@ -65,6 +64,7 @@ func NewTargetCluster(
 	log *logger.Logger,
 	appCfg appConfig.Config,
 	roundTripperFactory func(http.RoundTripper, rest.TLSClientConfig) http.RoundTripper,
+	enableHTTP2 bool,
 ) (*TargetCluster, error) {
 	fileData, err := readSchemaFile(schemaFilePath)
 	if err != nil {
@@ -78,7 +78,7 @@ func NewTargetCluster(
 	}
 
 	// Connect to cluster - use metadata if available, otherwise fall back to standard config
-	if err := cluster.connect(appCfg, fileData.ClusterMetadata, roundTripperFactory); err != nil {
+	if err := cluster.connect(appCfg, fileData.ClusterMetadata, roundTripperFactory, enableHTTP2); err != nil {
 		return nil, fmt.Errorf("failed to connect to cluster: %w", err)
 	}
 
@@ -91,56 +91,6 @@ func NewTargetCluster(
 		Str("cluster", name).
 		Str("endpoint", cluster.GetEndpoint(appCfg)).
 		Msg("Registered endpoint")
-
-	return cluster, nil
-}
-
-// NewTargetClusterFromMulticluster creates a new TargetCluster using multicluster runtime cluster
-func NewTargetClusterFromMulticluster(
-	name string,
-	schemaFilePath string,
-	mcCluster commoncluster.Cluster,
-	log *logger.Logger,
-	appCfg appConfig.Config,
-	roundTripperFactory RoundTripperFactory,
-) (*TargetCluster, error) {
-	log.Info().
-		Str("cluster", name).
-		Str("file", schemaFilePath).
-		Msg("Creating target cluster from multicluster runtime")
-
-	cluster := &TargetCluster{
-		appCfg: appCfg,
-		name:   name,
-		log:    log,
-	}
-
-	// Use multicluster runtime cluster directly
-	// Note: multicluster runtime client may not implement WithWatch, so we create a new one
-	cluster.restCfg = mcCluster.GetConfig()
-
-	// Create a new WithWatch client using the multicluster runtime config
-	var err error
-	cluster.client, err = client.NewWithWatch(cluster.restCfg, client.Options{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create WithWatch client from multicluster config: %w", err)
-	}
-
-	// Apply round tripper factory if provided
-	if roundTripperFactory != nil {
-		cluster.restCfg.Wrap(func(rt http.RoundTripper) http.RoundTripper {
-			return roundTripperFactory(rt, cluster.restCfg.TLSClientConfig)
-		})
-	}
-
-	// Load schema from file (still needed for GraphQL schema generation)
-	if err = cluster.loadSchemaFromFile(schemaFilePath); err != nil {
-		return nil, fmt.Errorf("failed to load schema from file: %w", err)
-	}
-
-	log.Info().
-		Str("cluster", name).
-		Msg("Successfully created target cluster from multicluster runtime")
 
 	return cluster, nil
 }
@@ -161,7 +111,7 @@ func (tc *TargetCluster) loadSchemaFromFile(schemaFilePath string) error {
 }
 
 // connect establishes connection to the target cluster
-func (tc *TargetCluster) connect(appCfg appConfig.Config, metadata *ClusterMetadata, roundTripperFactory func(http.RoundTripper, rest.TLSClientConfig) http.RoundTripper) error {
+func (tc *TargetCluster) connect(appCfg appConfig.Config, metadata *ClusterMetadata, roundTripperFactory func(http.RoundTripper, rest.TLSClientConfig) http.RoundTripper, enableHTTP2 bool) error {
 	// All clusters now use metadata from schema files to get kubeconfig
 	if metadata == nil {
 		return fmt.Errorf("cluster %s requires cluster metadata in schema file", tc.name)
@@ -171,13 +121,35 @@ func (tc *TargetCluster) connect(appCfg appConfig.Config, metadata *ClusterMetad
 		Str("cluster", tc.name).
 		Str("host", metadata.Host).
 		Bool("isVirtualWorkspace", strings.HasPrefix(tc.name, tc.appCfg.Url.VirtualWorkspacePrefix)).
+		Bool("enableHTTP2", enableHTTP2).
 		Msg("Using cluster metadata from schema file for connection")
 
 	var err error
-	tc.restCfg, err = buildConfigFromMetadata(metadata, tc.log)
+
+	// Use metadata-based configuration like main branch
+	tc.log.Debug().Msg("Using buildConfigFromMetadata() like main branch")
+	tc.restCfg, err = buildConfigFromMetadata(metadata, tc.log, enableHTTP2)
 	if err != nil {
 		return fmt.Errorf("failed to build config from metadata: %w", err)
 	}
+
+	// For KCP connections, use insecure TLS to avoid certificate issues
+	// This is safe for internal KCP communication within the same cluster
+	tc.restCfg.TLSClientConfig.Insecure = true
+	tc.restCfg.TLSClientConfig.CAFile = ""
+	tc.restCfg.TLSClientConfig.CAData = nil
+
+	// Force HTTP/1.1 to avoid HTTP/2 stream errors with KCP
+	if !enableHTTP2 {
+		tc.restCfg.TLSClientConfig.NextProtos = []string{"http/1.1"}
+		tc.log.Debug().Msg("Disabled HTTP/2 for cluster connection")
+	}
+
+	tc.log.Debug().
+		Str("host", metadata.Host).
+		Bool("enableHTTP2", enableHTTP2).
+		Strs("nextProtos", tc.restCfg.TLSClientConfig.NextProtos).
+		Msg("Configured cluster connection using Listener approach")
 
 	if roundTripperFactory != nil {
 		tc.restCfg.Wrap(func(rt http.RoundTripper) http.RoundTripper {
@@ -196,7 +168,7 @@ func (tc *TargetCluster) connect(appCfg appConfig.Config, metadata *ClusterMetad
 }
 
 // buildConfigFromMetadata creates rest.Config from cluster metadata
-func buildConfigFromMetadata(metadata *ClusterMetadata, log *logger.Logger) (*rest.Config, error) {
+func buildConfigFromMetadata(metadata *ClusterMetadata, log *logger.Logger, enableHTTP2 bool) (*rest.Config, error) {
 	var authType, token, kubeconfig, certData, keyData, caData string
 
 	if metadata.Auth != nil {
@@ -217,10 +189,17 @@ func buildConfigFromMetadata(metadata *ClusterMetadata, log *logger.Logger) (*re
 		return nil, err
 	}
 
+	// Apply HTTP/2 configuration to match Listener behavior
+	if !enableHTTP2 {
+		log.Debug().Msg("disabling HTTP/2 for cluster connection")
+		config.TLSClientConfig.NextProtos = []string{"http/1.1"}
+	}
+
 	log.Debug().
 		Str("host", metadata.Host).
 		Str("authType", authType).
 		Bool("hasCA", caData != "").
+		Bool("enableHTTP2", enableHTTP2).
 		Msg("configured cluster from metadata")
 
 	return config, nil

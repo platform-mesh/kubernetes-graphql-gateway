@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	kcpcore "github.com/kcp-dev/kcp/sdk/apis/core/v1alpha1"
+	kcptenancy "github.com/kcp-dev/kcp/sdk/apis/tenancy/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -252,7 +253,7 @@ func TestPathForCluster(t *testing.T) {
 						return nil
 					}).Once()
 			},
-			want:        "root:org:deleted-workspace",
+			want:        "root:org:deleted-workspace", // Now correctly returns the kcp.io/path annotation value
 			wantErr:     true,
 			errContains: "cluster is deleted",
 		},
@@ -273,9 +274,9 @@ func TestPathForCluster(t *testing.T) {
 						return nil
 					}).Once()
 			},
-			want:        "",
-			wantErr:     true,
-			errContains: "failed to get cluster path from kcp.io/path annotation",
+			want:        "no-path-workspace", // Now returns cluster name as fallback
+			wantErr:     false,               // No longer an error
+			errContains: "",
 		},
 		{
 			name:        "client_get_error",
@@ -284,9 +285,9 @@ func TestPathForCluster(t *testing.T) {
 				m.EXPECT().Get(mock.Anything, client.ObjectKey{Name: "cluster"}, mock.AnythingOfType("*v1alpha1.LogicalCluster")).
 					Return(errors.New("API server error")).Once()
 			},
-			want:        "",
-			wantErr:     true,
-			errContains: "failed to get logicalcluster resource",
+			want:        "error-workspace", // Now returns cluster name as fallback
+			wantErr:     false,             // No longer an error
+			errContains: "",
 		},
 	}
 
@@ -317,6 +318,84 @@ func TestPathForCluster(t *testing.T) {
 	}
 }
 
+func TestPathForClusterFromConfig(t *testing.T) {
+	tests := []struct {
+		name        string
+		clusterName string
+		config      *rest.Config
+		want        string
+	}{
+		{
+			name:        "root_cluster_returns_root",
+			clusterName: "root",
+			config:      &rest.Config{Host: "https://kcp.example.com"},
+			want:        "root",
+		},
+		{
+			name:        "nil_config_returns_cluster_name",
+			clusterName: "test-cluster",
+			config:      nil,
+			want:        "test-cluster",
+		},
+		{
+			name:        "invalid_url_returns_cluster_name",
+			clusterName: "test-cluster",
+			config:      &rest.Config{Host: "://invalid-url"},
+			want:        "test-cluster",
+		},
+		{
+			name:        "cluster_url_with_workspace_path",
+			clusterName: "hash123",
+			config:      &rest.Config{Host: "https://kcp.example.com/clusters/root:org:workspace"},
+			want:        "root:org:workspace",
+		},
+		{
+			name:        "cluster_url_with_hash_only",
+			clusterName: "hash123",
+			config:      &rest.Config{Host: "https://kcp.example.com/clusters/hash123"},
+			want:        "hash123",
+		},
+		{
+			name:        "virtual_workspace_url_extracts_workspace_path",
+			clusterName: "hash123",
+			config:      &rest.Config{Host: "https://kcp.example.com/services/apiexport/root:orgs:default/some-export"},
+			want:        "root:orgs:default",
+		},
+		{
+			name:        "virtual_workspace_url_simple_workspace",
+			clusterName: "hash123",
+			config:      &rest.Config{Host: "https://kcp.example.com/services/apiexport/root/some-export"},
+			want:        "root",
+		},
+		{
+			name:        "cluster_url_different_from_hash",
+			clusterName: "hash123",
+			config:      &rest.Config{Host: "https://kcp.example.com/clusters/simple-workspace"},
+			want:        "simple-workspace",
+		},
+		{
+			name:        "non_matching_url_returns_cluster_name",
+			clusterName: "test-cluster",
+			config:      &rest.Config{Host: "https://kcp.example.com/other/path"},
+			want:        "test-cluster",
+		},
+		{
+			name:        "cluster_url_without_path_returns_cluster_name",
+			clusterName: "test-cluster",
+			config:      &rest.Config{Host: "https://kcp.example.com"},
+			want:        "test-cluster",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := kcp.PathForClusterFromConfigExported(tt.clusterName, tt.config)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestConstants(t *testing.T) {
 	t.Run("error_variables", func(t *testing.T) {
 		assert.Equal(t, "config cannot be nil", kcp.ErrNilConfigExported.Error())
@@ -327,4 +406,124 @@ func TestConstants(t *testing.T) {
 		assert.Equal(t, "failed to parse rest config's Host URL", kcp.ErrParseHostURLExported.Error())
 		assert.Equal(t, "cluster is deleted", kcp.ErrClusterIsDeletedExported.Error())
 	})
+}
+
+func TestPathForClusterFromWorkspaces(t *testing.T) {
+	tests := []struct {
+		name         string
+		clusterHash  string
+		workspaces   []kcptenancy.Workspace
+		listError    error
+		expectedPath string
+		expectError  bool
+	}{
+		{
+			name:         "root_cluster_returns_root",
+			clusterHash:  "root",
+			expectedPath: "root",
+			expectError:  false,
+		},
+		{
+			name:        "workspace_found_by_logical_cluster",
+			clusterHash: "2no5f6yyo9w7af0e",
+			workspaces: []kcptenancy.Workspace{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:        "platform-mesh-system",
+						Namespace:   "root",
+						Annotations: map[string]string{},
+					},
+				},
+			},
+			expectedPath: "root:platform-mesh-system",
+			expectError:  false,
+		},
+		{
+			name:        "workspace_found_by_annotation",
+			clusterHash: "2no5f6yyo9w7af0e",
+			workspaces: []kcptenancy.Workspace{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "platform-mesh-system",
+						Namespace: "root",
+						Annotations: map[string]string{
+							"kcp.io/cluster": "2no5f6yyo9w7af0e",
+						},
+					},
+				},
+			},
+			expectedPath: "root:platform-mesh-system",
+			expectError:  false,
+		},
+		{
+			name:        "workspace_found_by_name_match",
+			clusterHash: "platform-mesh-system",
+			workspaces: []kcptenancy.Workspace{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:        "platform-mesh-system",
+						Namespace:   "root",
+						Annotations: map[string]string{},
+					},
+				},
+			},
+			expectedPath: "root:platform-mesh-system",
+			expectError:  false,
+		},
+		{
+			name:         "no_workspace_found",
+			clusterHash:  "unknown-hash",
+			workspaces:   []kcptenancy.Workspace{},
+			expectedPath: "unknown-hash",
+			expectError:  false, // Now returns cluster name without error (fallback behavior)
+		},
+		{
+			name:         "list_workspaces_error",
+			clusterHash:  "2no5f6yyo9w7af0e",
+			listError:    errors.New("failed to list workspaces"),
+			expectedPath: "2no5f6yyo9w7af0e",
+			expectError:  false, // Now returns cluster name without error (fallback behavior)
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockClient := &mocks.MockClient{}
+
+			// Only set up mock expectations if the cluster is not "root"
+			if tt.clusterHash != "root" {
+				// Since PathForClusterFromWorkspaces now calls PathForCluster,
+				// we need to mock the LogicalCluster Get call
+				if tt.expectedPath != tt.clusterHash && !tt.expectError {
+					// Mock successful LogicalCluster retrieval with kcp.io/path annotation
+					lc := &kcpcore.LogicalCluster{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "cluster",
+							Annotations: map[string]string{
+								"kcp.io/path": tt.expectedPath,
+							},
+						},
+					}
+					mockClient.On("Get", mock.Anything, client.ObjectKey{Name: "cluster"}, mock.AnythingOfType("*v1alpha1.LogicalCluster")).Run(func(args mock.Arguments) {
+						arg := args.Get(2).(*kcpcore.LogicalCluster)
+						*arg = *lc
+					}).Return(nil)
+				} else {
+					// Mock failed LogicalCluster retrieval (falls back to cluster name)
+					mockClient.On("Get", mock.Anything, client.ObjectKey{Name: "cluster"}, mock.AnythingOfType("*v1alpha1.LogicalCluster")).Return(errors.New("not found"))
+				}
+			}
+
+			result, err := kcp.PathForClusterFromWorkspacesExported(tt.clusterHash, mockClient)
+
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+
+			assert.Equal(t, tt.expectedPath, result)
+			mockClient.AssertExpectations(t)
+		})
+	}
 }

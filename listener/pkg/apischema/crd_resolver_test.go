@@ -12,6 +12,7 @@ import (
 	"github.com/platform-mesh/golang-commons/logger/testlogger"
 	apischema "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
 	apischemaMocks "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema/mocks"
+	kcpMocks "github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler/kcp/mocks"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -299,8 +300,8 @@ func TestResolveSchema(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			dc := apischemaMocks.NewMockDiscoveryInterface(t)
-			rm := apischemaMocks.NewMockRESTMapper(t)
+			dc := kcpMocks.NewMockDiscoveryInterface(t)
+			rm := kcpMocks.NewMockRESTMapper(t)
 
 			// First call in resolveSchema
 			dc.EXPECT().ServerPreferredResources().Return(tc.preferredResources, tc.err)

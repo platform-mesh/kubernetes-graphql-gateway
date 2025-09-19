@@ -9,6 +9,7 @@ import (
 
 	"github.com/platform-mesh/golang-commons/logger/testlogger"
 	apischemaMocks "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema/mocks"
+	kcpMocks "github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler/kcp/mocks"
 )
 
 // Compile-time check that ResolverProvider implements Resolver interface
@@ -63,8 +64,8 @@ func TestResolverProvider_Resolve(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			resolver := NewResolver(testlogger.New().Logger)
-			dc := apischemaMocks.NewMockDiscoveryInterface(t)
-			rm := apischemaMocks.NewMockRESTMapper(t)
+			dc := kcpMocks.NewMockDiscoveryInterface(t)
+			rm := kcpMocks.NewMockRESTMapper(t)
 
 			// First call in resolveSchema
 			dc.EXPECT().ServerPreferredResources().Return(tt.preferredResources, tt.err)

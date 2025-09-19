@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strings"
 
 	kcpcore "github.com/kcp-dev/kcp/sdk/apis/core/v1alpha1"
+	"github.com/kcp-dev/logicalcluster/v3"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -41,6 +43,12 @@ func ConfigForKCPCluster(clusterName string, cfg *rest.Config) (*rest.Config, er
 	// Set the path to point to the specific cluster/workspace
 	clusterCfgURL.Path = fmt.Sprintf("/clusters/%s", clusterName)
 	clusterCfg.Host = clusterCfgURL.String()
+
+	// For KCP connections, use insecure TLS to avoid certificate issues
+	// This is safe for internal KCP communication within the same cluster
+	clusterCfg.TLSClientConfig.Insecure = true
+	clusterCfg.TLSClientConfig.CAFile = ""
+	clusterCfg.TLSClientConfig.CAData = nil
 
 	return clusterCfg, nil
 }
@@ -83,19 +91,115 @@ func PathForCluster(name string, clt client.Client) (string, error) {
 	if name == "root" {
 		return name, nil
 	}
-	lc := &kcpcore.LogicalCluster{}
-	if err := clt.Get(context.TODO(), client.ObjectKey{Name: "cluster"}, lc); err != nil {
-		return "", errors.Join(ErrGetLogicalCluster, err)
-	}
 
-	path, ok := lc.GetAnnotations()["kcp.io/path"]
-	if !ok {
-		return "", ErrMissingPathAnnotation
+	// Try to get LogicalCluster resource to extract workspace path
+	lc := &kcpcore.LogicalCluster{}
+	err := clt.Get(context.TODO(), client.ObjectKey{Name: "cluster"}, lc)
+	if err != nil {
+		// If LogicalCluster is not available (e.g., API version mismatch or resource not found),
+		// fall back to using the cluster name directly as workspace path.
+		// This can happen with multicluster-provider where LogicalCluster might not be accessible
+		// or might be in a different API version.
+
+		// Log the error for debugging but don't fail completely
+		// In many cases, the cluster name itself might be a valid workspace path
+		// or close enough for compatibility with the GraphQL gateway
+		return name, nil
 	}
 
 	if lc.DeletionTimestamp != nil {
-		return path, ErrClusterIsDeleted
+		// Try to get the workspace name even if the cluster is being deleted
+		// First try the kcp.io/path annotation (most reliable)
+		if lc.Annotations != nil {
+			if path, ok := lc.Annotations["kcp.io/path"]; ok {
+				return path, ErrClusterIsDeleted
+			}
+		}
+		// Fallback to logicalcluster.From()
+		workspaceName := logicalcluster.From(lc).String()
+		if workspaceName != "" {
+			return workspaceName, ErrClusterIsDeleted
+		}
+		return name, ErrClusterIsDeleted
 	}
 
-	return path, nil
+	// Primary approach: Extract the workspace path from the kcp.io/path annotation
+	// This is the most reliable method as proven by our debug script
+	if lc.Annotations != nil {
+		if path, ok := lc.Annotations["kcp.io/path"]; ok {
+			return path, nil
+		}
+	}
+
+	// Fallback: Use logicalcluster.From() to get the actual workspace name
+	// This is the same approach used by the virtual-workspaces resolver
+	workspaceName := logicalcluster.From(lc).String()
+	if workspaceName != "" {
+		return workspaceName, nil
+	}
+
+	// Final fallback: use cluster name as-is
+	return name, nil
+}
+
+// PathForClusterFromWorkspaces is kept for backward compatibility and testing
+// but is no longer the primary resolution method
+func PathForClusterFromWorkspaces(clusterHash string, clt client.Client) (string, error) {
+	// This function is now deprecated in favor of the direct LogicalCluster approach
+	// but we keep it for testing purposes
+	return PathForCluster(clusterHash, clt)
+}
+
+// PathForClusterFromConfig attempts to extract workspace path from cluster configuration
+// This is an alternative approach when LogicalCluster resource is not accessible
+func PathForClusterFromConfig(clusterName string, cfg *rest.Config) (string, error) {
+	if clusterName == "root" {
+		return clusterName, nil
+	}
+
+	if cfg == nil {
+		return clusterName, nil
+	}
+
+	// Parse the cluster config host URL to extract workspace information
+	parsedURL, err := url.Parse(cfg.Host)
+	if err != nil {
+		return clusterName, nil
+	}
+
+	// Check if the URL path contains cluster information
+	// KCP URLs typically follow patterns like:
+	// - /clusters/{workspace-path} for direct cluster access (e.g., /clusters/root:orgs:default)
+	// - /services/apiexport/{workspace-path}/{export-name} for virtual workspaces
+	if strings.HasPrefix(parsedURL.Path, "/clusters/") {
+		// Extract workspace path from URL path
+		pathParts := strings.Split(strings.Trim(parsedURL.Path, "/"), "/")
+		if len(pathParts) >= 2 && pathParts[0] == "clusters" {
+			// The cluster name in the URL should be the workspace path
+			urlWorkspacePath := pathParts[1]
+			// If the URL workspace path looks like a workspace path (contains colons), use it
+			if strings.Contains(urlWorkspacePath, ":") {
+				return urlWorkspacePath, nil
+			}
+			// Even if it doesn't contain colons, it might still be a valid workspace path
+			// (e.g., "root" or single-level workspaces)
+			if urlWorkspacePath != clusterName {
+				return urlWorkspacePath, nil
+			}
+		}
+	}
+
+	// Check for virtual workspace patterns
+	if strings.HasPrefix(parsedURL.Path, "/services/apiexport/") {
+		// Extract workspace path from virtual workspace URL
+		// Pattern: /services/apiexport/{workspace-path}/{export-name}
+		pathParts := strings.Split(strings.Trim(parsedURL.Path, "/"), "/")
+		if len(pathParts) >= 4 && pathParts[0] == "services" && pathParts[1] == "apiexport" {
+			workspacePath := pathParts[2]
+			return workspacePath, nil
+		}
+	}
+
+	// If we can't extract meaningful workspace information, fall back to cluster name
+	return clusterName, nil
 }

@@ -77,9 +77,9 @@ func (rt *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	// Impersonation mode: extract user from token and impersonate
 	rt.log.Debug().Str("path", req.URL.Path).Msg("Using impersonation mode")
 	claims := jwt.MapClaims{}
-	_, _, err := jwt.NewParser().ParseUnverified(token, claims)
-	if err != nil {
-		rt.log.Error().Err(err).Str("path", req.URL.Path).Msg("Failed to parse token for impersonation, denying request")
+	_, _, parseErr := jwt.NewParser().ParseUnverified(token, claims)
+	if parseErr != nil {
+		rt.log.Error().Err(parseErr).Str("path", req.URL.Path).Msg("Failed to parse token for impersonation, denying request")
 		return rt.unauthorizedRT.RoundTrip(req)
 	}
 

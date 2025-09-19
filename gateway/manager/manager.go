@@ -6,10 +6,10 @@ import (
 	"net/http"
 
 	"github.com/pkg/errors"
+	openmfpconfig "github.com/platform-mesh/golang-commons/config"
 	"github.com/platform-mesh/golang-commons/logger"
 	"k8s.io/client-go/rest"
 
-	commoncluster "github.com/platform-mesh/kubernetes-graphql-gateway/common/cluster"
 	appConfig "github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/roundtripper"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/targetcluster"
@@ -24,27 +24,13 @@ type Service struct {
 }
 
 // NewGateway creates a new domain-driven Gateway instance
-func NewGateway(ctx context.Context, log *logger.Logger, appCfg appConfig.Config) (*Service, error) {
-	return NewGatewayWithClusterManager(ctx, log, appCfg, nil)
-}
-
-// NewGatewayWithClusterManager creates a new Gateway instance with optional multicluster manager
-func NewGatewayWithClusterManager(ctx context.Context, log *logger.Logger, appCfg appConfig.Config, clusterMgr commoncluster.Manager) (*Service, error) {
+func NewGateway(ctx context.Context, log *logger.Logger, appCfg appConfig.Config, defaultCfg *openmfpconfig.CommonServiceConfig) (*Service, error) {
 	// Create round tripper factory
 	roundTripperFactory := targetcluster.RoundTripperFactory(func(adminRT http.RoundTripper, tlsConfig rest.TLSClientConfig) http.RoundTripper {
 		return roundtripper.New(log, appCfg, adminRT, roundtripper.NewUnauthorizedRoundTripper())
 	})
 
-	var clusterRegistry ClusterManager
-	if clusterMgr != nil && clusterMgr.IsMulticluster() {
-		// Use multicluster-aware cluster registry
-		clusterRegistry = targetcluster.NewMulticlusterClusterRegistry(log, appCfg, roundTripperFactory, clusterMgr)
-		log.Info().Msg("Using multicluster-aware cluster registry")
-	} else {
-		// Use traditional file-based cluster registry
-		clusterRegistry = targetcluster.NewClusterRegistry(log, appCfg, roundTripperFactory)
-		log.Info().Msg("Using traditional file-based cluster registry")
-	}
+	clusterRegistry := targetcluster.NewClusterRegistry(log, appCfg, roundTripperFactory, defaultCfg.EnableHTTP2)
 
 	schemaWatcher, err := watcher.NewFileWatcher(log, clusterRegistry)
 	if err != nil {
