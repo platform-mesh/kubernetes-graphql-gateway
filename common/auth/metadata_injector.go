@@ -232,6 +232,9 @@ func (m *MetadataInjector) getSecret(ctx context.Context, name, namespace string
 func (m *MetadataInjector) extractKubeconfigFromEnv() ([]byte, string, error) {
 	// Check KUBECONFIG environment variable first
 	kubeconfigPath := os.Getenv("KUBECONFIG")
+	if kubeconfigPath != "" {
+		m.log.Debug().Str("source", "KUBECONFIG env var").Str("path", kubeconfigPath).Msg("using kubeconfig from environment variable")
+	}
 
 	// Fall back to default kubeconfig location if not set
 	if kubeconfigPath == "" {
@@ -404,7 +407,7 @@ func (m *MetadataInjector) determineHost(originalHost, hostOverride string) stri
 		m.log.Info().
 			Str("originalHost", originalHost).
 			Str("cleanedHost", cleanedHost).
-			Msg("cleaned virtual workspace path from host for normal workspace")
+			Msg("cleaned virtual workspace path from kubeconfig host for normal workspace")
 	}
 	return cleanedHost
 }

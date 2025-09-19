@@ -44,12 +44,6 @@ func ConfigForKCPCluster(clusterName string, cfg *rest.Config) (*rest.Config, er
 	clusterCfgURL.Path = fmt.Sprintf("/clusters/%s", clusterName)
 	clusterCfg.Host = clusterCfgURL.String()
 
-	// For KCP connections, use insecure TLS to avoid certificate issues
-	// This is safe for internal KCP communication within the same cluster
-	clusterCfg.TLSClientConfig.Insecure = true
-	clusterCfg.TLSClientConfig.CAFile = ""
-	clusterCfg.TLSClientConfig.CAData = nil
-
 	return clusterCfg, nil
 }
 

@@ -109,18 +109,10 @@ func (tc *TargetCluster) connect(appCfg appConfig.Config, metadata *ClusterMetad
 
 	var err error
 
-	// Use metadata-based configuration like main branch
-	tc.log.Debug().Msg("Using buildConfigFromMetadata() like main branch")
 	tc.restCfg, err = buildConfigFromMetadata(metadata, tc.log)
 	if err != nil {
 		return fmt.Errorf("failed to build config from metadata: %w", err)
 	}
-
-	// For KCP connections, use insecure TLS to avoid certificate issues
-	// This is safe for internal KCP communication within the same cluster
-	tc.restCfg.TLSClientConfig.Insecure = true
-	tc.restCfg.TLSClientConfig.CAFile = ""
-	tc.restCfg.TLSClientConfig.CAData = nil
 
 	if roundTripperFactory != nil {
 		tc.restCfg.Wrap(func(rt http.RoundTripper) http.RoundTripper {
@@ -128,8 +120,7 @@ func (tc *TargetCluster) connect(appCfg appConfig.Config, metadata *ClusterMetad
 		})
 	}
 
-	// Create client - with multicluster-provider, we use standard client for all modes
-	// The multicluster-runtime handles cluster awareness when needed
+	// multicluster-runtime uses standard client.WithWatch internally for each cluster it manages.
 	tc.client, err = client.NewWithWatch(tc.restCfg, client.Options{})
 	if err != nil {
 		return fmt.Errorf("failed to create cluster client: %w", err)
