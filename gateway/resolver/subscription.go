@@ -11,6 +11,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
@@ -135,6 +136,20 @@ func (r *Service) runWatch(
 		case resultChannel <- []map[string]interface{}{}:
 		}
 	}
+
+	listResult := &unstructured.UnstructuredList{}
+	listResult.SetGroupVersionKind(schema.GroupVersionKind{
+		Group: gvk.Group, Version: gvk.Version, Kind: gvk.Kind + "List",
+	})
+	r.runtimeClient.List(ctx, listResult, opts...)
+
+	rv := listResult.GetResourceVersion()
+	lo := &client.ListOptions{
+		Raw: &metav1.ListOptions{
+			ResourceVersion: rv,
+		},
+	}
+	opts = append(opts, lo)
 
 	watcher, err := r.runtimeClient.Watch(ctx, list, opts...)
 	if err != nil {
