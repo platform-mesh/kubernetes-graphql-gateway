@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	openmfpconfig "github.com/platform-mesh/golang-commons/config"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager"
 )
 
@@ -205,10 +204,7 @@ func (suite *CommonTestSuite) TestMultiClusterHTTPSubscription() {
 	appCfg := suite.appCfg
 	appCfg.OpenApiDefinitionsPath = tempDir
 
-	defaultCfg := &openmfpconfig.CommonServiceConfig{
-		EnableHTTP2: true,
-	}
-	gatewayService, err := manager.NewGateway(suite.T().Context(), suite.log, appCfg, defaultCfg)
+	gatewayService, err := manager.NewGateway(suite.T().Context(), suite.log, appCfg)
 	require.NoError(suite.T(), err)
 
 	// Start a test server with the multi-cluster manager
