@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/platform-mesh/account-operator/api/v1alpha1"
+	openmfpconfig "github.com/platform-mesh/golang-commons/config"
 	"github.com/platform-mesh/golang-commons/logger"
 	appConfig "github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager"
@@ -154,7 +155,10 @@ func (suite *CommonTestSuite) SetupTest() {
 
 	suite.graphqlSchema = *g.GetSchema()
 
-	suite.manager, err = manager.NewGateway(suite.T().Context(), suite.log, suite.appCfg)
+	defaultCfg := &openmfpconfig.CommonServiceConfig{
+		EnableHTTP2: true,
+	}
+	suite.manager, err = manager.NewGateway(suite.T().Context(), suite.log, suite.appCfg, defaultCfg)
 	require.NoError(suite.T(), err)
 
 	suite.server = httptest.NewServer(suite.manager)

@@ -9,7 +9,7 @@ import (
 
 // BuildConfigFromMetadata exposes the internal buildConfigFromMetadata function for testing
 func BuildConfigFromMetadata(metadata *ClusterMetadata, log *logger.Logger) (*rest.Config, error) {
-	return buildConfigFromMetadata(metadata, log, true) // Default to HTTP/2 enabled for tests
+	return buildConfigFromMetadata(metadata, log)
 }
 
 // NewTestTargetCluster creates a TargetCluster with the specified name for testing

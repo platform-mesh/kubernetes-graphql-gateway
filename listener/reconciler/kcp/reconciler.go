@@ -7,11 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/cluster"
 
 	kcpapis "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
 	"github.com/kcp-dev/multicluster-provider/apiexport"
@@ -308,47 +306,6 @@ func (m *KCPManager) generateAndWriteSchemaForWorkspace(ctx context.Context, wor
 			return fmt.Errorf("failed to write schema: %w", err)
 		}
 		m.log.Info().Str("clusterPath", workspacePath).Msg("schema file updated")
-	}
-
-	return nil
-}
-
-// generateAndWriteSchema generates the OpenAPI schema for a cluster and writes it to disk
-// DEPRECATED: Use generateAndWriteSchemaForWorkspace for direct workspace access
-func (m *KCPManager) generateAndWriteSchema(ctx context.Context, clusterPath string, clusterObj cluster.Cluster) error {
-	// Create discovery client and REST mapper from the cluster's config
-	discoveryClient, err := discovery.NewDiscoveryClientForConfig(clusterObj.GetConfig())
-	if err != nil {
-		return fmt.Errorf("failed to create discovery client: %w", err)
-	}
-
-	// Generate current schema
-	currentSchema, err := generateSchemaWithMetadata(
-		SchemaGenerationParams{
-			ClusterPath:     clusterPath,
-			DiscoveryClient: discoveryClient,
-			RESTMapper:      clusterObj.GetRESTMapper(),
-		},
-		m.schemaResolver,
-		m.log,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to generate schema: %w", err)
-	}
-
-	// Read existing schema (if it exists)
-	savedSchema, err := m.ioHandler.Read(clusterPath)
-	if err != nil && !strings.Contains(err.Error(), "file does not exist") && !strings.Contains(err.Error(), "no such file") {
-		return fmt.Errorf("failed to read existing schema: %w", err)
-	}
-
-	// Write if file doesn't exist or content has changed
-	if err != nil || !bytes.Equal(currentSchema, savedSchema) {
-		err = m.ioHandler.Write(currentSchema, clusterPath)
-		if err != nil {
-			return fmt.Errorf("failed to write schema: %w", err)
-		}
-		m.log.Info().Str("clusterPath", clusterPath).Msg("schema file updated")
 	}
 
 	return nil
