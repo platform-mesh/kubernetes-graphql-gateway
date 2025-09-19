@@ -30,7 +30,7 @@ func NewGateway(ctx context.Context, log *logger.Logger, appCfg appConfig.Config
 		return roundtripper.New(log, appCfg, adminRT, roundtripper.NewUnauthorizedRoundTripper())
 	})
 
-	clusterRegistry := targetcluster.NewClusterRegistry(log, appCfg, roundTripperFactory, defaultCfg.EnableHTTP2)
+	clusterRegistry := targetcluster.NewClusterRegistry(log, appCfg, roundTripperFactory)
 
 	schemaWatcher, err := watcher.NewFileWatcher(log, clusterRegistry)
 	if err != nil {

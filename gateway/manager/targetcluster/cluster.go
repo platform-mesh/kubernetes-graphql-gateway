@@ -64,7 +64,6 @@ func NewTargetCluster(
 	log *logger.Logger,
 	appCfg appConfig.Config,
 	roundTripperFactory func(http.RoundTripper, rest.TLSClientConfig) http.RoundTripper,
-	enableHTTP2 bool,
 ) (*TargetCluster, error) {
 	fileData, err := readSchemaFile(schemaFilePath)
 	if err != nil {
@@ -78,7 +77,7 @@ func NewTargetCluster(
 	}
 
 	// Connect to cluster - use metadata if available, otherwise fall back to standard config
-	if err := cluster.connect(appCfg, fileData.ClusterMetadata, roundTripperFactory, enableHTTP2); err != nil {
+	if err := cluster.connect(appCfg, fileData.ClusterMetadata, roundTripperFactory); err != nil {
 		return nil, fmt.Errorf("failed to connect to cluster: %w", err)
 	}
 
@@ -95,23 +94,8 @@ func NewTargetCluster(
 	return cluster, nil
 }
 
-// loadSchemaFromFile loads GraphQL schema from file and creates handler
-func (tc *TargetCluster) loadSchemaFromFile(schemaFilePath string) error {
-	fileData, err := readSchemaFile(schemaFilePath)
-	if err != nil {
-		return fmt.Errorf("failed to read schema file: %w", err)
-	}
-
-	// Create GraphQL schema and handler
-	if err := tc.createHandler(fileData.Definitions, tc.appCfg); err != nil {
-		return fmt.Errorf("failed to create GraphQL handler: %w", err)
-	}
-
-	return nil
-}
-
 // connect establishes connection to the target cluster
-func (tc *TargetCluster) connect(appCfg appConfig.Config, metadata *ClusterMetadata, roundTripperFactory func(http.RoundTripper, rest.TLSClientConfig) http.RoundTripper, enableHTTP2 bool) error {
+func (tc *TargetCluster) connect(appCfg appConfig.Config, metadata *ClusterMetadata, roundTripperFactory func(http.RoundTripper, rest.TLSClientConfig) http.RoundTripper) error {
 	// All clusters now use metadata from schema files to get kubeconfig
 	if metadata == nil {
 		return fmt.Errorf("cluster %s requires cluster metadata in schema file", tc.name)
@@ -121,14 +105,13 @@ func (tc *TargetCluster) connect(appCfg appConfig.Config, metadata *ClusterMetad
 		Str("cluster", tc.name).
 		Str("host", metadata.Host).
 		Bool("isVirtualWorkspace", strings.HasPrefix(tc.name, tc.appCfg.Url.VirtualWorkspacePrefix)).
-		Bool("enableHTTP2", enableHTTP2).
 		Msg("Using cluster metadata from schema file for connection")
 
 	var err error
 
 	// Use metadata-based configuration like main branch
 	tc.log.Debug().Msg("Using buildConfigFromMetadata() like main branch")
-	tc.restCfg, err = buildConfigFromMetadata(metadata, tc.log, enableHTTP2)
+	tc.restCfg, err = buildConfigFromMetadata(metadata, tc.log)
 	if err != nil {
 		return fmt.Errorf("failed to build config from metadata: %w", err)
 	}
@@ -138,18 +121,6 @@ func (tc *TargetCluster) connect(appCfg appConfig.Config, metadata *ClusterMetad
 	tc.restCfg.TLSClientConfig.Insecure = true
 	tc.restCfg.TLSClientConfig.CAFile = ""
 	tc.restCfg.TLSClientConfig.CAData = nil
-
-	// Force HTTP/1.1 to avoid HTTP/2 stream errors with KCP
-	if !enableHTTP2 {
-		tc.restCfg.TLSClientConfig.NextProtos = []string{"http/1.1"}
-		tc.log.Debug().Msg("Disabled HTTP/2 for cluster connection")
-	}
-
-	tc.log.Debug().
-		Str("host", metadata.Host).
-		Bool("enableHTTP2", enableHTTP2).
-		Strs("nextProtos", tc.restCfg.TLSClientConfig.NextProtos).
-		Msg("Configured cluster connection using Listener approach")
 
 	if roundTripperFactory != nil {
 		tc.restCfg.Wrap(func(rt http.RoundTripper) http.RoundTripper {
@@ -168,7 +139,7 @@ func (tc *TargetCluster) connect(appCfg appConfig.Config, metadata *ClusterMetad
 }
 
 // buildConfigFromMetadata creates rest.Config from cluster metadata
-func buildConfigFromMetadata(metadata *ClusterMetadata, log *logger.Logger, enableHTTP2 bool) (*rest.Config, error) {
+func buildConfigFromMetadata(metadata *ClusterMetadata, log *logger.Logger) (*rest.Config, error) {
 	var authType, token, kubeconfig, certData, keyData, caData string
 
 	if metadata.Auth != nil {
@@ -189,17 +160,10 @@ func buildConfigFromMetadata(metadata *ClusterMetadata, log *logger.Logger, enab
 		return nil, err
 	}
 
-	// Apply HTTP/2 configuration to match Listener behavior
-	if !enableHTTP2 {
-		log.Debug().Msg("disabling HTTP/2 for cluster connection")
-		config.TLSClientConfig.NextProtos = []string{"http/1.1"}
-	}
-
 	log.Debug().
 		Str("host", metadata.Host).
 		Str("authType", authType).
 		Bool("hasCA", caData != "").
-		Bool("enableHTTP2", enableHTTP2).
 		Msg("configured cluster from metadata")
 
 	return config, nil

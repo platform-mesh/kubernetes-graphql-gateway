@@ -7,10 +7,8 @@ replace (
 	// https://github.com/graphql-go/handler/pull/93
 	github.com/graphql-go/handler => github.com/vertex451/handler v0.0.0-20250124125145-ed328e3cf42a
 
-	// Pin golang.org/x/net to match multicluster-provider (prevents HTTP/2 incompatibility)
+	// Pin versions to match multicluster-provider requirements
 	golang.org/x/net => golang.org/x/net v0.40.0
-
-	// Pin Kubernetes versions to match main branch (prevents KCP front proxy HTTP/2 panics)
 	k8s.io/api => k8s.io/api v0.33.3
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.33.3
 	k8s.io/apimachinery => k8s.io/apimachinery v0.33.3
@@ -18,8 +16,6 @@ replace (
 	k8s.io/client-go => k8s.io/client-go v0.33.3
 	k8s.io/component-base => k8s.io/component-base v0.33.3
 	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20250701173324-9bd5c66d9911
-
-	// Pin controller-runtime to compatible version with k8s v0.33.3
 	sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.21.0
 )
 

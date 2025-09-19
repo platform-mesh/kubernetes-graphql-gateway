@@ -32,7 +32,6 @@ type ClusterRegistry struct {
 	log                 *logger.Logger
 	appCfg              appConfig.Config
 	roundTripperFactory RoundTripperFactory
-	enableHTTP2         bool
 }
 
 // NewClusterRegistry creates a new cluster registry
@@ -40,14 +39,12 @@ func NewClusterRegistry(
 	log *logger.Logger,
 	appCfg appConfig.Config,
 	roundTripperFactory RoundTripperFactory,
-	enableHTTP2 bool,
 ) *ClusterRegistry {
 	return &ClusterRegistry{
 		clusters:            make(map[string]*TargetCluster),
 		log:                 log,
 		appCfg:              appCfg,
 		roundTripperFactory: roundTripperFactory,
-		enableHTTP2:         enableHTTP2,
 	}
 }
 
@@ -65,7 +62,7 @@ func (cr *ClusterRegistry) LoadCluster(schemaFilePath string) error {
 		Msg("Loading target cluster")
 
 	// Create or update cluster
-	cluster, err := NewTargetCluster(name, schemaFilePath, cr.log, cr.appCfg, cr.roundTripperFactory, cr.enableHTTP2)
+	cluster, err := NewTargetCluster(name, schemaFilePath, cr.log, cr.appCfg, cr.roundTripperFactory)
 	if err != nil {
 		return fmt.Errorf("failed to create target cluster %s: %w", name, err)
 	}
