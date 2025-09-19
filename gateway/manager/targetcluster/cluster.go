@@ -108,7 +108,6 @@ func (tc *TargetCluster) connect(appCfg appConfig.Config, metadata *ClusterMetad
 		Msg("Using cluster metadata from schema file for connection")
 
 	var err error
-
 	tc.restCfg, err = buildConfigFromMetadata(metadata, tc.log)
 	if err != nil {
 		return fmt.Errorf("failed to build config from metadata: %w", err)

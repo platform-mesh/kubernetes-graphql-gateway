@@ -407,7 +407,7 @@ func (m *MetadataInjector) determineHost(originalHost, hostOverride string) stri
 		m.log.Info().
 			Str("originalHost", originalHost).
 			Str("cleanedHost", cleanedHost).
-			Msg("cleaned virtual workspace path from kubeconfig host for normal workspace")
+			Msg("cleaned virtual workspace path from host for normal workspace")
 	}
 	return cleanedHost
 }
@@ -430,7 +430,7 @@ func (m *MetadataInjector) determineKCPHost(kubeconfigHost, override, clusterPat
 			Str("clusterPath", clusterPath).
 			Str("originalHost", kubeconfigHost).
 			Str("cleanedHost", host).
-			Msg("cleaned virtual workspace path from host for normal workspace")
+			Msg("cleaned virtual workspace path from kubeconfig host for normal workspace")
 	}
 	return host
 }

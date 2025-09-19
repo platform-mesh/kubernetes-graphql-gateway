@@ -253,7 +253,7 @@ func TestPathForCluster(t *testing.T) {
 						return nil
 					}).Once()
 			},
-			want:        "root:org:deleted-workspace", // Now correctly returns the kcp.io/path annotation value
+			want:        "root:org:deleted-workspace",
 			wantErr:     true,
 			errContains: "cluster is deleted",
 		},
