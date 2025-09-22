@@ -28,9 +28,10 @@ var (
 
 // VirtualWorkspace represents a virtual workspace configuration
 type VirtualWorkspace struct {
-	Name       string `yaml:"name"`
-	URL        string `yaml:"url"`
-	Kubeconfig string `yaml:"kubeconfig,omitempty"` // Optional path to kubeconfig for authentication
+	Name            string `yaml:"name"`
+	URL             string `yaml:"url"`
+	Kubeconfig      string `yaml:"kubeconfig,omitempty"`      // Optional path to kubeconfig for authentication
+	TargetWorkspace string `yaml:"targetWorkspace,omitempty"` // Optional target workspace path (e.g., "root:orgs:default")
 }
 
 // VirtualWorkspacesConfig represents the configuration file structure
@@ -54,7 +55,7 @@ func (v *VirtualWorkspaceManager) GetWorkspacePath(workspace VirtualWorkspace) s
 }
 
 // createVirtualConfig creates a REST config for a virtual workspace
-func createVirtualConfig(workspace VirtualWorkspace) (*rest.Config, error) {
+func createVirtualConfig(workspace VirtualWorkspace, appCfg config.Config) (*rest.Config, error) {
 	if workspace.URL == "" {
 		return nil, fmt.Errorf("%w: empty URL for workspace %s", ErrInvalidVirtualWorkspaceURL, workspace.Name)
 	}
@@ -63,6 +64,16 @@ func createVirtualConfig(workspace VirtualWorkspace) (*rest.Config, error) {
 	_, err := url.Parse(workspace.URL)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrParseVirtualWorkspaceURL, err)
+	}
+
+	// Determine the target workspace path
+	// Use the configured targetWorkspace if specified, otherwise discover dynamically
+	targetWorkspace := workspace.TargetWorkspace
+	if targetWorkspace == "" {
+		// TODO: Implement dynamic workspace discovery
+		// For now, fall back to the main branch approach: use "root" and let KCP resolve it
+		// This should be replaced with proper workspace discovery using LogicalCluster resources
+		targetWorkspace = "root"
 	}
 
 	var virtualConfig *rest.Config
@@ -80,11 +91,11 @@ func createVirtualConfig(workspace VirtualWorkspace) (*rest.Config, error) {
 		}
 
 		virtualConfig = restConfig
-		virtualConfig.Host = workspace.URL + "/clusters/root"
+		virtualConfig.Host = workspace.URL + "/clusters/" + targetWorkspace
 	} else {
 		// Use minimal configuration for virtual workspaces without authentication
 		virtualConfig = &rest.Config{
-			Host:      workspace.URL + "/clusters/root",
+			Host:      workspace.URL + "/clusters/" + targetWorkspace,
 			UserAgent: "kubernetes-graphql-gateway-listener",
 			TLSClientConfig: rest.TLSClientConfig{
 				Insecure: true,
@@ -97,7 +108,7 @@ func createVirtualConfig(workspace VirtualWorkspace) (*rest.Config, error) {
 
 // CreateDiscoveryClient creates a discovery client for the virtual workspace
 func (v *VirtualWorkspaceManager) CreateDiscoveryClient(workspace VirtualWorkspace) (discovery.DiscoveryInterface, error) {
-	virtualConfig, err := createVirtualConfig(workspace)
+	virtualConfig, err := createVirtualConfig(workspace, v.appCfg)
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +124,7 @@ func (v *VirtualWorkspaceManager) CreateDiscoveryClient(workspace VirtualWorkspa
 
 // CreateRESTConfig creates a REST config for the virtual workspace (for REST mappers)
 func (v *VirtualWorkspaceManager) CreateRESTConfig(workspace VirtualWorkspace) (*rest.Config, error) {
-	return createVirtualConfig(workspace)
+	return createVirtualConfig(workspace, v.appCfg)
 }
 
 // LoadConfig loads the virtual workspaces configuration from a file
@@ -250,13 +261,22 @@ func (r *VirtualWorkspaceReconciler) processVirtualWorkspace(ctx context.Context
 		return fmt.Errorf("failed to create REST mapper for virtual workspace: %w", err)
 	}
 
+	// Determine the target workspace path for schema metadata
+	targetWorkspace := workspace.TargetWorkspace
+	if targetWorkspace == "" {
+		// TODO: Implement dynamic workspace discovery
+		// For now, fall back to the main branch approach: use "root" and let KCP resolve it
+		// This should be replaced with proper workspace discovery using LogicalCluster resources
+		targetWorkspace = "root"
+	}
+
 	// Use shared schema generation logic
 	schemaWithMetadata, err := generateSchemaWithMetadata(
 		SchemaGenerationParams{
 			ClusterPath:     workspacePath,
 			DiscoveryClient: discoveryClient,
 			RESTMapper:      restMapper,
-			HostOverride:    workspace.URL, // Use virtual workspace URL as host override
+			HostOverride:    workspace.URL + "/clusters/" + targetWorkspace, // Use full virtual workspace URL with dynamic workspace path
 		},
 		r.apiSchemaResolver,
 		r.log,

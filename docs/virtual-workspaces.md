@@ -11,9 +11,21 @@ virtualWorkspaces:
 - name: example
   url: https://192.168.1.118:6443/services/apiexport/root/configmaps-view
   kubeconfig: PATH_TO_KCP_KUBECONFIG
-- name: another-service
+  targetWorkspace: root:orgs:default  # Explicit full workspace path
+- name: production-service
   url: https://your-kcp-server:6443/services/apiexport/root/your-export
   kubeconfig: PATH_TO_KCP_KUBECONFIG
+  targetWorkspace: root:orgs:production  # Different organization
+- name: team-service
+  url: https://your-kcp-server:6443/services/apiexport/root/team-export
+  kubeconfig: PATH_TO_KCP_KUBECONFIG
+  targetWorkspace: root:orgs:team-a  # Team-specific organization
+- name: flexible-service
+  url: https://your-kcp-server:6443/services/apiexport/root/flexible-export
+  kubeconfig: PATH_TO_KCP_KUBECONFIG
+  # targetWorkspace not specified - will dynamically use default configuration
+  # If gateway-url-default-kcp-workspace="production", this will resolve to "root:orgs:production"
+  # If gateway-url-default-kcp-workspace="root:orgs:staging", this will use "root:orgs:staging" as-is
 ```
 
 ### Configuration Options
@@ -22,13 +34,42 @@ virtualWorkspaces:
   - `name`: Unique identifier for the virtual workspace (used in URL paths)
   - `url`: Full URL to the virtual workspace or API export
   - `kubeconfig`: path to kcp kubeconfig
+  - `targetWorkspace`: Optional target workspace path (e.g., "root:orgs:default", "root:orgs:production", "root:orgs:team-a")
+    - If not specified, uses the `gateway-url-default-kcp-workspace` and `gateway-url-kcp-workspace-pattern` configuration values
+    - If the default workspace contains ":", it's used as-is (e.g., "root:orgs:production")
+    - If the default workspace is just an organization name, it's inserted into the workspace pattern
+    - Default pattern: "root:orgs:{org}" where {org} is replaced with the organization name
+    - Allows different virtual workspaces to target different organizations or workspace hierarchies dynamically
 
-## Environment Variables
+## Configuration Options
+
+### Global Configuration
+
+The following environment variables or configuration options control the default workspace resolution:
+
+- `GATEWAY_URL_DEFAULT_KCP_WORKSPACE` (default: "default"): The default organization name
+- `GATEWAY_URL_KCP_WORKSPACE_PATTERN` (default: "root:orgs:{org}"): The pattern for building workspace paths
+
+### Environment Variables
 
 Set the configuration path using:
 
 ```bash
 export VIRTUAL_WORKSPACES_CONFIG_PATH="./bin/virtual-workspaces/config.yaml"
+```
+
+Set the default organization:
+
+```bash
+export GATEWAY_URL_DEFAULT_KCP_WORKSPACE="production"
+```
+
+Customize the workspace pattern (for different hierarchies):
+
+```bash
+export GATEWAY_URL_KCP_WORKSPACE_PATTERN="root:organizations:{org}"
+# or for a flat structure:
+export GATEWAY_URL_KCP_WORKSPACE_PATTERN="root:{org}"
 ```
 
 ## URL Pattern
