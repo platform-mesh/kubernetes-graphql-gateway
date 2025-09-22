@@ -130,6 +130,9 @@ func isDiscoveryRequest(req *http.Request) bool {
 	if len(parts) >= 5 && parts[0] == "services" && parts[2] == "clusters" {
 		// Handle virtual workspace prefixes first: /services/<service>/clusters/<workspace>/api
 		parts = parts[4:] // Remove /services/<service>/clusters/<workspace> prefix
+	} else if len(parts) >= 3 && parts[0] == "services" {
+		// Handle APIExport virtual workspace pattern: /services/<service>/api
+		parts = parts[2:] // Remove /services/<service> prefix
 	} else if len(parts) >= 3 && parts[0] == "clusters" {
 		// Handle KCP workspace prefixes: /clusters/<workspace>/api
 		parts = parts[2:] // Remove /clusters/<workspace> prefix
