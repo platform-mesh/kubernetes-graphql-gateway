@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"crypto/tls"
+	"os"
 
 	kcpapis "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
 	kcpcore "github.com/kcp-dev/kcp/sdk/apis/core/v1alpha1"
@@ -77,7 +78,18 @@ var listenCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		log.Info().Str("LogLevel", log.GetLevel().String()).Msg("Starting the Listener...")
 
-		ctx := ctrl.SetupSignalHandler()
+		// Set up signal handler and create a cancellable context for coordinated shutdown
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		// Set up signal handling
+		signalCtx := ctrl.SetupSignalHandler()
+		go func() {
+			<-signalCtx.Done()
+			log.Info().Msg("received shutdown signal, initiating graceful shutdown")
+			cancel()
+		}()
+
 		restCfg := ctrl.GetConfigOrDie()
 
 		mgrOpts := ctrl.Options{
@@ -116,7 +128,8 @@ var listenCmd = &cobra.Command{
 			if appCfg.Listener.VirtualWorkspacesConfigPath != "" {
 				go func() {
 					if err := kcpManager.StartVirtualWorkspaceWatching(ctx, appCfg.Listener.VirtualWorkspacesConfigPath); err != nil {
-						log.Fatal().Err(err).Msg("failed to start virtual workspace watching")
+						log.Error().Err(err).Msg("virtual workspace watching failed, initiating graceful shutdown")
+						cancel() // Trigger coordinated shutdown
 					}
 				}()
 			}
@@ -135,8 +148,20 @@ var listenCmd = &cobra.Command{
 		}
 
 		// Setup reconciler with its own manager and start everything
+		// Use the original context for the manager - it will be cancelled if watcher fails
 		if err := startManagerWithReconciler(ctx, reconcilerInstance); err != nil {
 			log.Fatal().Err(err).Msg("failed to start manager with reconciler")
+		}
+
+		// Check if we're exiting due to context cancellation
+		select {
+		case <-ctx.Done():
+			if ctx.Err() == context.Canceled {
+				log.Error().Msg("application shutting down due to critical component failure")
+				os.Exit(1)
+			}
+		default:
+			// Normal exit
 		}
 	},
 }
