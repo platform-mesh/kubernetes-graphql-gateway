@@ -168,7 +168,7 @@ func TestCreateVirtualConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			config, err := createVirtualConfig(tt.workspace)
+			config, err := createVirtualConfig(tt.workspace, "root:orgs:default")
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -179,7 +179,7 @@ func TestCreateVirtualConfig(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				assert.NotNil(t, config)
-				assert.Equal(t, tt.workspace.URL+"/clusters/root", config.Host)
+				assert.Equal(t, tt.workspace.URL+"/clusters/root:orgs:default", config.Host)
 				if tt.workspace.Kubeconfig == "" {
 					assert.True(t, config.TLSClientConfig.Insecure)
 					assert.Equal(t, "kubernetes-graphql-gateway-listener", config.UserAgent)
@@ -223,10 +223,10 @@ users:
 		Kubeconfig: kubeconfigPath,
 	}
 
-	config, err := createVirtualConfig(workspace)
+	config, err := createVirtualConfig(workspace, "root:orgs:default")
 	assert.NoError(t, err)
 	assert.NotNil(t, config)
-	assert.Equal(t, workspace.URL+"/clusters/root", config.Host)
+	assert.Equal(t, workspace.URL+"/clusters/root:orgs:default", config.Host)
 	assert.Equal(t, "test-token", config.BearerToken)
 }
 
@@ -302,7 +302,7 @@ users:
 			appCfg := config.Config{}
 			manager := NewVirtualWorkspaceManager(appCfg)
 
-			client, err := manager.CreateDiscoveryClient(tt.workspace)
+			client, err := manager.CreateDiscoveryClient(tt.workspace, "root:orgs:default")
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -387,7 +387,7 @@ users:
 			appCfg := config.Config{}
 			manager := NewVirtualWorkspaceManager(appCfg)
 
-			config, err := manager.CreateRESTConfig(tt.workspace)
+			config, err := manager.CreateRESTConfig(tt.workspace, "root:orgs:default")
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -395,7 +395,7 @@ users:
 			} else {
 				assert.NoError(t, err)
 				assert.NotNil(t, config)
-				assert.Equal(t, tt.workspace.URL+"/clusters/root", config.Host)
+				assert.Equal(t, tt.workspace.URL+"/clusters/root:orgs:default", config.Host)
 			}
 		})
 	}

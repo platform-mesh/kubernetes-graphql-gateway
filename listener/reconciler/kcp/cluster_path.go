@@ -144,8 +144,9 @@ func PathForClusterFromWorkspaces(clusterHash string, clt client.Client) (string
 	return PathForCluster(clusterHash, clt)
 }
 
-// PathForClusterFromConfig attempts to extract workspace path from cluster configuration
-// This is an alternative approach when LogicalCluster resource is not accessible
+// PathForClusterFromConfig attempts to extract cluster identifier from cluster configuration
+// Returns either a workspace path or cluster hash depending on the URL type.
+// This is an alternative approach when LogicalCluster resource is not accessible.
 func PathForClusterFromConfig(clusterName string, cfg *rest.Config) (string, error) {
 	if clusterName == "root" {
 		return clusterName, nil
@@ -185,15 +186,13 @@ func PathForClusterFromConfig(clusterName string, cfg *rest.Config) (string, err
 
 	// Check for virtual workspace patterns
 	if strings.HasPrefix(parsedURL.Path, "/services/apiexport/") {
-		// Extract workspace path from virtual workspace URL
-		// Pattern: /services/apiexport/{workspace-path}/{export-name}
-		pathParts := strings.Split(strings.Trim(parsedURL.Path, "/"), "/")
-		if len(pathParts) >= 4 && pathParts[0] == "services" && pathParts[1] == "apiexport" {
-			workspacePath := pathParts[2]
-			return workspacePath, nil
+		// Pattern: /services/apiexport/{cluster-hash}/{export-name}
+		if hash := extractClusterHashFromAPIExportURL(parsedURL.String()); hash != "" {
+			// Return the cluster hash as an identifier (callers must treat it as an identifier, not a workspace path).
+			return hash, nil
 		}
 	}
 
-	// If we can't extract meaningful workspace information, fall back to cluster name
+	// If we can't extract meaningful cluster identifier, fall back to cluster name
 	return clusterName, nil
 }
