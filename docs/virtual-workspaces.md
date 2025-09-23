@@ -20,12 +20,14 @@ virtualWorkspaces:
   url: https://your-kcp-server:6443/services/apiexport/root/team-export
   kubeconfig: PATH_TO_KCP_KUBECONFIG
   targetWorkspace: root:orgs:team-a  # Team-specific organization
-- name: flexible-service
-  url: https://your-kcp-server:6443/services/apiexport/root/flexible-export
+- name: contentconfigurations
+  url: https://your-kcp-server:6443/services/contentconfigurations
   kubeconfig: PATH_TO_KCP_KUBECONFIG
-  # targetWorkspace not specified - will dynamically use default configuration
-  # If gateway-url-default-kcp-workspace="production", this will resolve to "root:orgs:production"
-  # If gateway-url-default-kcp-workspace="root:orgs:staging", this will use "root:orgs:staging" as-is
+  # No targetWorkspace specified - workspace is resolved dynamically from user request:
+  # User request: /virtual-workspace/contentconfigurations/root:orgs:alpha/query
+  # → Connects to: /services/contentconfigurations/clusters/root:orgs:alpha/api/v1/configmaps
+  # User request: /virtual-workspace/contentconfigurations/root:orgs:beta/query  
+  # → Connects to: /services/contentconfigurations/clusters/root:orgs:beta/api/v1/configmaps
 ```
 
 ### Configuration Options
@@ -34,12 +36,11 @@ virtualWorkspaces:
   - `name`: Unique identifier for the virtual workspace (used in URL paths)
   - `url`: Full URL to the virtual workspace or API export
   - `kubeconfig`: path to kcp kubeconfig
-  - `targetWorkspace`: Optional target workspace path (e.g., "root:orgs:default", "root:orgs:production", "root:orgs:team-a")
-    - If not specified, uses the `gateway-url-default-kcp-workspace` and `gateway-url-kcp-workspace-pattern` configuration values
-    - If the default workspace contains ":", it's used as-is (e.g., "root:orgs:production")
-    - If the default workspace is just an organization name, it's inserted into the workspace pattern
-    - Default pattern: "root:orgs:{org}" where {org} is replaced with the organization name
-    - Allows different virtual workspaces to target different organizations or workspace hierarchies dynamically
+  - `targetWorkspace`: **REMOVED** - No longer supported. Workspace is now resolved dynamically from user requests.
+  - **Dynamic Resolution**: The workspace is extracted from the user's GraphQL request URL at runtime
+  - **Request-based**: Each user request can target a different workspace by specifying it in the URL
+  - **Example**: `/virtual-workspace/contentconfigurations/root:orgs:alpha/query` → targets `root:orgs:alpha`
+  - **Flexible**: Different users can access different organizations through the same virtual workspace configuration
 
 ## Configuration Options
 
@@ -87,8 +88,12 @@ For example:
 ## How It Works
 
 1. **Configuration Watching**: The listener watches the virtual workspaces configuration file for changes
-2. **Schema Generation**: For each virtual workspace, the listener:
-   - Creates a discovery client pointing to the virtual workspace URL
-   - Generates OpenAPI schemas for the available resources
+2. **Generic Schema Generation**: For each virtual workspace, the listener:
+   - Creates a discovery client pointing to the virtual workspace URL with a default workspace
+   - Generates generic OpenAPI schemas for the available resources
    - Stores the schema in a file at `virtual-workspace/{name}`
-3. **Gateway Integration**: The gateway watches the schema files and exposes virtual workspaces as GraphQL endpoints
+3. **Dynamic Workspace Resolution**: When a user makes a GraphQL request:
+   - The gateway extracts the workspace from the URL (e.g., `root:orgs:alpha`)
+   - The roundtripper modifies the backend request to include the specific workspace
+   - Example: `/services/contentconfigurations/api/v1/configmaps` → `/services/contentconfigurations/clusters/root:orgs:alpha/api/v1/configmaps`
+4. **Gateway Integration**: The gateway exposes virtual workspaces as GraphQL endpoints with dynamic workspace targeting

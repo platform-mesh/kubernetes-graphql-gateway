@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strings"
 	"sync"
 
 	"gopkg.in/yaml.v3"
@@ -28,10 +29,9 @@ var (
 
 // VirtualWorkspace represents a virtual workspace configuration
 type VirtualWorkspace struct {
-	Name            string `yaml:"name"`
-	URL             string `yaml:"url"`
-	Kubeconfig      string `yaml:"kubeconfig,omitempty"`      // Optional path to kubeconfig for authentication
-	TargetWorkspace string `yaml:"targetWorkspace,omitempty"` // Optional target workspace path (e.g., "root:orgs:default")
+	Name       string `yaml:"name"`
+	URL        string `yaml:"url"`
+	Kubeconfig string `yaml:"kubeconfig,omitempty"` // Optional path to kubeconfig for authentication
 }
 
 // VirtualWorkspacesConfig represents the configuration file structure
@@ -54,8 +54,71 @@ func (v *VirtualWorkspaceManager) GetWorkspacePath(workspace VirtualWorkspace) s
 	return fmt.Sprintf("%s/%s", v.appCfg.Url.VirtualWorkspacePrefix, workspace.Name)
 }
 
-// createVirtualConfig creates a REST config for a virtual workspace
-func createVirtualConfig(workspace VirtualWorkspace, appCfg config.Config) (*rest.Config, error) {
+// extractWorkspaceFromKubeconfig extracts the workspace path from kubeconfig server URL
+// This implements KCP-native workspace resolution similar to kcp/cli/pkg/helpers/helpers.go
+func extractWorkspaceFromKubeconfig(kubeconfigPath string) (string, error) {
+	if kubeconfigPath == "" {
+		return "", fmt.Errorf("kubeconfig path is empty")
+	}
+
+	cfg, err := clientcmd.LoadFromFile(kubeconfigPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to load kubeconfig %s: %w", kubeconfigPath, err)
+	}
+
+	restConfig, err := clientcmd.NewDefaultClientConfig(*cfg, &clientcmd.ConfigOverrides{}).ClientConfig()
+	if err != nil {
+		return "", fmt.Errorf("failed to create client config from kubeconfig %s: %w", kubeconfigPath, err)
+	}
+
+	return parseWorkspaceFromServerURL(restConfig.Host)
+}
+
+// parseWorkspaceFromServerURL extracts workspace path from KCP server URL
+// Based on kcp/cli/pkg/helpers/ParseClusterURL function
+func parseWorkspaceFromServerURL(serverURL string) (string, error) {
+	u, err := url.Parse(serverURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse server URL %s: %w", serverURL, err)
+	}
+
+	prefix := "/clusters/"
+	if clusterIndex := strings.Index(u.Path, prefix); clusterIndex >= 0 {
+		workspacePath := strings.SplitN(u.Path[clusterIndex+len(prefix):], "/", 2)[0]
+		if workspacePath == "" {
+			return "", fmt.Errorf("empty workspace path in URL: %s", serverURL)
+		}
+		return workspacePath, nil
+	}
+
+	return "", fmt.Errorf("server URL %s is not pointing to a workspace (missing /clusters/ path)", serverURL)
+}
+
+// resolveDefaultWorkspace resolves the default workspace using configuration
+func resolveDefaultWorkspace(appCfg config.Config) string {
+	// Use configuration values for default workspace resolution
+	defaultOrg := appCfg.Url.DefaultKcpWorkspace
+	if defaultOrg == "" {
+		defaultOrg = "default"
+	}
+
+	// If the default workspace already contains ":", use it as-is (full path)
+	if strings.Contains(defaultOrg, ":") {
+		return defaultOrg
+	}
+
+	// Otherwise, build the workspace path using the pattern
+	pattern := appCfg.Url.KcpWorkspacePattern
+	if pattern == "" {
+		pattern = "root:orgs:{org}"
+	}
+
+	// Replace {org} placeholder with the organization name
+	return strings.ReplaceAll(pattern, "{org}", defaultOrg)
+}
+
+// createVirtualConfig creates a REST config for a virtual workspace with a specific target workspace
+func createVirtualConfig(workspace VirtualWorkspace, targetWorkspace string) (*rest.Config, error) {
 	if workspace.URL == "" {
 		return nil, fmt.Errorf("%w: empty URL for workspace %s", ErrInvalidVirtualWorkspaceURL, workspace.Name)
 	}
@@ -66,14 +129,9 @@ func createVirtualConfig(workspace VirtualWorkspace, appCfg config.Config) (*res
 		return nil, fmt.Errorf("%w: %v", ErrParseVirtualWorkspaceURL, err)
 	}
 
-	// Determine the target workspace path
-	// Use the configured targetWorkspace if specified, otherwise discover dynamically
-	targetWorkspace := workspace.TargetWorkspace
+	// Use the provided target workspace
 	if targetWorkspace == "" {
-		// TODO: Implement dynamic workspace discovery
-		// For now, fall back to the main branch approach: use "root" and let KCP resolve it
-		// This should be replaced with proper workspace discovery using LogicalCluster resources
-		targetWorkspace = "root"
+		return nil, fmt.Errorf("target workspace cannot be empty for virtual workspace %s", workspace.Name)
 	}
 
 	var virtualConfig *rest.Config
@@ -106,9 +164,9 @@ func createVirtualConfig(workspace VirtualWorkspace, appCfg config.Config) (*res
 	return virtualConfig, nil
 }
 
-// CreateDiscoveryClient creates a discovery client for the virtual workspace
-func (v *VirtualWorkspaceManager) CreateDiscoveryClient(workspace VirtualWorkspace) (discovery.DiscoveryInterface, error) {
-	virtualConfig, err := createVirtualConfig(workspace, v.appCfg)
+// CreateDiscoveryClient creates a discovery client for the virtual workspace with a specific target workspace
+func (v *VirtualWorkspaceManager) CreateDiscoveryClient(workspace VirtualWorkspace, targetWorkspace string) (discovery.DiscoveryInterface, error) {
+	virtualConfig, err := createVirtualConfig(workspace, targetWorkspace)
 	if err != nil {
 		return nil, err
 	}
@@ -122,9 +180,9 @@ func (v *VirtualWorkspaceManager) CreateDiscoveryClient(workspace VirtualWorkspa
 	return discoveryClient, nil
 }
 
-// CreateRESTConfig creates a REST config for the virtual workspace (for REST mappers)
-func (v *VirtualWorkspaceManager) CreateRESTConfig(workspace VirtualWorkspace) (*rest.Config, error) {
-	return createVirtualConfig(workspace, v.appCfg)
+// CreateRESTConfig creates a REST config for the virtual workspace with a specific target workspace
+func (v *VirtualWorkspaceManager) CreateRESTConfig(workspace VirtualWorkspace, targetWorkspace string) (*rest.Config, error) {
+	return createVirtualConfig(workspace, targetWorkspace)
 }
 
 // LoadConfig loads the virtual workspaces configuration from a file
@@ -223,7 +281,8 @@ func (r *VirtualWorkspaceReconciler) ReconcileConfig(ctx context.Context, config
 	return nil
 }
 
-// processVirtualWorkspace generates schema for a single virtual workspace
+// processVirtualWorkspace generates a generic schema for a virtual workspace
+// The schema will be workspace-agnostic and the actual workspace will be resolved at request time
 func (r *VirtualWorkspaceReconciler) processVirtualWorkspace(ctx context.Context, workspace VirtualWorkspace) error {
 	workspacePath := r.virtualWSManager.GetWorkspacePath(workspace)
 
@@ -231,10 +290,13 @@ func (r *VirtualWorkspaceReconciler) processVirtualWorkspace(ctx context.Context
 		Str("workspace", workspace.Name).
 		Str("url", workspace.URL).
 		Str("path", workspacePath).
-		Msg("generating schema for virtual workspace")
+		Msg("generating generic schema for virtual workspace")
 
-	// Create discovery client for the virtual workspace
-	discoveryClient, err := r.virtualWSManager.CreateDiscoveryClient(workspace)
+	// Use a default workspace for schema generation - this will be overridden at request time
+	defaultWorkspace := resolveDefaultWorkspace(r.virtualWSManager.appCfg)
+
+	// Create discovery client for the virtual workspace with default workspace
+	discoveryClient, err := r.virtualWSManager.CreateDiscoveryClient(workspace, defaultWorkspace)
 	if err != nil {
 		r.log.Warn().Err(err).
 			Str("workspace", workspace.Name).
@@ -245,8 +307,8 @@ func (r *VirtualWorkspaceReconciler) processVirtualWorkspace(ctx context.Context
 
 	r.log.Debug().Str("workspace", workspace.Name).Str("url", workspace.URL).Msg("created discovery client for virtual workspace")
 
-	// Create REST config and mapper for the virtual workspace
-	virtualConfig, err := r.virtualWSManager.CreateRESTConfig(workspace)
+	// Create REST config and mapper for the virtual workspace with default workspace
+	virtualConfig, err := r.virtualWSManager.CreateRESTConfig(workspace, defaultWorkspace)
 	if err != nil {
 		return fmt.Errorf("failed to create REST config: %w", err)
 	}
@@ -261,22 +323,14 @@ func (r *VirtualWorkspaceReconciler) processVirtualWorkspace(ctx context.Context
 		return fmt.Errorf("failed to create REST mapper for virtual workspace: %w", err)
 	}
 
-	// Determine the target workspace path for schema metadata
-	targetWorkspace := workspace.TargetWorkspace
-	if targetWorkspace == "" {
-		// TODO: Implement dynamic workspace discovery
-		// For now, fall back to the main branch approach: use "root" and let KCP resolve it
-		// This should be replaced with proper workspace discovery using LogicalCluster resources
-		targetWorkspace = "root"
-	}
-
-	// Use shared schema generation logic
+	// Use shared schema generation logic with generic virtual workspace URL
+	// The actual workspace will be resolved at request time by the roundtripper
 	schemaWithMetadata, err := generateSchemaWithMetadata(
 		SchemaGenerationParams{
 			ClusterPath:     workspacePath,
 			DiscoveryClient: discoveryClient,
 			RESTMapper:      restMapper,
-			HostOverride:    workspace.URL + "/clusters/" + targetWorkspace, // Use full virtual workspace URL with dynamic workspace path
+			HostOverride:    workspace.URL, // Use base virtual workspace URL without specific workspace
 		},
 		r.apiSchemaResolver,
 		r.log,
@@ -294,7 +348,7 @@ func (r *VirtualWorkspaceReconciler) processVirtualWorkspace(ctx context.Context
 		Str("workspace", workspace.Name).
 		Str("path", workspacePath).
 		Int("schemaSize", len(schemaWithMetadata)).
-		Msg("successfully generated schema for virtual workspace")
+		Msg("successfully generated generic schema for virtual workspace")
 
 	return nil
 }

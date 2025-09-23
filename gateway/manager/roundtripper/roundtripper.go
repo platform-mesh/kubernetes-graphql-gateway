@@ -2,6 +2,7 @@ package roundtripper
 
 import (
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -12,6 +13,12 @@ import (
 )
 
 type TokenKey struct{}
+
+// contextKey is a custom type for context keys to avoid collisions
+type contextKey string
+
+// kcpWorkspaceKey is the context key for storing KCP workspace information
+const kcpWorkspaceKey contextKey = "kcpWorkspace"
 
 type roundTripper struct {
 	log                     *logger.Logger
@@ -44,6 +51,9 @@ func (rt *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 		Bool("shouldImpersonate", rt.appCfg.Gateway.ShouldImpersonate).
 		Str("usernameClaim", rt.appCfg.Gateway.UsernameClaim).
 		Msg("RoundTripper processing request")
+
+	// Handle virtual workspace URL modification
+	req = rt.handleVirtualWorkspaceURL(req)
 
 	if rt.appCfg.LocalDevelopment {
 		rt.log.Debug().Str("path", req.URL.Path).Msg("Local development mode, using admin credentials")
@@ -151,4 +161,56 @@ func isDiscoveryRequest(req *http.Request) bool {
 	default:
 		return false
 	}
+}
+
+// handleVirtualWorkspaceURL modifies the request URL for virtual workspace requests
+// to include the workspace from the request context
+func (rt *roundTripper) handleVirtualWorkspaceURL(req *http.Request) *http.Request {
+	// Check if this is a virtual workspace request by looking for kcpWorkspaceKey in context
+	kcpWorkspace, ok := req.Context().Value(kcpWorkspaceKey).(string)
+	if !ok || kcpWorkspace == "" {
+		// Not a virtual workspace request, return as-is
+		return req
+	}
+
+	// Parse the current URL
+	parsedURL, err := url.Parse(req.URL.String())
+	if err != nil {
+		rt.log.Error().Err(err).Str("url", req.URL.String()).Msg("Failed to parse request URL")
+		return req
+	}
+
+	// Check if the URL already contains /clusters/ path (already modified)
+	if strings.Contains(parsedURL.Path, "/clusters/") {
+		return req
+	}
+
+	// Modify the URL to include the workspace path
+	// Transform: /services/contentconfigurations/api/v1/configmaps
+	// To:        /services/contentconfigurations/clusters/root:orgs:alpha/api/v1/configmaps
+	if strings.HasPrefix(parsedURL.Path, "/services/") {
+		parts := strings.SplitN(parsedURL.Path, "/", 4) // [, services, serviceName, restOfPath]
+		if len(parts) >= 3 {
+			serviceName := parts[2]
+			restOfPath := ""
+			if len(parts) > 3 {
+				restOfPath = "/" + parts[3]
+			}
+
+			// Reconstruct the URL with the workspace
+			parsedURL.Path = "/services/" + serviceName + "/clusters/" + kcpWorkspace + restOfPath
+
+			rt.log.Debug().
+				Str("originalPath", req.URL.Path).
+				Str("modifiedPath", parsedURL.Path).
+				Str("workspace", kcpWorkspace).
+				Msg("Modified virtual workspace URL")
+		}
+	}
+
+	// Create a new request with the modified URL
+	newReq := req.Clone(req.Context())
+	newReq.URL = parsedURL
+
+	return newReq
 }

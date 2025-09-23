@@ -9,6 +9,7 @@ type Config struct {
 	Url struct {
 		VirtualWorkspacePrefix string `mapstructure:"gateway-url-virtual-workspace-prefix"`
 		DefaultKcpWorkspace    string `mapstructure:"gateway-url-default-kcp-workspace"`
+		KcpWorkspacePattern    string `mapstructure:"gateway-url-kcp-workspace-pattern"`
 		GraphqlSuffix          string `mapstructure:"gateway-url-graphql-suffix"`
 	} `mapstructure:",squash"`
 
