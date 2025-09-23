@@ -19,9 +19,19 @@ import (
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/roundtripper"
 )
 
-// LogicalClusterKey is the context key for storing logical cluster information
-// Using logicalcluster.Name as the key type to be compatible with KCP ecosystem
-type LogicalClusterKey = logicalcluster.Name
+// clusterNameCtxKey is a private context key type to avoid collisions
+type clusterNameCtxKey struct{}
+
+// WithClusterName stores a logical cluster name in the context
+func WithClusterName(ctx context.Context, name logicalcluster.Name) context.Context {
+	return context.WithValue(ctx, clusterNameCtxKey{}, name)
+}
+
+// ClusterNameFromContext retrieves a logical cluster name from the context
+func ClusterNameFromContext(ctx context.Context) (logicalcluster.Name, bool) {
+	name, ok := ctx.Value(clusterNameCtxKey{}).(logicalcluster.Name)
+	return name, ok
+}
 
 // GraphQLHandler wraps a GraphQL schema and HTTP handler
 type GraphQLHandler struct {
@@ -66,8 +76,8 @@ func SetContexts(r *http.Request, workspace, token string, enableKcp bool) *http
 		if kcpWorkspace, ok := r.Context().Value(kcpWorkspaceKey).(string); ok && kcpWorkspace != "" {
 			kcpWorkspaceName = kcpWorkspace
 		}
-		// Store the logical cluster name in context using logicalcluster.Name as key
-		r = r.WithContext(context.WithValue(r.Context(), LogicalClusterKey("cluster"), logicalcluster.Name(kcpWorkspaceName)))
+		// Store the logical cluster name in context using the helper function
+		r = r.WithContext(WithClusterName(r.Context(), logicalcluster.Name(kcpWorkspaceName)))
 	}
 	return r.WithContext(context.WithValue(r.Context(), roundtripper.TokenKey{}, token))
 }
