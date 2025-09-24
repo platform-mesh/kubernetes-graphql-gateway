@@ -31,29 +31,41 @@ type APIExportInfo struct {
 	ExportName    string
 }
 
-// extractAPIExportInfo extracts workspace path and export name from an APIExport URL
+// extractAPIExportRef extracts workspace path and export name from an APIExport URL
+// Returns (workspacePath, exportName, error)
 // Expected format: https://host/services/apiexport/{workspace-path}/{export-name}/
-func extractAPIExportInfo(hostURL string) (*APIExportInfo, error) {
+func extractAPIExportRef(hostURL string) (string, string, error) {
 	parsedURL, err := url.Parse(hostURL)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse URL: %w", err)
+		return "", "", fmt.Errorf("failed to parse URL: %w", err)
 	}
 
 	// Check if this is an APIExport URL
 	if !strings.HasPrefix(parsedURL.Path, "/services/apiexport/") {
-		return nil, fmt.Errorf("not an APIExport URL: %s", hostURL)
+		return "", "", fmt.Errorf("not an APIExport URL: %s", hostURL)
 	}
 
 	// Split the path and extract workspace path and export name
 	pathParts := strings.Split(strings.Trim(parsedURL.Path, "/"), "/")
 	// Expected: ["services", "apiexport", "{workspace-path}", "{export-name}"]
 	if len(pathParts) < 4 || pathParts[0] != "services" || pathParts[1] != "apiexport" {
-		return nil, fmt.Errorf("invalid APIExport URL format, expected /services/apiexport/{workspace-path}/{export-name}: %s", hostURL)
+		return "", "", fmt.Errorf("invalid APIExport URL format, expected /services/apiexport/{workspace-path}/{export-name}: %s", hostURL)
+	}
+
+	return pathParts[2], pathParts[3], nil
+}
+
+// extractAPIExportInfo extracts workspace path and export name from an APIExport URL
+// Expected format: https://host/services/apiexport/{workspace-path}/{export-name}/
+func extractAPIExportInfo(hostURL string) (*APIExportInfo, error) {
+	workspacePath, exportName, err := extractAPIExportRef(hostURL)
+	if err != nil {
+		return nil, err
 	}
 
 	return &APIExportInfo{
-		WorkspacePath: pathParts[2],
-		ExportName:    pathParts[3],
+		WorkspacePath: workspacePath,
+		ExportName:    exportName,
 	}, nil
 }
 

@@ -83,14 +83,14 @@ func NewKCPManager(
 
 	// Extract workspace path and export name from the original APIExport URL
 	// Fail fast if the URL doesn't contain the required information
-	apiExportInfo, err := extractAPIExportInfo(originalHost)
+	workspacePath, exportName, err := extractAPIExportRef(originalHost)
 	if err != nil {
-		log.Error().Err(err).Str("originalHost", originalHost).Msg("failed to parse APIExport URL - workspace path and export name are required")
+		log.Error().Err(err).Str("originalHost", originalHost).Msg("failed to extract workspace path and export name from APIExport URL")
 		return nil, fmt.Errorf("invalid APIExport URL in kubeconfig: %w", err)
 	}
 
 	// Construct the APIExport URL using the parsed workspace path and export name
-	apiexportURL := fmt.Sprintf("%s/services/apiexport/%s/%s/", baseHost, apiExportInfo.WorkspacePath, apiExportInfo.ExportName)
+	apiexportURL := fmt.Sprintf("%s/services/apiexport/%s/%s", baseHost, workspacePath, exportName)
 
 	log.Info().Str("baseHost", baseHost).Str("apiexportURL", apiexportURL).Msg("Using APIExport URL for multicluster provider")
 	apiexportConfig.Host = apiexportURL
