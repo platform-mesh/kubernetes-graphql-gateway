@@ -58,9 +58,6 @@ func (v *VirtualWorkspaceManager) GetWorkspacePath(workspace VirtualWorkspace) s
 func resolveDefaultWorkspace(appCfg config.Config) string {
 	// Use configuration values for default workspace resolution
 	defaultOrg := appCfg.Url.DefaultKcpWorkspace
-	if defaultOrg == "" {
-		defaultOrg = "default"
-	}
 
 	// If the default workspace already contains ":", use it as-is (full path)
 	if strings.Contains(defaultOrg, ":") {
