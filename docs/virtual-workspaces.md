@@ -14,19 +14,6 @@ virtualWorkspaces:
   # Workspace is resolved dynamically from user request:
   # User request: /virtual-workspace/example/root:orgs:alpha/query
   # → Connects to: /services/apiexport/root/configmaps-view/clusters/root:orgs:alpha/api/v1/configmaps
-- name: production-service
-  url: https://your-kcp-server:6443/services/apiexport/root/your-export
-  kubeconfig: PATH_TO_KCP_KUBECONFIG
-  # User request: /virtual-workspace/production-service/root:orgs:production/query
-  # → Connects to: /services/apiexport/root/your-export/clusters/root:orgs:production/api/v1/resources
-- name: contentconfigurations
-  url: https://your-kcp-server:6443/services/contentconfigurations
-  kubeconfig: PATH_TO_KCP_KUBECONFIG
-  # Workspace is resolved dynamically from user request:
-  # User request: /virtual-workspace/contentconfigurations/root:orgs:alpha/query
-  # → Connects to: /services/contentconfigurations/clusters/root:orgs:alpha/api/v1/configmaps
-  # User request: /virtual-workspace/contentconfigurations/root:orgs:beta/query  
-  # → Connects to: /services/contentconfigurations/clusters/root:orgs:beta/api/v1/configmaps
 ```
 
 ### Configuration Options
@@ -34,7 +21,7 @@ virtualWorkspaces:
 - `virtualWorkspaces`: Array of virtual workspace definitions
   - `name`: Unique identifier for the virtual workspace (used in URL paths)
   - `url`: Full URL to the virtual workspace or API export
-  - `kubeconfig`: Path to KCP kubeconfig for authentication (optional)
+  - `kubeconfig`: Path to KCP kubeconfig
 
 ### Dynamic Workspace Resolution
 

@@ -335,21 +335,21 @@ func (m *KCPManager) resolveWorkspacePath(ctx context.Context, clusterName strin
 	// The clusterClient passed in might not be correctly configured for the specific cluster
 
 	// Create a cluster-specific client using the cluster name/hash
-	clusterPathResolver, err := NewClusterPathResolver(m.mcMgr.GetLocalManager().GetConfig(), m.mcMgr.GetLocalManager().GetScheme())
+	clusterPathResolver, err := NewClusterPathResolver(m.mcMgr.GetLocalManager().GetConfig(), m.mcMgr.GetLocalManager().GetScheme(), m.log)
 	if err != nil {
-		// Fallback to using the provided client
+		// Fallback to using the provided client without logging
 		return PathForCluster(clusterName, clusterClient)
 	}
 
 	// Get a client specifically for this cluster
 	specificClusterClient, err := clusterPathResolver.ClientForCluster(clusterName)
 	if err != nil {
-		// Fallback to using the provided client
+		// Fallback to using the provided client without logging
 		return PathForCluster(clusterName, clusterClient)
 	}
 
-	// Use the cluster-specific client to resolve the workspace path
-	workspacePath, err := PathForCluster(clusterName, specificClusterClient)
+	// Use the cluster-specific client to resolve the workspace path with logger
+	workspacePath, err := clusterPathResolver.PathForCluster(clusterName, specificClusterClient)
 	if err != nil {
 		return clusterName, err
 	}

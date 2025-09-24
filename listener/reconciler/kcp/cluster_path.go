@@ -12,6 +12,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/platform-mesh/golang-commons/logger"
 )
 
 var (
@@ -57,19 +59,24 @@ type ClusterPathResolverProvider struct {
 	*runtime.Scheme
 	*rest.Config
 	clientFactory
+	log *logger.Logger
 }
 
-func NewClusterPathResolver(cfg *rest.Config, scheme *runtime.Scheme) (*ClusterPathResolverProvider, error) {
+func NewClusterPathResolver(cfg *rest.Config, scheme *runtime.Scheme, log *logger.Logger) (*ClusterPathResolverProvider, error) {
 	if cfg == nil {
 		return nil, ErrNilConfig
 	}
 	if scheme == nil {
 		return nil, ErrNilScheme
 	}
+	if log == nil {
+		return nil, fmt.Errorf("logger cannot be nil")
+	}
 	return &ClusterPathResolverProvider{
 		Scheme:        scheme,
 		Config:        cfg,
 		clientFactory: client.New,
+		log:           log,
 	}, nil
 }
 
@@ -81,7 +88,7 @@ func (rf *ClusterPathResolverProvider) ClientForCluster(name string) (client.Cli
 	return rf.clientFactory(clusterConfig, client.Options{Scheme: rf.Scheme})
 }
 
-func PathForCluster(name string, clt client.Client) (string, error) {
+func (rf *ClusterPathResolverProvider) PathForCluster(name string, clt client.Client) (string, error) {
 	if name == "root" {
 		return name, nil
 	}
@@ -90,14 +97,60 @@ func PathForCluster(name string, clt client.Client) (string, error) {
 	lc := &kcpcore.LogicalCluster{}
 	err := clt.Get(context.TODO(), client.ObjectKey{Name: "cluster"}, lc)
 	if err != nil {
-		// If LogicalCluster is not available (e.g., API version mismatch or resource not found),
-		// fall back to using the cluster name directly as workspace path.
-		// This can happen with multicluster-provider where LogicalCluster might not be accessible
-		// or might be in a different API version.
+		rf.log.Debug().
+			Err(err).
+			Str("clusterName", name).
+			Msg("LogicalCluster resource not accessible, using cluster name as fallback")
+		return name, nil
+	}
 
-		// Log the error for debugging but don't fail completely
-		// In many cases, the cluster name itself might be a valid workspace path
-		// or close enough for compatibility with the GraphQL gateway
+	if lc.DeletionTimestamp != nil {
+		// Try to get the workspace name even if the cluster is being deleted
+		// First try the kcp.io/path annotation (most reliable)
+		if lc.Annotations != nil {
+			if path, ok := lc.Annotations["kcp.io/path"]; ok {
+				return path, ErrClusterIsDeleted
+			}
+		}
+		// Fallback to logicalcluster.From()
+		workspaceName := logicalcluster.From(lc).String()
+		if workspaceName != "" {
+			return workspaceName, ErrClusterIsDeleted
+		}
+		return name, ErrClusterIsDeleted
+	}
+
+	// Primary approach: Extract the workspace path from the kcp.io/path annotation
+	// This is the most reliable method as proven by our debug script
+	if lc.Annotations != nil {
+		if path, ok := lc.Annotations["kcp.io/path"]; ok {
+			return path, nil
+		}
+	}
+
+	// Fallback: Use logicalcluster.From() to get the actual workspace name
+	// This is the same approach used by the virtual-workspaces resolver
+	workspaceName := logicalcluster.From(lc).String()
+	if workspaceName != "" {
+		return workspaceName, nil
+	}
+
+	// Final fallback: use cluster name as-is
+	return name, nil
+}
+
+func PathForCluster(name string, clt client.Client) (string, error) {
+	// This is a backward compatibility function that doesn't have logging
+	// For new code, prefer using ClusterPathResolverProvider.PathForCluster method
+	if name == "root" {
+		return name, nil
+	}
+
+	// Try to get LogicalCluster resource to extract workspace path
+	lc := &kcpcore.LogicalCluster{}
+	err := clt.Get(context.TODO(), client.ObjectKey{Name: "cluster"}, lc)
+	if err != nil {
+		// No logging available in this function - use the method version for logging
 		return name, nil
 	}
 

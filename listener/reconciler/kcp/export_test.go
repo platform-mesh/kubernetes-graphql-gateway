@@ -4,6 +4,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/platform-mesh/golang-commons/logger"
 )
 
 // Exported functions for testing private functions
@@ -11,8 +13,8 @@ import (
 // Cluster path exports
 var ConfigForKCPClusterExported = ConfigForKCPCluster
 
-func NewClusterPathResolverExported(cfg *rest.Config, scheme interface{}) (*ClusterPathResolverProvider, error) {
-	return NewClusterPathResolver(cfg, scheme.(*runtime.Scheme))
+func NewClusterPathResolverExported(cfg *rest.Config, scheme interface{}, log *logger.Logger) (*ClusterPathResolverProvider, error) {
+	return NewClusterPathResolver(cfg, scheme.(*runtime.Scheme), log)
 }
 
 func PathForClusterExported(name string, clt client.Client) (string, error) {
@@ -57,10 +59,11 @@ type ExportedDiscoveryFactoryProvider = DiscoveryFactoryProvider
 type ExportedKCPManager = KCPManager
 
 // Helper function to create ClusterPathResolverProvider with custom clientFactory for testing
-func NewClusterPathResolverProviderWithFactory(cfg *rest.Config, scheme *runtime.Scheme, factory func(config *rest.Config, options client.Options) (client.Client, error)) *ClusterPathResolverProvider {
+func NewClusterPathResolverProviderWithFactory(cfg *rest.Config, scheme *runtime.Scheme, log *logger.Logger, factory func(config *rest.Config, options client.Options) (client.Client, error)) *ClusterPathResolverProvider {
 	return &ClusterPathResolverProvider{
 		Scheme:        scheme,
 		Config:        cfg,
 		clientFactory: factory,
+		log:           log,
 	}
 }

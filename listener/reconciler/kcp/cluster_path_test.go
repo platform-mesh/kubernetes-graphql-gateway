@@ -14,6 +14,7 @@ import (
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/platform-mesh/golang-commons/logger/testlogger"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/common/mocks"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler/kcp"
 )
@@ -122,7 +123,7 @@ func TestNewClusterPathResolver(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := kcp.NewClusterPathResolverExported(tt.config, tt.scheme)
+			got, err := kcp.NewClusterPathResolverExported(tt.config, tt.scheme, testlogger.New().Logger)
 
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -176,7 +177,7 @@ func TestClusterPathResolverProvider_ClientForCluster(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			resolver := kcp.NewClusterPathResolverProviderWithFactory(baseConfig, scheme, tt.clientFactory)
+			resolver := kcp.NewClusterPathResolverProviderWithFactory(baseConfig, scheme, testlogger.New().Logger, tt.clientFactory)
 
 			got, err := resolver.ClientForCluster(tt.clusterName)
 
