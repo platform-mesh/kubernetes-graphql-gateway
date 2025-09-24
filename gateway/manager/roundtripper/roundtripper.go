@@ -13,9 +13,6 @@ import (
 	ctxkeys "github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/context"
 )
 
-// Legacy export for backward compatibility
-type TokenKey = ctxkeys.TokenCtxKey
-
 type roundTripper struct {
 	log                     *logger.Logger
 	adminRT, unauthorizedRT http.RoundTripper

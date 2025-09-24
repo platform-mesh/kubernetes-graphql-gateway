@@ -38,41 +38,22 @@ virtualWorkspaces:
 
 ### Dynamic Workspace Resolution
 
-Virtual workspaces now use **dynamic workspace resolution** instead of static configuration:
+Virtual workspaces use **dynamic workspace resolution**:
+- Workspace is extracted from the GraphQL request URL at runtime
+- Each request can target different workspaces: `/virtual-workspace/contentconfigurations/root:orgs:alpha/query`
+- No need to predefine target workspaces in configuration
 
-- **Runtime Resolution**: The workspace is extracted from the user's GraphQL request URL at runtime
-- **Request-based**: Each user request can target a different workspace by specifying it in the URL
-- **Example**: `/virtual-workspace/contentconfigurations/root:orgs:alpha/query` → targets `root:orgs:alpha`
-- **Flexible**: Different users can access different organizations through the same virtual workspace configuration
-- **No Static Config**: No need to predefine target workspaces in the configuration file
-
-## Global Configuration
-
-The following environment variables or configuration options control the default workspace resolution:
-
-- `GATEWAY_URL_DEFAULT_KCP_WORKSPACE` (default: "default"): The default organization name
-- `GATEWAY_URL_KCP_WORKSPACE_PATTERN` (default: "root:orgs:{org}"): The pattern for building workspace paths
-
-### Environment Variables
-
-Set the configuration path using:
+## Environment Variables
 
 ```bash
-export VIRTUAL_WORKSPACES_CONFIG_PATH="./bin/virtual-workspaces/config.yaml"
-```
+# Virtual workspaces configuration file path
+export VIRTUAL_WORKSPACES_CONFIG_PATH="./config/virtual-workspaces.yaml"
 
-Set the default organization:
+# Default workspace for schema generation (default: "root")  
+export GATEWAY_URL_DEFAULT_KCP_WORKSPACE="root"
 
-```bash
-export GATEWAY_URL_DEFAULT_KCP_WORKSPACE="production"
-```
-
-Customize the workspace pattern (for different hierarchies):
-
-```bash
-export GATEWAY_URL_KCP_WORKSPACE_PATTERN="root:organizations:{org}"
-# or for a flat structure:
-export GATEWAY_URL_KCP_WORKSPACE_PATTERN="root:{org}"
+# Workspace pattern for building full paths (default: "root:orgs:{org}")
+export GATEWAY_URL_KCP_WORKSPACE_PATTERN="root:orgs:{org}"
 ```
 
 ## URL Pattern

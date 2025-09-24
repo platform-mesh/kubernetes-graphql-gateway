@@ -54,46 +54,6 @@ func (v *VirtualWorkspaceManager) GetWorkspacePath(workspace VirtualWorkspace) s
 	return fmt.Sprintf("%s/%s", v.appCfg.Url.VirtualWorkspacePrefix, workspace.Name)
 }
 
-// extractWorkspaceFromKubeconfig extracts the workspace path from kubeconfig server URL
-// This implements KCP-native workspace resolution similar to kcp/cli/pkg/helpers/helpers.go
-func extractWorkspaceFromKubeconfig(kubeconfigPath string) (string, error) {
-	if kubeconfigPath == "" {
-		return "", fmt.Errorf("kubeconfig path is empty")
-	}
-
-	cfg, err := clientcmd.LoadFromFile(kubeconfigPath)
-	if err != nil {
-		return "", fmt.Errorf("failed to load kubeconfig %s: %w", kubeconfigPath, err)
-	}
-
-	restConfig, err := clientcmd.NewDefaultClientConfig(*cfg, &clientcmd.ConfigOverrides{}).ClientConfig()
-	if err != nil {
-		return "", fmt.Errorf("failed to create client config from kubeconfig %s: %w", kubeconfigPath, err)
-	}
-
-	return parseWorkspaceFromServerURL(restConfig.Host)
-}
-
-// parseWorkspaceFromServerURL extracts workspace path from KCP server URL
-// Based on kcp/cli/pkg/helpers/ParseClusterURL function
-func parseWorkspaceFromServerURL(serverURL string) (string, error) {
-	u, err := url.Parse(serverURL)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse server URL %s: %w", serverURL, err)
-	}
-
-	prefix := "/clusters/"
-	if clusterIndex := strings.Index(u.Path, prefix); clusterIndex >= 0 {
-		workspacePath := strings.SplitN(u.Path[clusterIndex+len(prefix):], "/", 2)[0]
-		if workspacePath == "" {
-			return "", fmt.Errorf("empty workspace path in URL: %s", serverURL)
-		}
-		return workspacePath, nil
-	}
-
-	return "", fmt.Errorf("server URL %s is not pointing to a workspace (missing /clusters/ path)", serverURL)
-}
-
 // resolveDefaultWorkspace resolves the default workspace using configuration
 func resolveDefaultWorkspace(appCfg config.Config) string {
 	// Use configuration values for default workspace resolution
@@ -107,14 +67,8 @@ func resolveDefaultWorkspace(appCfg config.Config) string {
 		return defaultOrg
 	}
 
-	// Otherwise, build the workspace path using the pattern
-	pattern := appCfg.Url.KcpWorkspacePattern
-	if pattern == "" {
-		pattern = "root:orgs:{org}"
-	}
-
 	// Replace {org} placeholder with the organization name
-	return strings.ReplaceAll(pattern, "{org}", defaultOrg)
+	return strings.ReplaceAll(appCfg.Url.KcpWorkspacePattern, "{org}", defaultOrg)
 }
 
 // createVirtualConfig creates a REST config for a virtual workspace with a specific target workspace

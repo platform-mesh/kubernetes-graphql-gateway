@@ -78,6 +78,7 @@ func initConfig() {
 	// Gateway URL
 	v.SetDefault("gateway-url-virtual-workspace-prefix", "virtual-workspace")
 	v.SetDefault("gateway-url-default-kcp-workspace", "root")
+	v.SetDefault("gateway-url-kcp-workspace-pattern", "root:orgs:{org}")
 	v.SetDefault("gateway-url-graphql-suffix", "graphql")
 }
 

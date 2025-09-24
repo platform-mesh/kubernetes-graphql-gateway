@@ -2,7 +2,6 @@ package targetcluster
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -18,16 +17,6 @@ import (
 	appConfig "github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
 	ctxkeys "github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/context"
 )
-
-// WithClusterName stores a logical cluster name in the context
-func WithClusterName(ctx context.Context, name logicalcluster.Name) context.Context {
-	return ctxkeys.WithClusterName(ctx, name)
-}
-
-// ClusterNameFromContext retrieves a logical cluster name from the context
-func ClusterNameFromContext(ctx context.Context) (logicalcluster.Name, bool) {
-	return ctxkeys.ClusterNameFromContext(ctx)
-}
 
 // GraphQLHandler wraps a GraphQL schema and HTTP handler
 type GraphQLHandler struct {
@@ -72,8 +61,8 @@ func SetContexts(r *http.Request, workspace, token string, enableKcp bool) *http
 		if kcpWorkspace, ok := ctxkeys.KcpWorkspaceFromContext(r.Context()); ok && kcpWorkspace != "" {
 			kcpWorkspaceName = kcpWorkspace
 		}
-		// Store the logical cluster name in context using the helper function
-		r = r.WithContext(WithClusterName(r.Context(), logicalcluster.Name(kcpWorkspaceName)))
+		// Store the logical cluster name in context
+		r = r.WithContext(ctxkeys.WithClusterName(r.Context(), logicalcluster.Name(kcpWorkspaceName)))
 	}
 	return r.WithContext(ctxkeys.WithToken(r.Context(), token))
 }
