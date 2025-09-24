@@ -11,6 +11,8 @@ virtualWorkspaces:
 - name: example
   url: https://192.168.1.118:6443/services/apiexport/root/configmaps-view
   kubeconfig: PATH_TO_KCP_KUBECONFIG
+  # The URL must contain both workspace path and export name
+  # Format: /services/apiexport/{workspace-path}/{export-name}
   # Workspace is resolved dynamically from user request:
   # User request: /virtual-workspace/example/root:orgs:alpha/query
   # → Connects to: /services/apiexport/root/configmaps-view/clusters/root:orgs:alpha/api/v1/configmaps

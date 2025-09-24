@@ -80,15 +80,15 @@ func NewClusterPathResolver(cfg *rest.Config, scheme *runtime.Scheme, log *logge
 	}, nil
 }
 
-func (rf *ClusterPathResolverProvider) ClientForCluster(name string) (client.Client, error) {
-	clusterConfig, err := ConfigForKCPCluster(name, rf.Config)
+func (cp *ClusterPathResolverProvider) ClientForCluster(name string) (client.Client, error) {
+	clusterConfig, err := ConfigForKCPCluster(name, cp.Config)
 	if err != nil {
 		return nil, errors.Join(ErrGetClusterConfig, err)
 	}
-	return rf.clientFactory(clusterConfig, client.Options{Scheme: rf.Scheme})
+	return cp.clientFactory(clusterConfig, client.Options{Scheme: cp.Scheme})
 }
 
-func (rf *ClusterPathResolverProvider) PathForCluster(name string, clt client.Client) (string, error) {
+func (cp *ClusterPathResolverProvider) PathForCluster(name string, clt client.Client) (string, error) {
 	if name == "root" {
 		return name, nil
 	}
@@ -97,7 +97,7 @@ func (rf *ClusterPathResolverProvider) PathForCluster(name string, clt client.Cl
 	lc := &kcpcore.LogicalCluster{}
 	err := clt.Get(context.TODO(), client.ObjectKey{Name: "cluster"}, lc)
 	if err != nil {
-		rf.log.Debug().
+		cp.log.Debug().
 			Err(err).
 			Str("clusterName", name).
 			Msg("LogicalCluster resource not accessible, using cluster name as fallback")
@@ -181,11 +181,14 @@ func PathForClusterFromConfig(clusterName string, cfg *rest.Config) (string, err
 
 	// Check for virtual workspace patterns
 	if strings.HasPrefix(parsedURL.Path, "/services/apiexport/") {
-		// Pattern: /services/apiexport/{cluster-hash}/{export-name}
-		if hash := extractClusterHashFromAPIExportURL(parsedURL.String()); hash != "" {
-			// Return the cluster hash as an identifier (callers must treat it as an identifier, not a workspace path).
-			return hash, nil
+		// Pattern: /services/apiexport/{workspace-path}/{export-name}
+		apiExportInfo, err := extractAPIExportInfo(parsedURL.String())
+		if err != nil {
+			// Return error if we can't parse the APIExport URL properly
+			return "", fmt.Errorf("failed to parse APIExport URL: %w", err)
 		}
+		// Return the workspace path from the parsed APIExport URL
+		return apiExportInfo.WorkspacePath, nil
 	}
 
 	// If we can't extract meaningful cluster identifier, fall back to cluster name

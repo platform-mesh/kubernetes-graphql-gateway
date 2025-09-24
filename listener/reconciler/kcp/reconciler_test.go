@@ -35,7 +35,7 @@ func createTestScheme() *runtime.Scheme {
 
 func createTestReconcilerOpts() reconciler.ReconcilerOpts {
 	return reconciler.ReconcilerOpts{
-		Config: &rest.Config{Host: "https://kcp.example.com"},
+		Config: &rest.Config{Host: "https://kcp.example.com/services/apiexport/root/core.platform-mesh.io"},
 		Scheme: createTestScheme(),
 		ManagerOpts: ctrl.Options{
 			Metrics: server.Options{BindAddress: "0"},
@@ -86,7 +86,7 @@ func TestNewKCPManager(t *testing.T) {
 			name:   "nil_scheme",
 			appCfg: config.Config{OpenApiDefinitionsPath: t.TempDir()},
 			opts: reconciler.ReconcilerOpts{
-				Config:      &rest.Config{Host: "https://kcp.example.com"},
+				Config:      &rest.Config{Host: "https://kcp.example.com/services/apiexport/root/core.platform-mesh.io"},
 				Scheme:      nil,
 				ManagerOpts: ctrl.Options{Metrics: server.Options{BindAddress: "0"}},
 			},

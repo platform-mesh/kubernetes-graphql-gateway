@@ -77,7 +77,7 @@ func TestVirtualWorkspaceManager_GetWorkspacePath(t *testing.T) {
 			prefix: "virtual-workspace",
 			workspace: VirtualWorkspace{
 				Name: "test-workspace",
-				URL:  "https://example.com",
+				URL:  "https://example.com/services/apiexport/root/configmaps-view",
 			},
 			expectedPath: "virtual-workspace/test-workspace",
 		},
@@ -86,7 +86,7 @@ func TestVirtualWorkspaceManager_GetWorkspacePath(t *testing.T) {
 			prefix: "vw",
 			workspace: VirtualWorkspace{
 				Name: "test-workspace_123.domain",
-				URL:  "https://example.com",
+				URL:  "https://example.com/services/apiexport/root/configmaps-view",
 			},
 			expectedPath: "vw/test-workspace_123.domain",
 		},
@@ -95,7 +95,7 @@ func TestVirtualWorkspaceManager_GetWorkspacePath(t *testing.T) {
 			prefix: "",
 			workspace: VirtualWorkspace{
 				Name: "test-workspace",
-				URL:  "https://example.com",
+				URL:  "https://example.com/services/apiexport/root/configmaps-view",
 			},
 			expectedPath: "/test-workspace",
 		},
@@ -125,7 +125,7 @@ func TestCreateVirtualConfig(t *testing.T) {
 			name: "valid_workspace_without_kubeconfig",
 			workspace: VirtualWorkspace{
 				Name: "test-workspace",
-				URL:  "https://example.com",
+				URL:  "https://example.com/services/apiexport/root/configmaps-view",
 			},
 			expectError: false,
 		},
@@ -240,7 +240,7 @@ func TestVirtualWorkspaceManager_CreateDiscoveryClient(t *testing.T) {
 			name: "valid_workspace",
 			workspace: VirtualWorkspace{
 				Name: "test-workspace",
-				URL:  "https://example.com",
+				URL:  "https://example.com/services/apiexport/root/configmaps-view",
 			},
 			expectError: false,
 		},
@@ -325,7 +325,7 @@ func TestVirtualWorkspaceManager_CreateRESTConfig(t *testing.T) {
 			name: "valid_workspace",
 			workspace: VirtualWorkspace{
 				Name: "test-workspace",
-				URL:  "https://example.com",
+				URL:  "https://example.com/services/apiexport/root/configmaps-view",
 			},
 			expectError: false,
 		},
@@ -427,7 +427,7 @@ func TestVirtualWorkspaceManager_LoadConfig(t *testing.T) {
 			configContent: `
 virtualWorkspaces:
   - name: "test-workspace"
-    url: "https://example.com"
+    url: "https://example.com/services/apiexport/root/configmaps-view"
 `,
 			expectError:   false,
 			expectedCount: 1,
@@ -438,7 +438,7 @@ virtualWorkspaces:
 			configContent: `
 virtualWorkspaces:
   - name: "workspace1"
-    url: "https://example.com"
+    url: "https://example.com/services/apiexport/root/configmaps-view"
   - name: "workspace2"
     url: "https://example.org"
     kubeconfig: "/path/to/kubeconfig"
@@ -452,7 +452,7 @@ virtualWorkspaces:
 			configContent: `
 virtualWorkspaces:
   - name: "test-workspace"
-    url: "https://example.com"
+    url: "https://example.com/services/apiexport/root/configmaps-view"
   invalid yaml content
 `,
 			expectError: true,
@@ -584,7 +584,7 @@ func TestVirtualWorkspaceReconciler_ReconcileConfig_Simple(t *testing.T) {
 			initialWorkspaces: make(map[string]VirtualWorkspace),
 			newConfig: &VirtualWorkspacesConfig{
 				VirtualWorkspaces: []VirtualWorkspace{
-					{Name: "new-ws", URL: "https://example.com"},
+					{Name: "new-ws", URL: "https://example.com/services/apiexport/root/configmaps-view"},
 				},
 			},
 			expectCurrentCount: 1,
@@ -661,7 +661,7 @@ func TestVirtualWorkspaceReconciler_ProcessVirtualWorkspace(t *testing.T) {
 			name: "successful_processing",
 			workspace: VirtualWorkspace{
 				Name: "test-ws",
-				URL:  "https://example.com",
+				URL:  "https://example.com/services/apiexport/root/configmaps-view",
 			},
 			expectError:        true, // Expected due to kubeconfig dependency in metadata injection
 			expectedWriteCalls: 0,    // Won't reach write due to metadata injection failure
@@ -671,7 +671,7 @@ func TestVirtualWorkspaceReconciler_ProcessVirtualWorkspace(t *testing.T) {
 			name: "io_write_error",
 			workspace: VirtualWorkspace{
 				Name: "test-ws",
-				URL:  "https://example.com",
+				URL:  "https://example.com/services/apiexport/root/configmaps-view",
 			},
 			ioWriteError:       errors.New("write failed"),
 			expectError:        true, // Expected due to kubeconfig dependency in metadata injection
@@ -682,7 +682,7 @@ func TestVirtualWorkspaceReconciler_ProcessVirtualWorkspace(t *testing.T) {
 			name: "api_resolve_error",
 			workspace: VirtualWorkspace{
 				Name: "test-ws",
-				URL:  "https://example.com",
+				URL:  "https://example.com/services/apiexport/root/configmaps-view",
 			},
 			apiResolveError:    errors.New("resolve failed"),
 			expectError:        true,
@@ -705,6 +705,8 @@ func TestVirtualWorkspaceReconciler_ProcessVirtualWorkspace(t *testing.T) {
 
 			appCfg := config.Config{}
 			appCfg.Url.VirtualWorkspacePrefix = "virtual-workspace"
+			appCfg.Url.DefaultKcpWorkspace = "root"
+			appCfg.Url.KcpWorkspacePattern = "root:orgs:{org}"
 
 			manager := NewVirtualWorkspaceManager(appCfg)
 

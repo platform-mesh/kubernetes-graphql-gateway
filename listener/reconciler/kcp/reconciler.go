@@ -81,16 +81,16 @@ func NewKCPManager(
 		Str("baseHost", baseHost).
 		Msg("Extracted base KCP host from kubeconfig")
 
-	// Construct the APIExport URL for multicluster-provider discovery
-	// We need to extract the cluster hash from the original APIExport URL if present
-	clusterHash := extractClusterHashFromAPIExportURL(originalHost)
-	if clusterHash == "" {
-		// Fallback to a known cluster hash - this should be made configurable
-		clusterHash = "1mx3340lwq4c8kkw"
-		log.Warn().Str("fallbackHash", clusterHash).Msg("Could not extract cluster hash from kubeconfig, using fallback")
+	// Extract workspace path and export name from the original APIExport URL
+	// Fail fast if the URL doesn't contain the required information
+	apiExportInfo, err := extractAPIExportInfo(originalHost)
+	if err != nil {
+		log.Error().Err(err).Str("originalHost", originalHost).Msg("failed to parse APIExport URL - workspace path and export name are required")
+		return nil, fmt.Errorf("invalid APIExport URL in kubeconfig: %w", err)
 	}
 
-	apiexportURL := fmt.Sprintf("%s/services/apiexport/%s/core.platform-mesh.io/", baseHost, clusterHash)
+	// Construct the APIExport URL using the parsed workspace path and export name
+	apiexportURL := fmt.Sprintf("%s/services/apiexport/%s/%s/", baseHost, apiExportInfo.WorkspacePath, apiExportInfo.ExportName)
 
 	log.Info().Str("baseHost", baseHost).Str("apiexportURL", apiexportURL).Msg("Using APIExport URL for multicluster provider")
 	apiexportConfig.Host = apiexportURL
