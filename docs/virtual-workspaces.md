@@ -11,19 +11,18 @@ virtualWorkspaces:
 - name: example
   url: https://192.168.1.118:6443/services/apiexport/root/configmaps-view
   kubeconfig: PATH_TO_KCP_KUBECONFIG
-  targetWorkspace: root:orgs:default  # Explicit full workspace path
+  # Workspace is resolved dynamically from user request:
+  # User request: /virtual-workspace/example/root:orgs:alpha/query
+  # → Connects to: /services/apiexport/root/configmaps-view/clusters/root:orgs:alpha/api/v1/configmaps
 - name: production-service
   url: https://your-kcp-server:6443/services/apiexport/root/your-export
   kubeconfig: PATH_TO_KCP_KUBECONFIG
-  targetWorkspace: root:orgs:production  # Different organization
-- name: team-service
-  url: https://your-kcp-server:6443/services/apiexport/root/team-export
-  kubeconfig: PATH_TO_KCP_KUBECONFIG
-  targetWorkspace: root:orgs:team-a  # Team-specific organization
+  # User request: /virtual-workspace/production-service/root:orgs:production/query
+  # → Connects to: /services/apiexport/root/your-export/clusters/root:orgs:production/api/v1/resources
 - name: contentconfigurations
   url: https://your-kcp-server:6443/services/contentconfigurations
   kubeconfig: PATH_TO_KCP_KUBECONFIG
-  # No targetWorkspace specified - workspace is resolved dynamically from user request:
+  # Workspace is resolved dynamically from user request:
   # User request: /virtual-workspace/contentconfigurations/root:orgs:alpha/query
   # → Connects to: /services/contentconfigurations/clusters/root:orgs:alpha/api/v1/configmaps
   # User request: /virtual-workspace/contentconfigurations/root:orgs:beta/query  
@@ -35,16 +34,19 @@ virtualWorkspaces:
 - `virtualWorkspaces`: Array of virtual workspace definitions
   - `name`: Unique identifier for the virtual workspace (used in URL paths)
   - `url`: Full URL to the virtual workspace or API export
-  - `kubeconfig`: path to kcp kubeconfig
-  - `targetWorkspace`: **REMOVED** - No longer supported. Workspace is now resolved dynamically from user requests.
-  - **Dynamic Resolution**: The workspace is extracted from the user's GraphQL request URL at runtime
-  - **Request-based**: Each user request can target a different workspace by specifying it in the URL
-  - **Example**: `/virtual-workspace/contentconfigurations/root:orgs:alpha/query` → targets `root:orgs:alpha`
-  - **Flexible**: Different users can access different organizations through the same virtual workspace configuration
+  - `kubeconfig`: Path to KCP kubeconfig for authentication (optional)
 
-## Configuration Options
+### Dynamic Workspace Resolution
 
-### Global Configuration
+Virtual workspaces now use **dynamic workspace resolution** instead of static configuration:
+
+- **Runtime Resolution**: The workspace is extracted from the user's GraphQL request URL at runtime
+- **Request-based**: Each user request can target a different workspace by specifying it in the URL
+- **Example**: `/virtual-workspace/contentconfigurations/root:orgs:alpha/query` → targets `root:orgs:alpha`
+- **Flexible**: Different users can access different organizations through the same virtual workspace configuration
+- **No Static Config**: No need to predefine target workspaces in the configuration file
+
+## Global Configuration
 
 The following environment variables or configuration options control the default workspace resolution:
 

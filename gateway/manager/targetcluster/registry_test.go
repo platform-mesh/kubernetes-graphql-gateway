@@ -1,13 +1,12 @@
 package targetcluster
 
 import (
-	"context"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/platform-mesh/golang-commons/logger/testlogger"
 	appConfig "github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/roundtripper"
+	ctxkeys "github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/context"
 )
 
 func TestExtractClusterNameWithKCPWorkspace(t *testing.T) {
@@ -212,7 +211,7 @@ func TestExtractClusterNameWithKCPWorkspace(t *testing.T) {
 			}
 
 			// Check KCP workspace in context - use the modified request returned by extractClusterName
-			if kcpWorkspace, ok := modifiedReq.Context().Value(kcpWorkspaceKey).(string); ok {
+			if kcpWorkspace, ok := ctxkeys.KcpWorkspaceFromContext(modifiedReq.Context()); ok {
 				if kcpWorkspace != tt.expectedKCPWorkspace {
 					t.Errorf("KCP workspace in context = %v, want %v", kcpWorkspace, tt.expectedKCPWorkspace)
 				}
@@ -266,7 +265,7 @@ func TestSetContextsWithKCPWorkspace(t *testing.T) {
 			// Create a test request with KCP workspace in context if provided
 			req := httptest.NewRequest("GET", "/test", nil)
 			if tt.contextKCPWorkspace != "" {
-				req = req.WithContext(context.WithValue(req.Context(), kcpWorkspaceKey, tt.contextKCPWorkspace))
+				req = req.WithContext(ctxkeys.WithKcpWorkspace(req.Context(), tt.contextKCPWorkspace))
 			}
 
 			// Call SetContexts
@@ -279,7 +278,7 @@ func TestSetContextsWithKCPWorkspace(t *testing.T) {
 			}
 
 			// Verify token context is set
-			if token, ok := resultReq.Context().Value(roundtripper.TokenKey{}).(string); ok {
+			if token, ok := ctxkeys.TokenFromContext(resultReq.Context()); ok {
 				if token != "test-token" {
 					t.Errorf("Token in context = %v, want %v", token, "test-token")
 				}

@@ -16,21 +16,17 @@ import (
 	"github.com/platform-mesh/golang-commons/logger"
 
 	appConfig "github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/roundtripper"
+	ctxkeys "github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/context"
 )
-
-// clusterNameCtxKey is a private context key type to avoid collisions
-type clusterNameCtxKey struct{}
 
 // WithClusterName stores a logical cluster name in the context
 func WithClusterName(ctx context.Context, name logicalcluster.Name) context.Context {
-	return context.WithValue(ctx, clusterNameCtxKey{}, name)
+	return ctxkeys.WithClusterName(ctx, name)
 }
 
 // ClusterNameFromContext retrieves a logical cluster name from the context
 func ClusterNameFromContext(ctx context.Context) (logicalcluster.Name, bool) {
-	name, ok := ctx.Value(clusterNameCtxKey{}).(logicalcluster.Name)
-	return name, ok
+	return ctxkeys.ClusterNameFromContext(ctx)
 }
 
 // GraphQLHandler wraps a GraphQL schema and HTTP handler
@@ -73,13 +69,13 @@ func SetContexts(r *http.Request, workspace, token string, enableKcp bool) *http
 		// For virtual workspaces, the multicluster-runtime will handle cluster context
 		// We just need to store the workspace name in the context for potential future use
 		kcpWorkspaceName := workspace
-		if kcpWorkspace, ok := r.Context().Value(kcpWorkspaceKey).(string); ok && kcpWorkspace != "" {
+		if kcpWorkspace, ok := ctxkeys.KcpWorkspaceFromContext(r.Context()); ok && kcpWorkspace != "" {
 			kcpWorkspaceName = kcpWorkspace
 		}
 		// Store the logical cluster name in context using the helper function
 		r = r.WithContext(WithClusterName(r.Context(), logicalcluster.Name(kcpWorkspaceName)))
 	}
-	return r.WithContext(context.WithValue(r.Context(), roundtripper.TokenKey{}, token))
+	return r.WithContext(ctxkeys.WithToken(r.Context(), token))
 }
 
 // GetToken extracts the token from the request Authorization header

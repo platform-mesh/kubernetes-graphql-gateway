@@ -15,7 +15,7 @@ import (
 	"github.com/platform-mesh/golang-commons/logger/testlogger"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/common"
 	appConfig "github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/roundtripper"
+	ctxkeys "github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/context"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/targetcluster"
 )
 
@@ -189,7 +189,7 @@ func TestSetContexts(t *testing.T) {
 			result := targetcluster.SetContexts(req, tt.workspace, tt.token, tt.enableKcp)
 
 			// Check token context
-			tokenFromCtx := result.Context().Value(roundtripper.TokenKey{})
+			tokenFromCtx, _ := ctxkeys.TokenFromContext(result.Context())
 			if tokenFromCtx != tt.token {
 				t.Errorf("expected token %q in context, got %q", tt.token, tokenFromCtx)
 			}

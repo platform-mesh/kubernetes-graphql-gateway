@@ -10,15 +10,11 @@ import (
 	"k8s.io/client-go/transport"
 
 	"github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
+	ctxkeys "github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/context"
 )
 
-type TokenKey struct{}
-
-// contextKey is a custom type for context keys to avoid collisions
-type contextKey string
-
-// kcpWorkspaceKey is the context key for storing KCP workspace information
-const kcpWorkspaceKey contextKey = "kcpWorkspace"
+// Legacy export for backward compatibility
+type TokenKey = ctxkeys.TokenCtxKey
 
 type roundTripper struct {
 	log                     *logger.Logger
@@ -68,7 +64,7 @@ func (rt *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 		return rt.adminRT.RoundTrip(req)
 	}
 
-	token, ok := req.Context().Value(TokenKey{}).(string)
+	token, ok := ctxkeys.TokenFromContext(req.Context())
 	if !ok || token == "" {
 		rt.log.Error().Str("path", req.URL.Path).Msg("No token found for resource request, denying")
 		return rt.unauthorizedRT.RoundTrip(req)
@@ -166,8 +162,8 @@ func isDiscoveryRequest(req *http.Request) bool {
 // handleVirtualWorkspaceURL modifies the request URL for virtual workspace requests
 // to include the workspace from the request context
 func (rt *roundTripper) handleVirtualWorkspaceURL(req *http.Request) *http.Request {
-	// Check if this is a virtual workspace request by looking for kcpWorkspaceKey in context
-	kcpWorkspace, ok := req.Context().Value(kcpWorkspaceKey).(string)
+	// Check if this is a virtual workspace request by looking for KCP workspace in context
+	kcpWorkspace, ok := ctxkeys.KcpWorkspaceFromContext(req.Context())
 	if !ok || kcpWorkspace == "" {
 		// Not a virtual workspace request, return as-is
 		return req

@@ -12,15 +12,9 @@ import (
 
 	"github.com/platform-mesh/golang-commons/logger"
 	appConfig "github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/roundtripper"
+	ctxkeys "github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/context"
 	"k8s.io/client-go/rest"
 )
-
-// contextKey is a custom type for context keys to avoid collisions
-type contextKey string
-
-// kcpWorkspaceKey is the context key for storing KCP workspace information
-const kcpWorkspaceKey contextKey = "kcpWorkspace"
 
 // RoundTripperFactory creates HTTP round trippers for authentication
 type RoundTripperFactory func(http.RoundTripper, rest.TLSClientConfig) http.RoundTripper
@@ -279,7 +273,7 @@ func (cr *ClusterRegistry) validateToken(ctx context.Context, token string, clus
 
 	// Set the token in the request context so the roundtripper can use it
 	// This leverages the same authentication logic as normal requests
-	req = req.WithContext(context.WithValue(req.Context(), roundtripper.TokenKey{}, token))
+	req = req.WithContext(ctxkeys.WithToken(req.Context(), token))
 
 	cr.log.Debug().Str("cluster", cluster.name).Str("url", apiURL).Msg("Making token validation request")
 
@@ -331,7 +325,7 @@ func (cr *ClusterRegistry) extractClusterName(w http.ResponseWriter, r *http.Req
 
 	// Store the KCP workspace name in the request context if present
 	if kcpWorkspace != "" {
-		r = r.WithContext(context.WithValue(r.Context(), kcpWorkspaceKey, kcpWorkspace))
+		r = r.WithContext(ctxkeys.WithKcpWorkspace(r.Context(), kcpWorkspace))
 	}
 
 	return clusterName, r, true
