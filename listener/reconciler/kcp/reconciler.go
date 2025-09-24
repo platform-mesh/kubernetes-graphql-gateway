@@ -37,6 +37,7 @@ type KCPManager struct {
 	configWatcher              *ConfigWatcher
 	log                        *logger.Logger
 	manager                    ctrl.Manager // Local controller-runtime manager
+	clusterPathResolver        *ClusterPathResolverProvider
 }
 
 func NewKCPManager(
@@ -124,6 +125,13 @@ func NewKCPManager(
 		return nil, err
 	}
 
+	// Create cluster path resolver for workspace path resolution
+	clusterPathResolver, err := NewClusterPathResolver(mcMgr.GetLocalManager().GetConfig(), mcMgr.GetLocalManager().GetScheme(), log)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to create cluster path resolver")
+		return nil, err
+	}
+
 	managerInstance := &KCPManager{
 		mcMgr:                      mcMgr,
 		provider:                   provider,
@@ -133,6 +141,7 @@ func NewKCPManager(
 		configWatcher:              configWatcher,
 		log:                        log,
 		manager:                    mcMgr.GetLocalManager(), // Use the local manager directly
+		clusterPathResolver:        clusterPathResolver,
 	}
 
 	log.Info().Msg("Successfully configured KCP manager with multicluster-provider")
@@ -334,22 +343,15 @@ func (m *KCPManager) resolveWorkspacePath(ctx context.Context, clusterName strin
 	// For multicluster-provider, we need to create a client that connects directly to the cluster hash
 	// The clusterClient passed in might not be correctly configured for the specific cluster
 
-	// Create a cluster-specific client using the cluster name/hash
-	clusterPathResolver, err := NewClusterPathResolver(m.mcMgr.GetLocalManager().GetConfig(), m.mcMgr.GetLocalManager().GetScheme(), m.log)
+	// Get a client specifically for this cluster using the pre-initialized resolver
+	specificClusterClient, err := m.clusterPathResolver.ClientForCluster(clusterName)
 	if err != nil {
-		// Fallback to using the provided client without logging
-		return PathForCluster(clusterName, clusterClient)
-	}
-
-	// Get a client specifically for this cluster
-	specificClusterClient, err := clusterPathResolver.ClientForCluster(clusterName)
-	if err != nil {
-		// Fallback to using the provided client without logging
-		return PathForCluster(clusterName, clusterClient)
+		// Use the resolver with the provided client as fallback
+		return m.clusterPathResolver.PathForCluster(clusterName, clusterClient)
 	}
 
 	// Use the cluster-specific client to resolve the workspace path with logger
-	workspacePath, err := clusterPathResolver.PathForCluster(clusterName, specificClusterClient)
+	workspacePath, err := m.clusterPathResolver.PathForCluster(clusterName, specificClusterClient)
 	if err != nil {
 		return clusterName, err
 	}

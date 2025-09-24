@@ -139,64 +139,6 @@ func (rf *ClusterPathResolverProvider) PathForCluster(name string, clt client.Cl
 	return name, nil
 }
 
-func PathForCluster(name string, clt client.Client) (string, error) {
-	// This is a backward compatibility function that doesn't have logging
-	// For new code, prefer using ClusterPathResolverProvider.PathForCluster method
-	if name == "root" {
-		return name, nil
-	}
-
-	// Try to get LogicalCluster resource to extract workspace path
-	lc := &kcpcore.LogicalCluster{}
-	err := clt.Get(context.TODO(), client.ObjectKey{Name: "cluster"}, lc)
-	if err != nil {
-		// No logging available in this function - use the method version for logging
-		return name, nil
-	}
-
-	if lc.DeletionTimestamp != nil {
-		// Try to get the workspace name even if the cluster is being deleted
-		// First try the kcp.io/path annotation (most reliable)
-		if lc.Annotations != nil {
-			if path, ok := lc.Annotations["kcp.io/path"]; ok {
-				return path, ErrClusterIsDeleted
-			}
-		}
-		// Fallback to logicalcluster.From()
-		workspaceName := logicalcluster.From(lc).String()
-		if workspaceName != "" {
-			return workspaceName, ErrClusterIsDeleted
-		}
-		return name, ErrClusterIsDeleted
-	}
-
-	// Primary approach: Extract the workspace path from the kcp.io/path annotation
-	// This is the most reliable method as proven by our debug script
-	if lc.Annotations != nil {
-		if path, ok := lc.Annotations["kcp.io/path"]; ok {
-			return path, nil
-		}
-	}
-
-	// Fallback: Use logicalcluster.From() to get the actual workspace name
-	// This is the same approach used by the virtual-workspaces resolver
-	workspaceName := logicalcluster.From(lc).String()
-	if workspaceName != "" {
-		return workspaceName, nil
-	}
-
-	// Final fallback: use cluster name as-is
-	return name, nil
-}
-
-// PathForClusterFromWorkspaces is kept for backward compatibility and testing
-// but is no longer the primary resolution method
-func PathForClusterFromWorkspaces(clusterHash string, clt client.Client) (string, error) {
-	// This function is now deprecated in favor of the direct LogicalCluster approach
-	// but we keep it for testing purposes
-	return PathForCluster(clusterHash, clt)
-}
-
 // PathForClusterFromConfig attempts to extract cluster identifier from cluster configuration
 // Returns either a workspace path or cluster hash depending on the URL type.
 // This is an alternative approach when LogicalCluster resource is not accessible.
