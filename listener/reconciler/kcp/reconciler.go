@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"math/rand"
 	"strings"
 	"time"
 
@@ -22,6 +23,14 @@ import (
 	mcbuilder "sigs.k8s.io/multicluster-runtime/pkg/builder"
 	mcmanager "sigs.k8s.io/multicluster-runtime/pkg/manager"
 	mcreconcile "sigs.k8s.io/multicluster-runtime/pkg/reconcile"
+)
+
+// Exponential backoff configuration
+const (
+	initialDelay  = 1 * time.Second
+	maxDelay      = 60 * time.Second
+	backoffFactor = 2.0
+	jitterFactor  = 0.1
 )
 
 // KCPManager manages multicluster KCP components and schema generation.
@@ -369,22 +378,65 @@ type providerRunnable struct {
 func (p *providerRunnable) Start(ctx context.Context) error {
 	p.log.Info().Msg("Starting KCP provider with multicluster manager")
 
-	// Add a small delay to allow KCP services to be ready
-	p.log.Info().Msg("Waiting for KCP services to be ready...")
-	select {
-	case <-time.After(5 * time.Second):
-		// Continue after delay
-	case <-ctx.Done():
-		return ctx.Err()
-	}
+	delay := initialDelay
+	attempt := 1
 
-	// Run the provider with error handling to prevent listener crash
-	if err := p.provider.Run(ctx, p.mcMgr); err != nil {
-		p.log.Error().Err(err).Msg("KCP provider encountered an error, but continuing to run")
-		// Don't return the error to prevent the entire listener from crashing
-		// The provider will retry connections automatically
-		return nil
-	}
+	for {
+		select {
+		case <-ctx.Done():
+			p.log.Info().Msg("Context cancelled, stopping KCP provider")
+			return ctx.Err()
+		default:
+		}
 
-	return nil
+		p.log.Info().Int("attempt", attempt).Msg("Starting KCP provider attempt")
+
+		// Run the provider
+		err := p.provider.Run(ctx, p.mcMgr)
+
+		// Check if context was cancelled during provider run
+		if ctx.Err() != nil {
+			p.log.Info().Msg("Context cancelled during provider run")
+			return ctx.Err()
+		}
+
+		// If provider returned without context cancellation, it's an error
+		if err != nil {
+			p.log.Error().
+				Err(err).
+				Int("attempt", attempt).
+				Dur("nextRetryIn", delay).
+				Msg("KCP provider failed, retrying with backoff")
+		} else {
+			p.log.Warn().
+				Int("attempt", attempt).
+				Dur("nextRetryIn", delay).
+				Msg("KCP provider stopped unexpectedly, retrying with backoff")
+		}
+
+		// Wait with exponential backoff and jitter
+		jitter := time.Duration(float64(delay) * jitterFactor * (2*rand.Float64() - 1))
+		backoffDelay := delay + jitter
+
+		p.log.Debug().
+			Dur("baseDelay", delay).
+			Dur("jitter", jitter).
+			Dur("totalDelay", backoffDelay).
+			Msg("Applying backoff before retry")
+
+		select {
+		case <-time.After(backoffDelay):
+			// Continue to next attempt
+		case <-ctx.Done():
+			p.log.Info().Msg("Context cancelled during backoff, stopping KCP provider")
+			return ctx.Err()
+		}
+
+		// Increase delay for next attempt with cap
+		delay = time.Duration(float64(delay) * backoffFactor)
+		if delay > maxDelay {
+			delay = maxDelay
+		}
+		attempt++
+	}
 }
