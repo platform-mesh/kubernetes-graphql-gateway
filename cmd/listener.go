@@ -81,6 +81,8 @@ var listenCmd = &cobra.Command{
 		// Set up signal handler and create a cancellable context for coordinated shutdown
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
+		// Error channel to distinguish error-triggered shutdown from normal signals
+		errCh := make(chan error, 1)
 
 		// Set up signal handling
 		signalCtx := ctrl.SetupSignalHandler()
@@ -132,6 +134,10 @@ var listenCmd = &cobra.Command{
 				go func() {
 					if err := kcpManager.StartVirtualWorkspaceWatching(ctx, appCfg.Listener.VirtualWorkspacesConfigPath); err != nil {
 						log.Error().Err(err).Msg("virtual workspace watching failed, initiating graceful shutdown")
+						select {
+						case errCh <- err:
+						default:
+						}
 						cancel() // Trigger coordinated shutdown
 					}
 				}()
@@ -157,15 +163,16 @@ var listenCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		// Check if we're exiting due to context cancellation
+		// Determine exit reason: error-triggered vs. normal signal
 		select {
-		case <-ctx.Done():
-			if ctx.Err() == context.Canceled {
-				log.Error().Msg("application shutting down due to critical component failure")
+		case err := <-errCh:
+			if err != nil {
+				log.Error().Err(err).Msg("exiting due to critical component failure")
 				os.Exit(1)
 			}
 		default:
-			// Normal exit
+			// Normal, graceful shutdown via signal
+			log.Info().Msg("graceful shutdown complete")
 		}
 	},
 }
