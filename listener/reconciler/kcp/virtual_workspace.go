@@ -44,9 +44,11 @@ func (v *VirtualWorkspace) Validate() error {
 		return fmt.Errorf("virtual workspace URL cannot be empty")
 	}
 
-	// Validate APIExport URL format
-	if _, _, err := extractAPIExportRef(v.URL); err != nil {
-		return fmt.Errorf("invalid APIExport URL format for workspace %s: %w", v.Name, err)
+	// Validate APIExport URL format if it looks like an APIExport URL
+	if strings.Contains(v.URL, "/services/apiexport/") {
+		if _, _, err := extractAPIExportRef(v.URL); err != nil {
+			return fmt.Errorf("invalid APIExport URL format for workspace %s: %w", v.Name, err)
+		}
 	}
 
 	// Validate kubeconfig file exists if specified

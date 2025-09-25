@@ -182,10 +182,22 @@ func PathForClusterFromConfig(clusterName string, cfg *rest.Config) (string, err
 	// Check for virtual workspace patterns
 	if strings.HasPrefix(parsedURL.Path, "/services/apiexport/") {
 		// Pattern: /services/apiexport/{workspace-path}/{export-name}
+		// First try to extract workspace path directly from URL path
+		pathParts := strings.Split(strings.Trim(parsedURL.Path, "/"), "/")
+		// Expected: ["services", "apiexport", "{workspace-path}", "{export-name}"]
+		if len(pathParts) >= 3 && pathParts[0] == "services" && pathParts[1] == "apiexport" {
+			workspacePathSegment := pathParts[2]
+			// Check if the workspace path segment is usable (contains ":" or is different from clusterName)
+			if strings.Contains(workspacePathSegment, ":") || workspacePathSegment != clusterName {
+				return workspacePathSegment, nil
+			}
+		}
+
+		// Fallback: try to extract using the full parser for validation
 		workspacePath, _, err := extractAPIExportRef(parsedURL.String())
 		if err != nil {
-			// Return error if we can't parse the APIExport URL properly
-			return "", fmt.Errorf("failed to parse APIExport URL: %w", err)
+			// If we can't parse the APIExport URL properly, fall back to cluster name
+			return clusterName, nil
 		}
 		// Return the workspace path from the parsed APIExport URL
 		return workspacePath, nil

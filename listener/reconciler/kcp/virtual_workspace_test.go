@@ -441,7 +441,6 @@ virtualWorkspaces:
     url: "https://example.com/services/apiexport/root/configmaps-view"
   - name: "workspace2"
     url: "https://example.org"
-    kubeconfig: "/path/to/kubeconfig"
 `,
 			expectError:   false,
 			expectedCount: 2,
@@ -547,7 +546,7 @@ users:
 				if tt.expectedCount == 2 {
 					assert.Equal(t, "workspace1", config.VirtualWorkspaces[0].Name)
 					assert.Equal(t, "workspace2", config.VirtualWorkspaces[1].Name)
-					assert.Equal(t, "/path/to/kubeconfig", config.VirtualWorkspaces[1].Kubeconfig)
+					assert.Equal(t, "", config.VirtualWorkspaces[1].Kubeconfig)
 				}
 			}
 		})
@@ -844,7 +843,7 @@ func TestVirtualWorkspace_Validate(t *testing.T) {
 			name: "invalid_apiexport_url",
 			workspace: VirtualWorkspace{
 				Name: "test-workspace",
-				URL:  "https://example.com/invalid/path",
+				URL:  "https://example.com/services/apiexport/incomplete",
 			},
 			expectError: true,
 			errorMsg:    "invalid APIExport URL format",
@@ -906,7 +905,7 @@ virtualWorkspaces:
 			configYAML: `
 virtualWorkspaces:
 - name: test-workspace
-  url: https://example.com/invalid/path
+  url: https://example.com/services/apiexport/incomplete
 `,
 			expectError: true,
 			errorMsg:    "invalid APIExport URL format",
