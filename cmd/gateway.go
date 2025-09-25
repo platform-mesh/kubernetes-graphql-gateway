@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	openmfpcontext "github.com/platform-mesh/golang-commons/context"
@@ -29,19 +30,22 @@ var gatewayCmd = &cobra.Command{
 		defer shutdown()
 
 		if err := initializeSentry(ctx, log); err != nil {
-			log.Fatal().Err(err).Msg("Failed to initialize Sentry")
+			log.Error().Err(err).Msg("Failed to initialize Sentry")
+			os.Exit(1)
 		}
 
 		ctrl.SetLogger(log.Logr())
 
 		gatewayInstance, err := manager.NewGateway(ctx, log, appCfg)
 		if err != nil {
-			log.Fatal().Err(err).Msg("Failed to create gateway")
+			log.Error().Err(err).Msg("Failed to create gateway")
+			os.Exit(1)
 		}
 
 		tracingShutdown, err := initializeTracing(ctx, log)
 		if err != nil {
-			log.Fatal().Err(err).Msg("Failed to initialize tracing")
+			log.Error().Err(err).Msg("Failed to initialize tracing")
+			os.Exit(1)
 		}
 		defer func() {
 			if err := tracingShutdown(ctx); err != nil {
@@ -50,7 +54,8 @@ var gatewayCmd = &cobra.Command{
 		}()
 
 		if err := runServers(ctx, log, gatewayInstance); err != nil {
-			log.Fatal().Err(err).Msg("Failed to run servers")
+			log.Error().Err(err).Msg("Failed to run servers")
+			os.Exit(1)
 		}
 	},
 }
@@ -65,7 +70,7 @@ func initializeSentry(ctx context.Context, log *logger.Logger) error {
 		defaultCfg.Image.Name, defaultCfg.Image.Tag,
 	)
 	if err != nil {
-		log.Fatal().Err(err).Msg("Sentry init failed")
+		return fmt.Errorf("sentry init failed: %w", err)
 	}
 
 	defer openmfpcontext.Recover(log)
@@ -76,14 +81,14 @@ func initializeTracing(ctx context.Context, log *logger.Logger) (func(ctx contex
 	if defaultCfg.Tracing.Enabled {
 		shutdown, err := traces.InitProvider(ctx, defaultCfg.Tracing.Collector)
 		if err != nil {
-			log.Fatal().Err(err).Msg("unable to start gRPC-Sidecar TracerProvider")
+			return nil, fmt.Errorf("unable to start gRPC-Sidecar TracerProvider: %w", err)
 		}
 		return shutdown, nil
 	}
 
 	shutdown, err := traces.InitLocalProvider(ctx, defaultCfg.Tracing.Collector, false)
 	if err != nil {
-		log.Fatal().Err(err).Msg("unable to start local TracerProvider")
+		return nil, fmt.Errorf("unable to start local TracerProvider: %w", err)
 	}
 	return shutdown, nil
 }

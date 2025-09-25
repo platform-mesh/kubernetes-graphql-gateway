@@ -105,7 +105,8 @@ var listenCmd = &cobra.Command{
 			Scheme: scheme,
 		})
 		if err != nil {
-			log.Fatal().Err(err).Msg("failed to create client from config")
+			log.Error().Err(err).Msg("failed to create client from config")
+			os.Exit(1)
 		}
 
 		reconcilerOpts := reconciler.ReconcilerOpts{
@@ -121,7 +122,8 @@ var listenCmd = &cobra.Command{
 		if appCfg.EnableKcp {
 			kcpManager, err := kcp.NewKCPManager(appCfg, reconcilerOpts, log)
 			if err != nil {
-				log.Fatal().Err(err).Msg("unable to create KCP manager")
+				log.Error().Err(err).Msg("unable to create KCP manager")
+				os.Exit(1)
 			}
 			reconcilerInstance = kcpManager
 
@@ -137,19 +139,22 @@ var listenCmd = &cobra.Command{
 		} else {
 			ioHandler, err := workspacefile.NewIOHandler(appCfg.OpenApiDefinitionsPath)
 			if err != nil {
-				log.Fatal().Err(err).Msg("unable to create IO handler")
+				log.Error().Err(err).Msg("unable to create IO handler")
+				os.Exit(1)
 			}
 
 			reconcilerInstance, err = clusteraccess.NewClusterAccessReconciler(ctx, appCfg, reconcilerOpts, ioHandler, apischema.NewResolver(log), log)
 			if err != nil {
-				log.Fatal().Err(err).Msg("unable to create cluster access reconciler")
+				log.Error().Err(err).Msg("unable to create cluster access reconciler")
+				os.Exit(1)
 			}
 		}
 
 		// Setup reconciler with its own manager and start everything
 		// Use the original context for the manager - it will be cancelled if watcher fails
 		if err := startManagerWithReconciler(ctx, reconcilerInstance); err != nil {
-			log.Fatal().Err(err).Msg("failed to start manager with reconciler")
+			log.Error().Err(err).Msg("failed to start manager with reconciler")
+			os.Exit(1)
 		}
 
 		// Check if we're exiting due to context cancellation

@@ -243,7 +243,7 @@ func (r *VirtualWorkspaceReconciler) processVirtualWorkspace(ctx context.Context
 		Str("path", workspacePath).
 		Msg("generating generic schema for virtual workspace")
 
-	// Use a default workspace for schema generation - this will be overridden at request time
+	// Use a default workspace for schema generation - but the gateway will override it at request time
 	defaultWorkspace := resolveDefaultWorkspace(r.virtualWSManager.appCfg)
 
 	// Create discovery client for the virtual workspace with default workspace
