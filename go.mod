@@ -2,22 +2,9 @@ module github.com/platform-mesh/kubernetes-graphql-gateway
 
 go 1.24.3
 
-replace (
-	// this PR introduces newer version of graphiQL that supports headers
-	// https://github.com/graphql-go/handler/pull/93
-	github.com/graphql-go/handler => github.com/vertex451/handler v0.0.0-20250124125145-ed328e3cf42a
-
-	// Pin versions to match multicluster-provider requirements
-	golang.org/x/net => golang.org/x/net v0.40.0
-	k8s.io/api => k8s.io/api v0.33.3
-	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.33.3
-	k8s.io/apimachinery => k8s.io/apimachinery v0.33.3
-	k8s.io/apiserver => k8s.io/apiserver v0.33.3
-	k8s.io/client-go => k8s.io/client-go v0.33.3
-	k8s.io/component-base => k8s.io/component-base v0.33.3
-	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20250701173324-9bd5c66d9911
-	sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.21.0
-)
+// this PR introduces newer version of graphiQL that supports headers
+// https://github.com/graphql-go/handler/pull/93
+replace github.com/graphql-go/handler => github.com/vertex451/handler v0.0.0-20250124125145-ed328e3cf42a
 
 require (
 	github.com/fsnotify/fsnotify v1.9.0
@@ -44,11 +31,11 @@ require (
 	golang.org/x/exp v0.0.0-20250911091902-df9299821621
 	golang.org/x/text v0.29.0
 	gopkg.in/yaml.v3 v3.0.1
-	k8s.io/api v0.33.3
-	k8s.io/apiextensions-apiserver v0.33.3
-	k8s.io/apimachinery v0.33.3
-	k8s.io/client-go v0.33.3
-	k8s.io/kube-openapi v0.0.0-20250701173324-9bd5c66d9911
+	k8s.io/api v0.34.0
+	k8s.io/apiextensions-apiserver v0.34.0
+	k8s.io/apimachinery v0.34.0
+	k8s.io/client-go v0.34.0
+	k8s.io/kube-openapi v0.0.0-20250710124328-f3f2b991d03b
 	sigs.k8s.io/controller-runtime v0.22.1
 	sigs.k8s.io/multicluster-runtime v0.21.0-alpha.9
 )
@@ -143,6 +130,6 @@ require (
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.31.2 // indirect
 	sigs.k8s.io/json v0.0.0-20241014173422-cfa47c3a1cc8 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
-	sigs.k8s.io/structured-merge-diff/v4 v4.6.0 // indirect
+	sigs.k8s.io/structured-merge-diff/v6 v6.3.0 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
 )
