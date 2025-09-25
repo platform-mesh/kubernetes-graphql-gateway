@@ -120,7 +120,7 @@ var listenCmd = &cobra.Command{
 		}
 
 		// Create the appropriate reconciler based on configuration
-		var reconcilerInstance reconciler.CustomReconciler
+		var reconcilerInstance reconciler.ControllerProvider
 		if appCfg.EnableKcp {
 			kcpManager, err := kcp.NewKCPManager(appCfg, reconcilerOpts, log)
 			if err != nil {
@@ -178,7 +178,7 @@ var listenCmd = &cobra.Command{
 }
 
 // startManagerWithReconciler handles the common manager setup and start operations
-func startManagerWithReconciler(ctx context.Context, reconciler reconciler.CustomReconciler) error {
+func startManagerWithReconciler(ctx context.Context, reconciler reconciler.ControllerProvider) error {
 	mgr := reconciler.GetManager()
 
 	if err := reconciler.SetupWithManager(mgr); err != nil {

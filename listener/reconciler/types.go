@@ -17,10 +17,6 @@ type ControllerProvider interface {
 	GetManager() ctrl.Manager
 }
 
-// CustomReconciler is an alias for ControllerProvider for backward compatibility
-// TODO: Migrate usages to ControllerProvider and remove this alias
-type CustomReconciler = ControllerProvider
-
 // ReconcilerOpts contains common options needed by all reconciler strategies
 type ReconcilerOpts struct {
 	*rest.Config

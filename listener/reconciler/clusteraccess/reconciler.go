@@ -39,7 +39,7 @@ func NewClusterAccessReconciler(
 	ioHandler workspacefile.IOHandler,
 	schemaResolver apischema.Resolver,
 	log *logger.Logger,
-) (reconciler.CustomReconciler, error) {
+) (reconciler.ControllerProvider, error) {
 	// Validate required dependencies
 	if ioHandler == nil {
 		return nil, fmt.Errorf("ioHandler is required")
@@ -96,7 +96,7 @@ func NewReconciler(
 	ioHandler workspacefile.IOHandler,
 	schemaResolver apischema.Resolver,
 	log *logger.Logger,
-) (reconciler.CustomReconciler, error) {
+) (reconciler.ControllerProvider, error) {
 	// Create standard manager
 	mgr, err := ctrl.NewManager(opts.Config, opts.ManagerOpts)
 	if err != nil {
