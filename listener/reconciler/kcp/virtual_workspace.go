@@ -34,6 +34,31 @@ type VirtualWorkspace struct {
 	Kubeconfig string `yaml:"kubeconfig,omitempty"` // Optional path to kubeconfig for authentication
 }
 
+// Validate validates the virtual workspace configuration
+func (v *VirtualWorkspace) Validate() error {
+	if v.Name == "" {
+		return fmt.Errorf("virtual workspace name cannot be empty")
+	}
+
+	if v.URL == "" {
+		return fmt.Errorf("virtual workspace URL cannot be empty")
+	}
+
+	// Validate APIExport URL format
+	if _, _, err := extractAPIExportRef(v.URL); err != nil {
+		return fmt.Errorf("invalid APIExport URL format for workspace %s: %w", v.Name, err)
+	}
+
+	// Validate kubeconfig file exists if specified
+	if v.Kubeconfig != "" {
+		if _, err := os.Stat(v.Kubeconfig); os.IsNotExist(err) {
+			return fmt.Errorf("kubeconfig file not found for workspace %s: %s", v.Name, v.Kubeconfig)
+		}
+	}
+
+	return nil
+}
+
 // VirtualWorkspacesConfig represents the configuration file structure
 type VirtualWorkspacesConfig struct {
 	VirtualWorkspaces []VirtualWorkspace `yaml:"virtualWorkspaces"`
@@ -153,6 +178,13 @@ func (v *VirtualWorkspaceManager) LoadConfig(configPath string) (*VirtualWorkspa
 	var config VirtualWorkspacesConfig
 	if err := yaml.Unmarshal(data, &config); err != nil {
 		return nil, fmt.Errorf("failed to parse virtual workspaces config: %w", err)
+	}
+
+	// Validate all virtual workspaces
+	for i, workspace := range config.VirtualWorkspaces {
+		if err := workspace.Validate(); err != nil {
+			return nil, fmt.Errorf("validation failed for virtual workspace at index %d: %w", i, err)
+		}
 	}
 
 	return &config, nil

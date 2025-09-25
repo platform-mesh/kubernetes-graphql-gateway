@@ -806,3 +806,139 @@ func TestVirtualWorkspaceReconciler_RemoveVirtualWorkspace(t *testing.T) {
 		})
 	}
 }
+
+func TestVirtualWorkspace_Validate(t *testing.T) {
+	tests := []struct {
+		name        string
+		workspace   VirtualWorkspace
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name: "valid_workspace",
+			workspace: VirtualWorkspace{
+				Name: "test-workspace",
+				URL:  "https://example.com/services/apiexport/root/configmaps-view",
+			},
+			expectError: false,
+		},
+		{
+			name: "empty_name",
+			workspace: VirtualWorkspace{
+				Name: "",
+				URL:  "https://example.com/services/apiexport/root/configmaps-view",
+			},
+			expectError: true,
+			errorMsg:    "virtual workspace name cannot be empty",
+		},
+		{
+			name: "empty_url",
+			workspace: VirtualWorkspace{
+				Name: "test-workspace",
+				URL:  "",
+			},
+			expectError: true,
+			errorMsg:    "virtual workspace URL cannot be empty",
+		},
+		{
+			name: "invalid_apiexport_url",
+			workspace: VirtualWorkspace{
+				Name: "test-workspace",
+				URL:  "https://example.com/invalid/path",
+			},
+			expectError: true,
+			errorMsg:    "invalid APIExport URL format",
+		},
+		{
+			name: "nonexistent_kubeconfig",
+			workspace: VirtualWorkspace{
+				Name:       "test-workspace",
+				URL:        "https://example.com/services/apiexport/root/configmaps-view",
+				Kubeconfig: "/nonexistent/kubeconfig",
+			},
+			expectError: true,
+			errorMsg:    "kubeconfig file not found",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.workspace.Validate()
+
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errorMsg)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestVirtualWorkspaceManager_LoadConfig_WithValidation(t *testing.T) {
+	tests := []struct {
+		name        string
+		configYAML  string
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name: "valid_config",
+			configYAML: `
+virtualWorkspaces:
+- name: test-workspace
+  url: https://example.com/services/apiexport/root/configmaps-view
+`,
+			expectError: false,
+		},
+		{
+			name: "invalid_workspace_name",
+			configYAML: `
+virtualWorkspaces:
+- name: ""
+  url: https://example.com/services/apiexport/root/configmaps-view
+`,
+			expectError: true,
+			errorMsg:    "validation failed for virtual workspace at index 0",
+		},
+		{
+			name: "invalid_apiexport_url",
+			configYAML: `
+virtualWorkspaces:
+- name: test-workspace
+  url: https://example.com/invalid/path
+`,
+			expectError: true,
+			errorMsg:    "invalid APIExport URL format",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create temporary config file
+			tempFile, err := os.CreateTemp("", "test-config-*.yaml")
+			require.NoError(t, err)
+			defer os.Remove(tempFile.Name())
+
+			_, err = tempFile.WriteString(tt.configYAML)
+			require.NoError(t, err)
+			tempFile.Close()
+
+			// Test loading config
+			appCfg := config.Config{}
+			manager := NewVirtualWorkspaceManager(appCfg)
+
+			config, err := manager.LoadConfig(tempFile.Name())
+
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errorMsg)
+				assert.Nil(t, config)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, config)
+				assert.Len(t, config.VirtualWorkspaces, 1)
+			}
+		})
+	}
+}
