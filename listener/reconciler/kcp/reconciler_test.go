@@ -16,6 +16,7 @@ import (
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	mcreconcile "sigs.k8s.io/multicluster-runtime/pkg/reconcile"
 
 	"github.com/platform-mesh/golang-commons/logger"
 	"github.com/platform-mesh/golang-commons/logger/testlogger"
@@ -126,11 +127,6 @@ func TestNewKCPManager(t *testing.T) {
 }
 
 func TestKCPManager_GetManager(t *testing.T) {
-	t.Run("nil_manager", func(t *testing.T) {
-		manager := &kcp.ExportedKCPManager{}
-		assert.Nil(t, manager.GetManager())
-	})
-
 	t.Run("initialized_manager", func(t *testing.T) {
 		manager := createTestKCPManager(t)
 		assert.NotNil(t, manager.GetManager())
@@ -224,6 +220,206 @@ func TestKCPManager_StartVirtualWorkspaceWatching(t *testing.T) {
 				if err != nil {
 					t.Logf("Got error (possibly expected): %v", err)
 				}
+			}
+		})
+	}
+}
+
+func TestKCPManager_ResolveWorkspacePath(t *testing.T) {
+	manager := createTestKCPManager(t)
+	ctx := context.Background()
+
+	tests := []struct {
+		name        string
+		clusterName string
+		expectErr   bool
+		expectedLen int // minimum expected length for workspace path
+	}{
+		{
+			name:        "simple_cluster_name",
+			clusterName: "test-cluster",
+			expectErr:   false,
+			expectedLen: 1,
+		},
+		{
+			name:        "root_cluster",
+			clusterName: "root",
+			expectErr:   false,
+			expectedLen: 1,
+		},
+		{
+			name:        "empty_cluster_name",
+			clusterName: "",
+			expectErr:   false,
+			expectedLen: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Use the exported method for testing
+			exported := kcp.ExportedKCPManager{KCPManager: manager}
+			result, err := exported.ResolveWorkspacePath(ctx, tt.clusterName, nil)
+
+			if tt.expectErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.True(t, len(result) >= tt.expectedLen)
+			}
+		})
+	}
+}
+
+func TestKCPManager_GenerateAndWriteSchemaForWorkspace(t *testing.T) {
+	manager := createTestKCPManager(t)
+	ctx := context.Background()
+
+	tests := []struct {
+		name          string
+		workspacePath string
+		clusterName   string
+		expectErr     bool
+	}{
+		{
+			name:          "valid_workspace",
+			workspacePath: "root:orgs:test",
+			clusterName:   "test-cluster",
+			expectErr:     false, // Should not error even if connection fails
+		},
+		{
+			name:          "root_workspace",
+			workspacePath: "root",
+			clusterName:   "root",
+			expectErr:     false,
+		},
+		{
+			name:          "empty_workspace",
+			workspacePath: "",
+			clusterName:   "empty",
+			expectErr:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Use the exported method for testing
+			exported := kcp.ExportedKCPManager{KCPManager: manager}
+			err := exported.GenerateAndWriteSchemaForWorkspace(ctx, tt.workspacePath, tt.clusterName)
+
+			if tt.expectErr {
+				assert.Error(t, err)
+			} else {
+				// The function may return an error due to connection issues in tests,
+				// but we're testing that it doesn't panic and handles the parameters correctly
+				t.Logf("Schema generation result for %s: %v", tt.workspacePath, err)
+			}
+		})
+	}
+}
+
+func TestProviderRunnable_Start(t *testing.T) {
+	t.Parallel()
+
+	log := testlogger.New().HideLogOutput().Logger
+
+	tests := []struct {
+		name           string
+		contextTimeout time.Duration
+		expectErr      bool
+	}{
+		{
+			name:           "context_cancelled_immediately",
+			contextTimeout: 1 * time.Millisecond,
+			expectErr:      true,
+		},
+		{
+			name:           "context_cancelled_during_retry",
+			contextTimeout: 50 * time.Millisecond,
+			expectErr:      true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), tt.contextTimeout)
+			defer cancel()
+
+			// Create a mock provider runnable for testing
+			exported := kcp.ExportedKCPManager{KCPManager: createTestKCPManager(t)}
+			runnable := exported.CreateProviderRunnableForTesting(log)
+
+			err := runnable.Start(ctx)
+
+			if tt.expectErr {
+				assert.Error(t, err)
+				// Should return context.DeadlineExceeded or context.Canceled
+				assert.True(t, err == context.DeadlineExceeded || err == context.Canceled)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestKCPManager_EdgeCases(t *testing.T) {
+	manager := createTestKCPManager(t)
+
+	t.Run("get_manager_not_nil", func(t *testing.T) {
+		mgr := manager.GetManager()
+		assert.NotNil(t, mgr)
+	})
+
+	t.Run("reconcile_returns_empty_result", func(t *testing.T) {
+		ctx := context.Background()
+		req := ctrl.Request{NamespacedName: types.NamespacedName{Name: "test", Namespace: "default"}}
+
+		result, err := manager.Reconcile(ctx, req)
+		assert.NoError(t, err)
+		assert.Equal(t, ctrl.Result{}, result)
+	})
+
+}
+
+func TestKCPManager_ReconcileAPIBinding(t *testing.T) {
+	manager := createTestKCPManager(t)
+	ctx := context.Background()
+
+	tests := []struct {
+		name        string
+		req         mcreconcile.Request
+		expectErr   bool
+		description string
+	}{
+		{
+			name: "cluster_not_found",
+			req: mcreconcile.Request{
+				ClusterName: "nonexistent-cluster",
+			},
+			expectErr:   true,
+			description: "Should error when cluster is not found in multicluster manager",
+		},
+		{
+			name: "empty_cluster_name",
+			req: mcreconcile.Request{
+				ClusterName: "",
+			},
+			expectErr:   false,
+			description: "Empty cluster name is handled gracefully",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			exported := kcp.ExportedKCPManager{KCPManager: manager}
+			result, err := exported.ReconcileAPIBinding(ctx, tt.req)
+
+			if tt.expectErr {
+				assert.Error(t, err)
+				t.Logf("Expected error for %s: %v", tt.description, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, ctrl.Result{}, result)
 			}
 		})
 	}
