@@ -391,6 +391,54 @@ func TestPathForClusterFromConfig(t *testing.T) {
 			config:      &rest.Config{Host: "https://kcp.example.com"},
 			want:        "test-cluster",
 		},
+		{
+			name:        "apiexport_url_with_query_params",
+			clusterName: "hash123",
+			config:      &rest.Config{Host: "https://kcp.example.com/services/apiexport/root:orgs:test/export?timeout=30s"},
+			want:        "root:orgs:test",
+		},
+		{
+			name:        "apiexport_url_with_fragment",
+			clusterName: "hash123",
+			config:      &rest.Config{Host: "https://kcp.example.com/services/apiexport/root/export#section"},
+			want:        "root",
+		},
+		{
+			name:        "cluster_url_with_query_params",
+			clusterName: "hash123",
+			config:      &rest.Config{Host: "https://kcp.example.com/clusters/root:orgs:test?timeout=30s"},
+			want:        "root:orgs:test",
+		},
+		{
+			name:        "apiexport_url_workspace_equals_cluster_name",
+			clusterName: "root",
+			config:      &rest.Config{Host: "https://kcp.example.com/services/apiexport/root/export"},
+			want:        "root",
+		},
+		{
+			name:        "apiexport_url_malformed_fallback_to_extractAPIExportRef",
+			clusterName: "hash123",
+			config:      &rest.Config{Host: "https://kcp.example.com/services/apiexport/workspace/export/extra"},
+			want:        "workspace",
+		},
+		{
+			name:        "apiexport_url_invalid_format_fallback_to_cluster_name",
+			clusterName: "hash123",
+			config:      &rest.Config{Host: "https://kcp.example.com/services/apiexport/incomplete"},
+			want:        "incomplete",
+		},
+		{
+			name:        "cluster_url_with_empty_segments",
+			clusterName: "test-cluster",
+			config:      &rest.Config{Host: "https://kcp.example.com/clusters//empty"},
+			want:        "", // Function returns empty string for malformed path with empty segments
+		},
+		{
+			name:        "cluster_url_with_trailing_slash",
+			clusterName: "hash123",
+			config:      &rest.Config{Host: "https://kcp.example.com/clusters/root:orgs:test/"},
+			want:        "root:orgs:test",
+		},
 	}
 
 	for _, tt := range tests {
