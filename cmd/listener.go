@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"crypto/tls"
+	"os"
 
 	kcpapis "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
 	kcpcore "github.com/kcp-dev/kcp/sdk/apis/core/v1alpha1"
@@ -77,7 +78,20 @@ var listenCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		log.Info().Str("LogLevel", log.GetLevel().String()).Msg("Starting the Listener...")
 
-		ctx := ctrl.SetupSignalHandler()
+		// Set up signal handler and create a cancellable context for coordinated shutdown
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		// Error channel to distinguish error-triggered shutdown from normal signals
+		errCh := make(chan error, 1)
+
+		// Set up signal handling
+		signalCtx := ctrl.SetupSignalHandler()
+		go func() {
+			<-signalCtx.Done()
+			log.Info().Msg("received shutdown signal, initiating graceful shutdown")
+			cancel()
+		}()
+
 		restCfg := ctrl.GetConfigOrDie()
 
 		mgrOpts := ctrl.Options{
@@ -93,7 +107,8 @@ var listenCmd = &cobra.Command{
 			Scheme: scheme,
 		})
 		if err != nil {
-			log.Fatal().Err(err).Msg("failed to create client from config")
+			log.Error().Err(err).Msg("failed to create client from config")
+			os.Exit(1)
 		}
 
 		reconcilerOpts := reconciler.ReconcilerOpts{
@@ -105,44 +120,65 @@ var listenCmd = &cobra.Command{
 		}
 
 		// Create the appropriate reconciler based on configuration
-		var reconcilerInstance reconciler.CustomReconciler
+		var reconcilerInstance reconciler.ControllerProvider
 		if appCfg.EnableKcp {
-			kcpReconciler, err := kcp.NewKCPReconciler(appCfg, reconcilerOpts, log)
+			kcpManager, err := kcp.NewKCPManager(appCfg, reconcilerOpts, log)
 			if err != nil {
-				log.Fatal().Err(err).Msg("unable to create KCP reconciler")
+				log.Error().Err(err).Msg("unable to create KCP manager")
+				os.Exit(1)
 			}
+			reconcilerInstance = kcpManager
 
 			// Start virtual workspace watching if path is configured
 			if appCfg.Listener.VirtualWorkspacesConfigPath != "" {
 				go func() {
-					if err := kcpReconciler.StartVirtualWorkspaceWatching(ctx, appCfg.Listener.VirtualWorkspacesConfigPath); err != nil {
-						log.Fatal().Err(err).Msg("failed to start virtual workspace watching")
+					if err := kcpManager.StartVirtualWorkspaceWatching(ctx, appCfg.Listener.VirtualWorkspacesConfigPath); err != nil {
+						log.Error().Err(err).Msg("virtual workspace watching failed, initiating graceful shutdown")
+						select {
+						case errCh <- err:
+						default:
+						}
+						cancel() // Trigger coordinated shutdown
 					}
 				}()
 			}
-
-			reconcilerInstance = kcpReconciler
 		} else {
 			ioHandler, err := workspacefile.NewIOHandler(appCfg.OpenApiDefinitionsPath)
 			if err != nil {
-				log.Fatal().Err(err).Msg("unable to create IO handler")
+				log.Error().Err(err).Msg("unable to create IO handler")
+				os.Exit(1)
 			}
 
 			reconcilerInstance, err = clusteraccess.NewClusterAccessReconciler(ctx, appCfg, reconcilerOpts, ioHandler, apischema.NewResolver(log), log)
 			if err != nil {
-				log.Fatal().Err(err).Msg("unable to create cluster access reconciler")
+				log.Error().Err(err).Msg("unable to create cluster access reconciler")
+				os.Exit(1)
 			}
 		}
 
 		// Setup reconciler with its own manager and start everything
+		// Use the original context for the manager - it will be cancelled if watcher fails
 		if err := startManagerWithReconciler(ctx, reconcilerInstance); err != nil {
-			log.Fatal().Err(err).Msg("failed to start manager with reconciler")
+			log.Error().Err(err).Msg("failed to start manager with reconciler")
+			os.Exit(1)
+		}
+
+		// Determine exit reason: error-triggered vs. normal signal
+		select {
+		case err := <-errCh:
+			if err != nil {
+				log.Error().Err(err).Msg("exiting due to critical component failure")
+				os.Exit(1)
+			}
+		default:
+			// Normal, graceful shutdown via signal
+			log.Info().Msg("graceful shutdown complete")
 		}
 	},
 }
 
 // startManagerWithReconciler handles the common manager setup and start operations
-func startManagerWithReconciler(ctx context.Context, reconciler reconciler.CustomReconciler) error {
+func startManagerWithReconciler(ctx context.Context, reconciler reconciler.ControllerProvider) error {
 	mgr := reconciler.GetManager()
 
 	if err := reconciler.SetupWithManager(mgr); err != nil {

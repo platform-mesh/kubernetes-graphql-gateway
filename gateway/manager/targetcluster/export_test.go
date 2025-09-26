@@ -30,3 +30,8 @@ func CreateTestConfig(localDev bool, gatewayPort string) appConfig.Config {
 	config.Url.GraphqlSuffix = "graphql"
 	return config
 }
+
+// ExtractClusterNameFromPathForTest exposes the extractClusterNameFromPath method for testing
+func (cr *ClusterRegistry) ExtractClusterNameFromPathForTest(schemaFilePath string) string {
+	return cr.extractClusterNameFromPath(schemaFilePath)
+}

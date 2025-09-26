@@ -1,13 +1,12 @@
 package targetcluster
 
 import (
-	"context"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/platform-mesh/golang-commons/logger/testlogger"
 	appConfig "github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/roundtripper"
+	ctxkeys "github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/context"
 )
 
 func TestExtractClusterNameWithKCPWorkspace(t *testing.T) {
@@ -212,12 +211,131 @@ func TestExtractClusterNameWithKCPWorkspace(t *testing.T) {
 			}
 
 			// Check KCP workspace in context - use the modified request returned by extractClusterName
-			if kcpWorkspace, ok := modifiedReq.Context().Value(kcpWorkspaceKey).(string); ok {
+			if kcpWorkspace, ok := ctxkeys.KcpWorkspaceFromContext(modifiedReq.Context()); ok {
 				if kcpWorkspace != tt.expectedKCPWorkspace {
 					t.Errorf("KCP workspace in context = %v, want %v", kcpWorkspace, tt.expectedKCPWorkspace)
 				}
 			} else if tt.expectedKCPWorkspace != "" {
 				t.Errorf("Expected KCP workspace %v in context, but not found", tt.expectedKCPWorkspace)
+			}
+		})
+	}
+}
+
+func TestClusterRegistry_Close(t *testing.T) {
+	log := testlogger.New().HideLogOutput().Logger
+	appCfg := appConfig.Config{}
+
+	registry := NewClusterRegistry(log, appCfg, nil)
+
+	// Test that Close() doesn't panic and returns no error
+	err := registry.Close()
+
+	if err != nil {
+		t.Errorf("Close() returned error: %v", err)
+	}
+
+	// Test that Close() can be called multiple times without error
+	err = registry.Close()
+	if err != nil {
+		t.Errorf("Second Close() call returned error: %v", err)
+	}
+}
+
+func TestClusterRegistry_ExtractClusterNameFromPath(t *testing.T) {
+	log := testlogger.New().HideLogOutput().Logger
+	appCfg := appConfig.Config{}
+
+	registry := NewClusterRegistry(log, appCfg, nil)
+
+	tests := []struct {
+		name           string
+		schemaFilePath string
+		expected       string
+	}{
+		{
+			name:           "path_with_definitions_directory",
+			schemaFilePath: "/path/to/definitions/cluster-name.json",
+			expected:       "cluster-name",
+		},
+		{
+			name:           "path_with_definitions_directory_and_extension",
+			schemaFilePath: "/path/to/definitions/my-cluster.graphql",
+			expected:       "my-cluster",
+		},
+		{
+			name:           "nested_path_with_definitions",
+			schemaFilePath: "/very/deep/path/definitions/production-cluster.yaml",
+			expected:       "production-cluster",
+		},
+		{
+			name:           "multiple_definitions_in_path",
+			schemaFilePath: "/definitions/old/definitions/new-cluster.txt",
+			expected:       "new-cluster",
+		},
+		{
+			name:           "path_without_definitions_directory",
+			schemaFilePath: "/path/to/schema/cluster-name.json",
+			expected:       "cluster-name",
+		},
+		{
+			name:           "filename_only",
+			schemaFilePath: "cluster-name.json",
+			expected:       "cluster-name",
+		},
+		{
+			name:           "filename_without_extension",
+			schemaFilePath: "cluster-name",
+			expected:       "cluster-name",
+		},
+		{
+			name:           "path_with_no_extension",
+			schemaFilePath: "/path/to/definitions/cluster-name",
+			expected:       "cluster-name",
+		},
+		{
+			name:           "empty_path",
+			schemaFilePath: "",
+			expected:       ".",
+		},
+		{
+			name:           "path_with_multiple_dots",
+			schemaFilePath: "/path/definitions/cluster.name.with.dots.json",
+			expected:       "cluster.name.with.dots",
+		},
+		{
+			name:           "path_with_special_characters",
+			schemaFilePath: "/path/definitions/cluster-name_123.yaml",
+			expected:       "cluster-name_123",
+		},
+		{
+			name:           "windows_style_path",
+			schemaFilePath: "C:\\path\\definitions\\cluster-name.json",
+			expected:       "C:\\path\\definitions\\cluster-name",
+		},
+		{
+			name:           "relative_path_with_definitions",
+			schemaFilePath: "./definitions/cluster-name.json",
+			expected:       "cluster-name",
+		},
+		{
+			name:           "path_ending_with_definitions",
+			schemaFilePath: "/path/to/definitions",
+			expected:       "definitions",
+		},
+		{
+			name:           "definitions_as_filename",
+			schemaFilePath: "/path/to/definitions.json",
+			expected:       "definitions",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := registry.ExtractClusterNameFromPathForTest(tt.schemaFilePath)
+
+			if result != tt.expected {
+				t.Errorf("extractClusterNameFromPath() = %v, want %v", result, tt.expected)
 			}
 		})
 	}
@@ -266,7 +384,7 @@ func TestSetContextsWithKCPWorkspace(t *testing.T) {
 			// Create a test request with KCP workspace in context if provided
 			req := httptest.NewRequest("GET", "/test", nil)
 			if tt.contextKCPWorkspace != "" {
-				req = req.WithContext(context.WithValue(req.Context(), kcpWorkspaceKey, tt.contextKCPWorkspace))
+				req = req.WithContext(ctxkeys.WithKcpWorkspace(req.Context(), tt.contextKCPWorkspace))
 			}
 
 			// Call SetContexts
@@ -279,7 +397,7 @@ func TestSetContextsWithKCPWorkspace(t *testing.T) {
 			}
 
 			// Verify token context is set
-			if token, ok := resultReq.Context().Value(roundtripper.TokenKey{}).(string); ok {
+			if token, ok := ctxkeys.TokenFromContext(resultReq.Context()); ok {
 				if token != "test-token" {
 					t.Errorf("Token in context = %v, want %v", token, "test-token")
 				}

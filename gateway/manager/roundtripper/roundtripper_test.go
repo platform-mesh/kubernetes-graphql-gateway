@@ -1,7 +1,6 @@
 package roundtripper_test
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -13,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	appConfig "github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
+	ctxkeys "github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/context"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/mocks"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/roundtripper"
 )
@@ -81,8 +81,7 @@ func TestRoundTripper_RoundTrip(t *testing.T) {
 
 			req := httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/pods", nil)
 			if tt.token != "" {
-				ctx := context.WithValue(req.Context(), roundtripper.TokenKey{}, tt.token)
-				req = req.WithContext(ctx)
+				req = req.WithContext(ctxkeys.WithToken(req.Context(), tt.token))
 			}
 
 			resp, err := rt.RoundTrip(req)
@@ -380,8 +379,7 @@ func TestRoundTripper_ComprehensiveFunctionality(t *testing.T) {
 
 			req := httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/pods", nil)
 			if tt.token != "" {
-				ctx := context.WithValue(req.Context(), roundtripper.TokenKey{}, tt.token)
-				req = req.WithContext(ctx)
+				req = req.WithContext(ctxkeys.WithToken(req.Context(), tt.token))
 			}
 
 			resp, err := rt.RoundTrip(req)
@@ -535,7 +533,7 @@ func TestRoundTripper_ExistingAuthHeadersAreCleanedBeforeTokenAuth(t *testing.T)
 	req.Header.Set("Authorization", "Bearer admin-token-that-should-be-removed")
 
 	// Add the token to context
-	req = req.WithContext(context.WithValue(req.Context(), roundtripper.TokenKey{}, "user-token"))
+	req = req.WithContext(ctxkeys.WithToken(req.Context(), "user-token"))
 
 	resp, err := rt.RoundTrip(req)
 	require.NoError(t, err)
@@ -582,7 +580,7 @@ func TestRoundTripper_ExistingAuthHeadersAreCleanedBeforeImpersonation(t *testin
 	require.NoError(t, err)
 
 	// Add the token to context
-	req = req.WithContext(context.WithValue(req.Context(), roundtripper.TokenKey{}, tokenString))
+	req = req.WithContext(ctxkeys.WithToken(req.Context(), tokenString))
 
 	resp, err := rt.RoundTrip(req)
 	require.NoError(t, err)
@@ -599,4 +597,19 @@ func TestRoundTripper_ExistingAuthHeadersAreCleanedBeforeImpersonation(t *testin
 	// Verify that the impersonation header is set
 	impersonateHeader := capturedRequest.Header.Get("Impersonate-User")
 	assert.Equal(t, "test-user", impersonateHeader)
+}
+
+func TestUnauthorizedRoundTripper_RoundTrip(t *testing.T) {
+	// Test the unauthorizedRoundTripper directly to cover the 0% coverage function
+	rt := roundtripper.NewUnauthorizedRoundTripperForTest()
+
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/pods", nil)
+
+	resp, err := rt.RoundTrip(req)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+
+	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+	assert.Equal(t, req, resp.Request)
+	assert.Equal(t, http.NoBody, resp.Body)
 }

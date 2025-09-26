@@ -11,9 +11,11 @@ virtualWorkspaces:
 - name: example
   url: https://192.168.1.118:6443/services/apiexport/root/configmaps-view
   kubeconfig: PATH_TO_KCP_KUBECONFIG
-- name: another-service
-  url: https://your-kcp-server:6443/services/apiexport/root/your-export
-  kubeconfig: PATH_TO_KCP_KUBECONFIG
+  # The URL must contain both workspace path and export name
+  # Format: /services/apiexport/{workspace-path}/{export-name}
+  # Workspace is resolved dynamically from user request:
+  # User request: /virtual-workspace/example/root:orgs:alpha/query
+  # → Connects to: /services/apiexport/root/configmaps-view/clusters/root:orgs:alpha/api/v1/configmaps
 ```
 
 ### Configuration Options
@@ -21,14 +23,26 @@ virtualWorkspaces:
 - `virtualWorkspaces`: Array of virtual workspace definitions
   - `name`: Unique identifier for the virtual workspace (used in URL paths)
   - `url`: Full URL to the virtual workspace or API export
-  - `kubeconfig`: path to kcp kubeconfig
+  - `kubeconfig`: Path to KCP kubeconfig
+
+### Dynamic Workspace Resolution
+
+Virtual workspaces use **dynamic workspace resolution**:
+- Workspace is extracted from the GraphQL request URL at runtime
+- Each request can target different workspaces: `/virtual-workspace/contentconfigurations/root:orgs:alpha/query`
+- No need to predefine target workspaces in configuration
 
 ## Environment Variables
 
-Set the configuration path using:
-
 ```bash
-export VIRTUAL_WORKSPACES_CONFIG_PATH="./bin/virtual-workspaces/config.yaml"
+# Virtual workspaces configuration file path
+export VIRTUAL_WORKSPACES_CONFIG_PATH="./config/virtual-workspaces.yaml"
+
+# Default workspace for schema generation (default: "root")  
+export GATEWAY_URL_DEFAULT_KCP_WORKSPACE="root"
+
+# Workspace pattern for building full paths (default: "root:orgs:{org}")
+export GATEWAY_URL_KCP_WORKSPACE_PATTERN="root:orgs:{org}"
 ```
 
 ## URL Pattern
@@ -46,8 +60,12 @@ For example:
 ## How It Works
 
 1. **Configuration Watching**: The listener watches the virtual workspaces configuration file for changes
-2. **Schema Generation**: For each virtual workspace, the listener:
-   - Creates a discovery client pointing to the virtual workspace URL
-   - Generates OpenAPI schemas for the available resources
+2. **Generic Schema Generation**: For each virtual workspace, the listener:
+   - Creates a discovery client pointing to the virtual workspace URL with a default workspace
+   - Generates generic OpenAPI schemas for the available resources
    - Stores the schema in a file at `virtual-workspace/{name}`
-3. **Gateway Integration**: The gateway watches the schema files and exposes virtual workspaces as GraphQL endpoints
+3. **Dynamic Workspace Resolution**: When a user makes a GraphQL request:
+   - The gateway extracts the workspace from the URL (e.g., `root:orgs:alpha`)
+   - The roundtripper modifies the backend request to include the specific workspace
+   - Example: `/services/contentconfigurations/api/v1/configmaps` → `/services/contentconfigurations/clusters/root:orgs:alpha/api/v1/configmaps`
+4. **Gateway Integration**: The gateway exposes virtual workspaces as GraphQL endpoints with dynamic workspace targeting

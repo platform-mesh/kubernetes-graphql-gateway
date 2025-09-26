@@ -362,6 +362,8 @@ func TestWatchSingleFile_InvalidDirectory(t *testing.T) {
 }
 
 func TestWatchSingleFile_RealFile(t *testing.T) {
+	t.Parallel() // Run in parallel to avoid resource conflicts
+
 	log := testlogger.New().HideLogOutput().Logger
 	handler := &MockFileEventHandler{}
 
@@ -388,15 +390,15 @@ func TestWatchSingleFile_RealFile(t *testing.T) {
 		watchDone <- watcher.WatchSingleFile(ctx, tempFile, 50) // 50ms debounce
 	}()
 
-	// Give the watcher time to start
-	time.Sleep(30 * time.Millisecond)
+	// Give the watcher more time to start (increased for parallel execution)
+	time.Sleep(100 * time.Millisecond)
 
 	// Modify the file to trigger an event
 	err = os.WriteFile(tempFile, []byte("modified"), 0644)
 	require.NoError(t, err)
 
-	// Give time for file change to be detected and debounced
-	time.Sleep(150 * time.Millisecond) // 50ms debounce + extra buffer
+	// Give more time for file change to be detected and debounced (increased for parallel execution)
+	time.Sleep(300 * time.Millisecond) // 50ms debounce + extra buffer for parallel tests
 
 	// Wait for watch to finish (should timeout after remaining time)
 	err = <-watchDone
@@ -626,6 +628,8 @@ func TestHandleEvent_StatError(t *testing.T) {
 }
 
 func TestWatchSingleFile_WithDebounceTimer(t *testing.T) {
+	t.Parallel() // Run in parallel to avoid resource conflicts
+
 	log := testlogger.New().HideLogOutput().Logger
 	handler := &MockFileEventHandler{}
 
@@ -976,6 +980,8 @@ func TestWatchDirectory_ErrorInLoop(t *testing.T) {
 
 // TestWatchSingleFile_TimerStop tests the timer stop path in watchWithDebounce
 func TestWatchSingleFile_TimerStop(t *testing.T) {
+	t.Parallel() // Run in parallel to avoid resource conflicts
+
 	log := testlogger.New().HideLogOutput().Logger
 	handler := &MockFileEventHandler{}
 
