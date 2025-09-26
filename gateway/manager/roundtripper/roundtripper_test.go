@@ -598,3 +598,18 @@ func TestRoundTripper_ExistingAuthHeadersAreCleanedBeforeImpersonation(t *testin
 	impersonateHeader := capturedRequest.Header.Get("Impersonate-User")
 	assert.Equal(t, "test-user", impersonateHeader)
 }
+
+func TestUnauthorizedRoundTripper_RoundTrip(t *testing.T) {
+	// Test the unauthorizedRoundTripper directly to cover the 0% coverage function
+	rt := roundtripper.NewUnauthorizedRoundTripperForTest()
+
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/pods", nil)
+
+	resp, err := rt.RoundTrip(req)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+
+	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+	assert.Equal(t, req, resp.Request)
+	assert.Equal(t, http.NoBody, resp.Body)
+}

@@ -356,6 +356,44 @@ users:
 	}
 }
 
+func TestTargetCluster_GetName(t *testing.T) {
+	tests := []struct {
+		name        string
+		clusterName string
+	}{
+		{
+			name:        "simple_name",
+			clusterName: "production",
+		},
+		{
+			name:        "name_with_dashes",
+			clusterName: "staging-cluster",
+		},
+		{
+			name:        "virtual_workspace_name",
+			clusterName: "virtual-workspace/my-workspace",
+		},
+		{
+			name:        "empty_name",
+			clusterName: "",
+		},
+		{
+			name:        "single_character",
+			clusterName: "a",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tc := targetcluster.NewTestTargetCluster(tt.clusterName)
+
+			result := tc.GetName()
+
+			assert.Equal(t, tt.clusterName, result)
+		})
+	}
+}
+
 func TestTargetCluster_GetEndpoint(t *testing.T) {
 	tests := []struct {
 		name           string
