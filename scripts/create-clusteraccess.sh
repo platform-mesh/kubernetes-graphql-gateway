@@ -99,6 +99,36 @@ if [[ -z "$CLUSTER_NAME" ]]; then
 fi
 log_info "Cluster name: $CLUSTER_NAME"
 
+ensure_crd_installed() {
+    log_info "Checking if ClusterAccess CRD is installed in management cluster..."
+    
+    # Check if CRD exists
+    if ! KUBECONFIG="$MANAGEMENT_KUBECONFIG" kubectl get crd clusteraccesses.gateway.platform-mesh.io &>/dev/null; then
+        log_info "ClusterAccess CRD not found. Installing CRD..."
+        
+        # Get the directory where this script is located
+        SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+        CRD_PATH="$SCRIPT_DIR/../config/crd/gateway.platform-mesh.io_clusteraccesses.yaml"
+        
+        # Check if CRD file exists
+        if [[ ! -f "$CRD_PATH" ]]; then
+            log_error "CRD file not found at: $CRD_PATH"
+            log_error "Please ensure the CRD file exists in the expected location"
+            exit 1
+        fi
+        
+        # Install the CRD
+        if KUBECONFIG="$MANAGEMENT_KUBECONFIG" kubectl apply -f "$CRD_PATH"; then
+            log_info "ClusterAccess CRD installed successfully"
+        else
+            log_error "Failed to install ClusterAccess CRD"
+            exit 1
+        fi
+    else
+        log_info "ClusterAccess CRD is already installed"
+    fi
+}
+
 cleanup_existing_resources() {
     log_info "Checking for existing ClusterAccess resource '$CLUSTER_NAME'..."
     
@@ -173,6 +203,9 @@ if ! KUBECONFIG="$MANAGEMENT_KUBECONFIG" kubectl cluster-info &>/dev/null; then
     exit 1
 fi
 log_info "Management cluster is accessible"
+
+# Ensure CRD is installed in management cluster
+ensure_crd_installed
 
 # Create kubeconfig secret in management cluster
 log_info "Creating admin kubeconfig secret in management cluster..."
