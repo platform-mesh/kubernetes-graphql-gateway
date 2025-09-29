@@ -232,7 +232,7 @@ func TestStringMapScalar_ParseLiteral(t *testing.T) {
 					},
 				},
 			},
-			expected: map[string]string{"name": "prod", "env": "prod"},
+			expected: map[string]string{"name": "test", "env": "prod"},
 		},
 		{
 			name: "list_value_with_invalid_item",
