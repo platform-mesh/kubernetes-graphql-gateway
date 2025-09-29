@@ -120,6 +120,15 @@ ensure_crd_installed() {
         # Install the CRD
         if KUBECONFIG="$MANAGEMENT_KUBECONFIG" kubectl apply -f "$CRD_PATH"; then
             log_info "ClusterAccess CRD installed successfully"
+            
+            # Wait for CRD to reach Established condition
+            log_info "Waiting for ClusterAccess CRD to become established..."
+            if KUBECONFIG="$MANAGEMENT_KUBECONFIG" kubectl wait --for=condition=Established crd/clusteraccesses.gateway.platform-mesh.io --timeout=60s; then
+                log_info "ClusterAccess CRD is now established and ready"
+            else
+                log_error "ClusterAccess CRD failed to reach Established condition within 60 seconds"
+                exit 1
+            fi
         else
             log_error "Failed to install ClusterAccess CRD"
             exit 1
