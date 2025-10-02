@@ -6,3 +6,8 @@ import "net/http"
 func NewUnauthorizedRoundTripperForTest() http.RoundTripper {
 	return &unauthorizedRoundTripper{}
 }
+
+// IsWorkspaceQualifiedForTest exports isWorkspaceQualified for testing
+func IsWorkspaceQualifiedForTest(path string) bool {
+	return isWorkspaceQualified(path)
+}

@@ -613,3 +613,183 @@ func TestUnauthorizedRoundTripper_RoundTrip(t *testing.T) {
 	assert.Equal(t, req, resp.Request)
 	assert.Equal(t, http.NoBody, resp.Body)
 }
+
+func TestIsWorkspaceQualified(t *testing.T) {
+	tests := []struct {
+		name     string
+		path     string
+		expected bool
+	}{
+		{
+			name:     "clusters_as_first_segment",
+			path:     "/clusters/workspace1/api/v1/pods",
+			expected: true,
+		},
+		{
+			name:     "clusters_as_first_segment_no_trailing",
+			path:     "/clusters/workspace1",
+			expected: true,
+		},
+		{
+			name:     "clusters_as_first_segment_with_trailing_slash",
+			path:     "/clusters/",
+			expected: true,
+		},
+		{
+			name:     "clusters_only",
+			path:     "/clusters",
+			expected: true,
+		},
+		{
+			name:     "services_then_clusters_false_positive",
+			path:     "/services/clusters/api/v1/pods",
+			expected: false,
+		},
+		{
+			name:     "services_with_clusters_as_third_segment",
+			path:     "/services/myservice/clusters/workspace1/api/v1/pods",
+			expected: true,
+		},
+		{
+			name:     "services_with_clusters_short_path",
+			path:     "/services/myservice/clusters",
+			expected: true,
+		},
+		{
+			name:     "services_without_clusters",
+			path:     "/services/myservice/api/v1/pods",
+			expected: false,
+		},
+		{
+			name:     "api_path",
+			path:     "/api/v1/pods",
+			expected: false,
+		},
+		{
+			name:     "empty_path",
+			path:     "",
+			expected: false,
+		},
+		{
+			name:     "root_path",
+			path:     "/",
+			expected: false,
+		},
+		{
+			name:     "clusters_in_query_param",
+			path:     "/api?param=clusters",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := roundtripper.IsWorkspaceQualifiedForTest(tt.path)
+			assert.Equal(t, tt.expected, result,
+				"isWorkspaceQualified(%s) = %v, expected %v", tt.path, result, tt.expected)
+		})
+	}
+}
+
+func TestRoundTripper_WorkspaceQualifiedPathDetection(t *testing.T) {
+	tests := []struct {
+		name                 string
+		path                 string
+		workspace            string
+		expectedOriginalPath string
+		expectedModifiedPath string
+	}{
+		{
+			name:                 "clusters_first_segment_is_qualified",
+			path:                 "/clusters/workspace1/api/v1/pods",
+			workspace:            "workspace2",
+			expectedOriginalPath: "/clusters/workspace1/api/v1/pods",
+			expectedModifiedPath: "/clusters/workspace1/api/v1/pods",
+		},
+		{
+			name:                 "clusters_first_segment_short_path",
+			path:                 "/clusters/workspace1",
+			workspace:            "workspace2",
+			expectedOriginalPath: "/clusters/workspace1",
+			expectedModifiedPath: "/clusters/workspace1",
+		},
+		{
+			name:                 "services_with_clusters_in_middle_not_qualified",
+			path:                 "/services/clusters/api/v1/pods",
+			workspace:            "workspace1",
+			expectedOriginalPath: "/services/clusters/api/v1/pods",
+			expectedModifiedPath: "/services/clusters/clusters/workspace1/api/v1/pods",
+		},
+		{
+			name:                 "services_normal_path_not_qualified",
+			path:                 "/services/myservice/api/v1/pods",
+			workspace:            "workspace1",
+			expectedOriginalPath: "/services/myservice/api/v1/pods",
+			expectedModifiedPath: "/services/myservice/clusters/workspace1/api/v1/pods",
+		},
+		{
+			name:                 "services_with_existing_clusters_qualified",
+			path:                 "/services/myservice/clusters/workspace1/api/v1/pods",
+			workspace:            "workspace2",
+			expectedOriginalPath: "/services/myservice/clusters/workspace1/api/v1/pods",
+			expectedModifiedPath: "/services/myservice/clusters/workspace1/api/v1/pods",
+		},
+		{
+			name:                 "api_path_not_qualified",
+			path:                 "/api/v1/pods",
+			workspace:            "workspace1",
+			expectedOriginalPath: "/api/v1/pods",
+			expectedModifiedPath: "/api/v1/pods",
+		},
+		{
+			name:                 "root_path_not_qualified",
+			path:                 "/",
+			workspace:            "workspace1",
+			expectedOriginalPath: "/",
+			expectedModifiedPath: "/",
+		},
+		{
+			name:                 "empty_workspace_no_modification",
+			path:                 "/services/myservice/api/v1/pods",
+			workspace:            "",
+			expectedOriginalPath: "/services/myservice/api/v1/pods",
+			expectedModifiedPath: "/services/myservice/api/v1/pods",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockAdmin := &mocks.MockRoundTripper{}
+			mockUnauthorized := &mocks.MockRoundTripper{}
+
+			var capturedRequest *http.Request
+			mockAdmin.EXPECT().RoundTrip(mock.Anything).Return(&http.Response{StatusCode: http.StatusOK}, nil).Run(func(req *http.Request) {
+				capturedRequest = req
+			})
+
+			appCfg := appConfig.Config{
+				LocalDevelopment: true,
+			}
+
+			rt := roundtripper.New(testlogger.New().Logger, appCfg, mockAdmin, mockUnauthorized)
+
+			req := httptest.NewRequest(http.MethodGet, "http://example.com"+tt.path, nil)
+
+			if tt.workspace != "" {
+				req = req.WithContext(ctxkeys.WithKcpWorkspace(req.Context(), tt.workspace))
+			}
+
+			resp, err := rt.RoundTrip(req)
+			require.NoError(t, err)
+			require.NotNil(t, resp)
+
+			assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+			require.NotNil(t, capturedRequest)
+			assert.Equal(t, tt.expectedModifiedPath, capturedRequest.URL.Path,
+				"Expected path to be %s but got %s", tt.expectedModifiedPath, capturedRequest.URL.Path)
+
+			mockAdmin.AssertExpectations(t)
+		})
+	}
+}

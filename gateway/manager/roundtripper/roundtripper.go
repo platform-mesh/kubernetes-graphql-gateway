@@ -155,6 +155,21 @@ func stripWorkspacePrefix(parts []string) []string {
 	return parts
 }
 
+func isWorkspaceQualified(path string) bool {
+	path = strings.Trim(path, "/")
+	if path == "" {
+		return false
+	}
+	segments := strings.Split(path, "/")
+	if len(segments) > 0 && segments[0] == "clusters" {
+		return true
+	}
+	if len(segments) >= 3 && segments[0] == "services" && segments[2] == "clusters" {
+		return true
+	}
+	return false
+}
+
 // handleVirtualWorkspaceURL modifies the request URL for virtual workspace requests
 // to include the workspace from the request context
 func (rt *roundTripper) handleVirtualWorkspaceURL(req *http.Request) *http.Request {
@@ -165,7 +180,7 @@ func (rt *roundTripper) handleVirtualWorkspaceURL(req *http.Request) *http.Reque
 		return req
 	}
 
-	if strings.Contains(req.URL.Path, "/clusters/") {
+	if isWorkspaceQualified(req.URL.Path) {
 		return req
 	}
 
