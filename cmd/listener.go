@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"crypto/tls"
-	"os"
 
 	kcpapis "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
 	kcpcore "github.com/kcp-dev/kcp/sdk/apis/core/v1alpha1"
@@ -107,8 +106,7 @@ var listenCmd = &cobra.Command{
 			Scheme: scheme,
 		})
 		if err != nil {
-			log.Error().Err(err).Msg("failed to create client from config")
-			os.Exit(1)
+			log.Fatal().Err(err).Msg("failed to create client from config")
 		}
 
 		reconcilerOpts := reconciler.ReconcilerOpts{
@@ -124,8 +122,7 @@ var listenCmd = &cobra.Command{
 		if appCfg.EnableKcp {
 			kcpManager, err := kcp.NewKCPManager(appCfg, reconcilerOpts, log)
 			if err != nil {
-				log.Error().Err(err).Msg("unable to create KCP manager")
-				os.Exit(1)
+				log.Fatal().Err(err).Msg("unable to create KCP manager")
 			}
 			reconcilerInstance = kcpManager
 
@@ -145,33 +142,28 @@ var listenCmd = &cobra.Command{
 		} else {
 			ioHandler, err := workspacefile.NewIOHandler(appCfg.OpenApiDefinitionsPath)
 			if err != nil {
-				log.Error().Err(err).Msg("unable to create IO handler")
-				os.Exit(1)
+				log.Fatal().Err(err).Msg("unable to create IO handler")
 			}
 
 			reconcilerInstance, err = clusteraccess.NewClusterAccessReconciler(ctx, appCfg, reconcilerOpts, ioHandler, apischema.NewResolver(log), log)
 			if err != nil {
-				log.Error().Err(err).Msg("unable to create cluster access reconciler")
-				os.Exit(1)
+				log.Fatal().Err(err).Msg("unable to create cluster access reconciler")
 			}
 		}
 
 		// Setup reconciler with its own manager and start everything
 		// Use the original context for the manager - it will be cancelled if watcher fails
 		if err := startManagerWithReconciler(ctx, reconcilerInstance); err != nil {
-			log.Error().Err(err).Msg("failed to start manager with reconciler")
-			os.Exit(1)
+			log.Fatal().Err(err).Msg("failed to start manager with reconciler")
 		}
 
 		// Determine exit reason: error-triggered vs. normal signal
 		select {
 		case err := <-errCh:
 			if err != nil {
-				log.Error().Err(err).Msg("exiting due to critical component failure")
-				os.Exit(1)
+				log.Fatal().Err(err).Msg("exiting due to critical component failure")
 			}
 		default:
-			// Normal, graceful shutdown via signal
 			log.Info().Msg("graceful shutdown complete")
 		}
 	},

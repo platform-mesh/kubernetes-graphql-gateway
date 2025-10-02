@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 	"time"
 
 	openmfpcontext "github.com/platform-mesh/golang-commons/context"
@@ -30,22 +29,19 @@ var gatewayCmd = &cobra.Command{
 		defer shutdown()
 
 		if err := initializeSentry(ctx, log); err != nil {
-			log.Error().Err(err).Msg("Failed to initialize Sentry")
-			os.Exit(1)
+			log.Fatal().Err(err).Msg("Failed to initialize Sentry")
 		}
 
 		ctrl.SetLogger(log.Logr())
 
 		gatewayInstance, err := manager.NewGateway(ctx, log, appCfg)
 		if err != nil {
-			log.Error().Err(err).Msg("Failed to create gateway")
-			os.Exit(1)
+			log.Fatal().Err(err).Msg("Failed to create gateway")
 		}
 
 		tracingShutdown, err := initializeTracing(ctx, log)
 		if err != nil {
-			log.Error().Err(err).Msg("Failed to initialize tracing")
-			os.Exit(1)
+			log.Fatal().Err(err).Msg("Failed to initialize tracing")
 		}
 		defer func() {
 			if err := tracingShutdown(ctx); err != nil {
@@ -54,8 +50,7 @@ var gatewayCmd = &cobra.Command{
 		}()
 
 		if err := runServers(ctx, log, gatewayInstance); err != nil {
-			log.Error().Err(err).Msg("Failed to run servers")
-			os.Exit(1)
+			log.Fatal().Err(err).Msg("Failed to run servers")
 		}
 	},
 }
