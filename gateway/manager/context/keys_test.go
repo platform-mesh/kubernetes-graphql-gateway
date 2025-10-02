@@ -18,12 +18,11 @@ func TestTokenContextHelpers(t *testing.T) {
 	})
 
 	t.Run("WithToken_and_TokenFromContext", func(t *testing.T) {
-		ctx := context.Background()
 		token := "test-token-123"
 
 		// Store token in context
-		ctxWithToken := ctxkeys.WithToken(ctx, token)
-		assert.NotEqual(t, ctx, ctxWithToken, "Context should be different after adding token")
+		ctxWithToken := ctxkeys.WithToken(t.Context(), token)
+		assert.NotEqual(t, t.Context(), ctxWithToken, "Context should be different after adding token")
 
 		// Retrieve token from context
 		retrievedToken, ok := ctxkeys.TokenFromContext(ctxWithToken)
@@ -32,17 +31,14 @@ func TestTokenContextHelpers(t *testing.T) {
 	})
 
 	t.Run("TokenFromContext_empty_context", func(t *testing.T) {
-		ctx := context.Background()
-
-		token, ok := ctxkeys.TokenFromContext(ctx)
+		token, ok := ctxkeys.TokenFromContext(t.Context())
 		assert.False(t, ok, "Token should not be found in empty context")
 		assert.Empty(t, token, "Token should be empty when not found")
 	})
 
 	t.Run("TokenFromContext_wrong_type", func(t *testing.T) {
-		ctx := context.Background()
 		// Store a non-string value using the token key
-		ctxWithWrongType := context.WithValue(ctx, ctxkeys.TokenKey(), 123)
+		ctxWithWrongType := context.WithValue(t.Context(), ctxkeys.TokenKey(), 123)
 
 		token, ok := ctxkeys.TokenFromContext(ctxWithWrongType)
 		assert.False(t, ok, "Token should not be found when wrong type is stored")
@@ -50,10 +46,9 @@ func TestTokenContextHelpers(t *testing.T) {
 	})
 
 	t.Run("WithToken_empty_string", func(t *testing.T) {
-		ctx := context.Background()
 		emptyToken := ""
 
-		ctxWithToken := ctxkeys.WithToken(ctx, emptyToken)
+		ctxWithToken := ctxkeys.WithToken(t.Context(), emptyToken)
 		retrievedToken, ok := ctxkeys.TokenFromContext(ctxWithToken)
 		assert.True(t, ok, "Empty token should still be found in context")
 		assert.Equal(t, emptyToken, retrievedToken, "Empty token should be retrievable")
@@ -68,12 +63,11 @@ func TestKcpWorkspaceContextHelpers(t *testing.T) {
 	})
 
 	t.Run("WithKcpWorkspace_and_KcpWorkspaceFromContext", func(t *testing.T) {
-		ctx := context.Background()
 		workspace := "root:orgs:default"
 
 		// Store workspace in context
-		ctxWithWorkspace := ctxkeys.WithKcpWorkspace(ctx, workspace)
-		assert.NotEqual(t, ctx, ctxWithWorkspace, "Context should be different after adding workspace")
+		ctxWithWorkspace := ctxkeys.WithKcpWorkspace(t.Context(), workspace)
+		assert.NotEqual(t, t.Context(), ctxWithWorkspace, "Context should be different after adding workspace")
 
 		// Retrieve workspace from context
 		retrievedWorkspace, ok := ctxkeys.KcpWorkspaceFromContext(ctxWithWorkspace)
@@ -82,17 +76,14 @@ func TestKcpWorkspaceContextHelpers(t *testing.T) {
 	})
 
 	t.Run("KcpWorkspaceFromContext_empty_context", func(t *testing.T) {
-		ctx := context.Background()
-
-		workspace, ok := ctxkeys.KcpWorkspaceFromContext(ctx)
+		workspace, ok := ctxkeys.KcpWorkspaceFromContext(t.Context())
 		assert.False(t, ok, "Workspace should not be found in empty context")
 		assert.Empty(t, workspace, "Workspace should be empty when not found")
 	})
 
 	t.Run("KcpWorkspaceFromContext_wrong_type", func(t *testing.T) {
-		ctx := context.Background()
 		// Store a non-string value using the workspace key
-		ctxWithWrongType := context.WithValue(ctx, ctxkeys.KcpWorkspaceKey(), 456)
+		ctxWithWrongType := context.WithValue(t.Context(), ctxkeys.KcpWorkspaceKey(), 456)
 
 		workspace, ok := ctxkeys.KcpWorkspaceFromContext(ctxWithWrongType)
 		assert.False(t, ok, "Workspace should not be found when wrong type is stored")
@@ -100,10 +91,9 @@ func TestKcpWorkspaceContextHelpers(t *testing.T) {
 	})
 
 	t.Run("WithKcpWorkspace_complex_path", func(t *testing.T) {
-		ctx := context.Background()
 		complexWorkspace := "root:orgs:company:team:project"
 
-		ctxWithWorkspace := ctxkeys.WithKcpWorkspace(ctx, complexWorkspace)
+		ctxWithWorkspace := ctxkeys.WithKcpWorkspace(t.Context(), complexWorkspace)
 		retrievedWorkspace, ok := ctxkeys.KcpWorkspaceFromContext(ctxWithWorkspace)
 		assert.True(t, ok, "Complex workspace should be found in context")
 		assert.Equal(t, complexWorkspace, retrievedWorkspace, "Complex workspace should be retrievable")
@@ -118,12 +108,11 @@ func TestClusterNameContextHelpers(t *testing.T) {
 	})
 
 	t.Run("WithClusterName_and_ClusterNameFromContext", func(t *testing.T) {
-		ctx := context.Background()
 		clusterName := logicalcluster.Name("test-cluster")
 
 		// Store cluster name in context
-		ctxWithClusterName := ctxkeys.WithClusterName(ctx, clusterName)
-		assert.NotEqual(t, ctx, ctxWithClusterName, "Context should be different after adding cluster name")
+		ctxWithClusterName := ctxkeys.WithClusterName(t.Context(), clusterName)
+		assert.NotEqual(t, t.Context(), ctxWithClusterName, "Context should be different after adding cluster name")
 
 		// Retrieve cluster name from context
 		retrievedClusterName, ok := ctxkeys.ClusterNameFromContext(ctxWithClusterName)
@@ -132,17 +121,14 @@ func TestClusterNameContextHelpers(t *testing.T) {
 	})
 
 	t.Run("ClusterNameFromContext_empty_context", func(t *testing.T) {
-		ctx := context.Background()
-
-		clusterName, ok := ctxkeys.ClusterNameFromContext(ctx)
+		clusterName, ok := ctxkeys.ClusterNameFromContext(t.Context())
 		assert.False(t, ok, "Cluster name should not be found in empty context")
 		assert.Equal(t, logicalcluster.Name(""), clusterName, "Cluster name should be empty when not found")
 	})
 
 	t.Run("ClusterNameFromContext_wrong_type", func(t *testing.T) {
-		ctx := context.Background()
 		// Store a non-logicalcluster.Name value using the cluster name key
-		ctxWithWrongType := context.WithValue(ctx, ctxkeys.ClusterNameKey(), "wrong-type")
+		ctxWithWrongType := context.WithValue(t.Context(), ctxkeys.ClusterNameKey(), "wrong-type")
 
 		clusterName, ok := ctxkeys.ClusterNameFromContext(ctxWithWrongType)
 		assert.False(t, ok, "Cluster name should not be found when wrong type is stored")
@@ -150,20 +136,18 @@ func TestClusterNameContextHelpers(t *testing.T) {
 	})
 
 	t.Run("WithClusterName_root_cluster", func(t *testing.T) {
-		ctx := context.Background()
 		rootCluster := logicalcluster.Name("root")
 
-		ctxWithClusterName := ctxkeys.WithClusterName(ctx, rootCluster)
+		ctxWithClusterName := ctxkeys.WithClusterName(t.Context(), rootCluster)
 		retrievedClusterName, ok := ctxkeys.ClusterNameFromContext(ctxWithClusterName)
 		assert.True(t, ok, "Root cluster name should be found in context")
 		assert.Equal(t, rootCluster, retrievedClusterName, "Root cluster name should be retrievable")
 	})
 
 	t.Run("WithClusterName_empty_name", func(t *testing.T) {
-		ctx := context.Background()
 		emptyName := logicalcluster.Name("")
 
-		ctxWithClusterName := ctxkeys.WithClusterName(ctx, emptyName)
+		ctxWithClusterName := ctxkeys.WithClusterName(t.Context(), emptyName)
 		retrievedClusterName, ok := ctxkeys.ClusterNameFromContext(ctxWithClusterName)
 		assert.True(t, ok, "Empty cluster name should still be found in context")
 		assert.Equal(t, emptyName, retrievedClusterName, "Empty cluster name should be retrievable")
@@ -172,14 +156,12 @@ func TestClusterNameContextHelpers(t *testing.T) {
 
 func TestContextKeyIsolation(t *testing.T) {
 	t.Run("different_keys_dont_interfere", func(t *testing.T) {
-		ctx := context.Background()
-
 		// Store values with different keys
 		token := "test-token"
 		workspace := "test-workspace"
 		clusterName := logicalcluster.Name("test-cluster")
 
-		ctx = ctxkeys.WithToken(ctx, token)
+		ctx := ctxkeys.WithToken(t.Context(), token)
 		ctx = ctxkeys.WithKcpWorkspace(ctx, workspace)
 		ctx = ctxkeys.WithClusterName(ctx, clusterName)
 
@@ -198,13 +180,11 @@ func TestContextKeyIsolation(t *testing.T) {
 	})
 
 	t.Run("overwriting_values", func(t *testing.T) {
-		ctx := context.Background()
-
 		// Store initial values
 		initialToken := "initial-token"
 		initialWorkspace := "initial-workspace"
 
-		ctx = ctxkeys.WithToken(ctx, initialToken)
+		ctx := ctxkeys.WithToken(t.Context(), initialToken)
 		ctx = ctxkeys.WithKcpWorkspace(ctx, initialWorkspace)
 
 		// Overwrite with new values
