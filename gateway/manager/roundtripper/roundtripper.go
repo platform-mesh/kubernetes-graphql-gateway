@@ -116,44 +116,44 @@ func (u *unauthorizedRoundTripper) RoundTrip(req *http.Request) (*http.Response,
 }
 
 func isDiscoveryRequest(req *http.Request) bool {
-	// Only GET requests can be discovery requests
 	if req.Method != http.MethodGet {
 		return false
 	}
 
-	// Parse and clean the URL path
 	path := req.URL.Path
-	path = strings.Trim(path, "/") // remove leading and trailing slashes
+	path = strings.Trim(path, "/")
 	if path == "" {
 		return false
 	}
 	parts := strings.Split(path, "/")
 
-	// Remove workspace prefixes to get the actual API path
-	if len(parts) >= 5 && parts[0] == "services" && parts[2] == "clusters" {
-		// Handle virtual workspace prefixes first: /services/<service>/clusters/<workspace>/api
-		parts = parts[4:] // Remove /services/<service>/clusters/<workspace> prefix
-	} else if len(parts) >= 3 && parts[0] == "services" {
-		// Handle APIExport virtual workspace pattern: /services/<service>/api
-		parts = parts[2:] // Remove /services/<service> prefix
-	} else if len(parts) >= 3 && parts[0] == "clusters" {
-		// Handle KCP workspace prefixes: /clusters/<workspace>/api
-		parts = parts[2:] // Remove /clusters/<workspace> prefix
-	}
+	parts = stripWorkspacePrefix(parts)
 
-	// Check if the remaining path matches Kubernetes discovery API patterns
 	switch {
 	case len(parts) == 1 && (parts[0] == "api" || parts[0] == "apis"):
-		return true // /api or /apis (root discovery endpoints)
+		return true // /api or /apis
 	case len(parts) == 2 && parts[0] == "apis":
-		return true // /apis/<group> (group discovery)
+		return true // /apis/<group>
 	case len(parts) == 2 && parts[0] == "api":
-		return true // /api/v1 (core API version discovery)
+		return true // /api/v1
 	case len(parts) == 3 && parts[0] == "apis":
-		return true // /apis/<group>/<version> (group version discovery)
+		return true // /apis/<group>/<version>
 	default:
 		return false
 	}
+}
+
+func stripWorkspacePrefix(parts []string) []string {
+	if len(parts) >= 5 && parts[0] == "services" && parts[2] == "clusters" {
+		return parts[4:] // /services/<service>/clusters/<workspace>/api/...
+	}
+	if len(parts) >= 3 && parts[0] == "services" {
+		return parts[2:] // /services/<service>/api/...
+	}
+	if len(parts) >= 3 && parts[0] == "clusters" {
+		return parts[2:] // /clusters/<workspace>/api/...
+	}
+	return parts
 }
 
 // handleVirtualWorkspaceURL modifies the request URL for virtual workspace requests
