@@ -2,7 +2,6 @@ package roundtripper
 
 import (
 	"net/http"
-	"net/url"
 	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -166,17 +165,11 @@ func (rt *roundTripper) handleVirtualWorkspaceURL(req *http.Request) *http.Reque
 		return req
 	}
 
-	// Parse the current URL
-	parsedURL, err := url.Parse(req.URL.String())
-	if err != nil {
-		rt.log.Error().Err(err).Str("url", req.URL.String()).Msg("Failed to parse request URL")
+	if strings.Contains(req.URL.Path, "/clusters/") {
 		return req
 	}
 
-	// Check if the URL already contains /clusters/ path (already modified)
-	if strings.Contains(parsedURL.Path, "/clusters/") {
-		return req
-	}
+	parsedURL := *req.URL
 
 	// Modify the URL to include the workspace path
 	// Transform: /services/contentconfigurations/api/v1/configmaps
@@ -201,9 +194,8 @@ func (rt *roundTripper) handleVirtualWorkspaceURL(req *http.Request) *http.Reque
 		}
 	}
 
-	// Create a new request with the modified URL
 	newReq := req.Clone(req.Context())
-	newReq.URL = parsedURL
+	newReq.URL = &parsedURL
 
 	return newReq
 }
