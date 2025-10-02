@@ -100,42 +100,29 @@ fi
 log_info "Cluster name: $CLUSTER_NAME"
 
 ensure_crd_installed() {
-    log_info "Checking if ClusterAccess CRD is installed in management cluster..."
+    log_info "Ensuring ClusterAccess CRD is installed in management cluster..."
     
-    # Check if CRD exists
-    if ! KUBECONFIG="$MANAGEMENT_KUBECONFIG" kubectl get crd clusteraccesses.gateway.platform-mesh.io &>/dev/null; then
-        log_info "ClusterAccess CRD not found. Installing CRD..."
-        
-        # Get the directory where this script is located
-        SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-        CRD_PATH="$SCRIPT_DIR/../config/crd/gateway.platform-mesh.io_clusteraccesses.yaml"
-        
-        # Check if CRD file exists
-        if [[ ! -f "$CRD_PATH" ]]; then
-            log_error "CRD file not found at: $CRD_PATH"
-            log_error "Please ensure the CRD file exists in the expected location"
-            exit 1
-        fi
-        
-        # Install the CRD
-        if KUBECONFIG="$MANAGEMENT_KUBECONFIG" kubectl apply -f "$CRD_PATH"; then
-            log_info "ClusterAccess CRD installed successfully"
-            
-            # Wait for CRD to reach Established condition
-            log_info "Waiting for ClusterAccess CRD to become established..."
-            if KUBECONFIG="$MANAGEMENT_KUBECONFIG" kubectl wait --for=condition=Established crd/clusteraccesses.gateway.platform-mesh.io --timeout=60s; then
-                log_info "ClusterAccess CRD is now established and ready"
-            else
-                log_error "ClusterAccess CRD failed to reach Established condition within 60 seconds"
-                exit 1
-            fi
-        else
-            log_error "Failed to install ClusterAccess CRD"
-            exit 1
-        fi
-    else
-        log_info "ClusterAccess CRD is already installed"
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    CRD_PATH="$SCRIPT_DIR/../config/crd/gateway.platform-mesh.io_clusteraccesses.yaml"
+    
+    if [[ ! -f "$CRD_PATH" ]]; then
+        log_error "CRD file not found at: $CRD_PATH"
+        log_error "Please ensure the CRD file exists in the expected location"
+        exit 1
     fi
+    
+    if ! KUBECONFIG="$MANAGEMENT_KUBECONFIG" kubectl apply -f "$CRD_PATH"; then
+        log_error "Failed to apply ClusterAccess CRD"
+        exit 1
+    fi
+    
+    log_info "Waiting for ClusterAccess CRD to become established..."
+    if ! KUBECONFIG="$MANAGEMENT_KUBECONFIG" kubectl wait --for=condition=Established crd/clusteraccesses.gateway.platform-mesh.io --timeout=60s; then
+        log_error "ClusterAccess CRD failed to reach Established condition within 60 seconds"
+        exit 1
+    fi
+    
+    log_info "ClusterAccess CRD is established and ready"
 }
 
 cleanup_existing_resources() {
