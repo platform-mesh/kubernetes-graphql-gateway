@@ -651,9 +651,14 @@ func TestIsWorkspaceQualified(t *testing.T) {
 			expected: true,
 		},
 		{
-			name:     "services_with_clusters_short_path",
+			name:     "services_with_clusters_short_path_no_workspace",
 			path:     "/services/myservice/clusters",
-			expected: true,
+			expected: false,
+		},
+		{
+			name:     "services_with_clusters_empty_workspace",
+			path:     "/services/myservice/clusters/",
+			expected: false,
 		},
 		{
 			name:     "services_without_clusters",

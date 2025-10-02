@@ -164,7 +164,7 @@ func isWorkspaceQualified(path string) bool {
 	if len(segments) > 0 && segments[0] == "clusters" {
 		return true
 	}
-	if len(segments) >= 3 && segments[0] == "services" && segments[2] == "clusters" {
+	if len(segments) >= 4 && segments[0] == "services" && segments[2] == "clusters" && segments[3] != "" {
 		return true
 	}
 	return false
