@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 
 	kcpapis "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
 	kcpcore "github.com/kcp-dev/kcp/sdk/apis/core/v1alpha1"
@@ -130,12 +131,17 @@ var listenCmd = &cobra.Command{
 			if appCfg.Listener.VirtualWorkspacesConfigPath != "" {
 				go func() {
 					if err := kcpManager.StartVirtualWorkspaceWatching(ctx, appCfg.Listener.VirtualWorkspacesConfigPath); err != nil {
-						log.Error().Err(err).Msg("virtual workspace watching failed, initiating graceful shutdown")
-						select {
-						case errCh <- err:
-						default:
+						if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+							log.Info().Msg("virtual workspace watching stopped due to context cancellation")
+							cancel()
+						} else {
+							log.Error().Err(err).Msg("virtual workspace watching failed, initiating graceful shutdown")
+							select {
+							case errCh <- err:
+							default:
+							}
+							cancel()
 						}
-						cancel() // Trigger coordinated shutdown
 					}
 				}()
 			}
