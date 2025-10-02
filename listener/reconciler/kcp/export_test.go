@@ -2,6 +2,7 @@ package kcp
 
 import (
 	"context"
+	"fmt"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
@@ -18,7 +19,11 @@ import (
 var ConfigForKCPClusterExported = ConfigForKCPCluster
 
 func NewClusterPathResolverExported(cfg *rest.Config, scheme interface{}, log *logger.Logger) (*ClusterPathResolverProvider, error) {
-	return NewClusterPathResolver(cfg, scheme.(*runtime.Scheme), log)
+	s, ok := scheme.(*runtime.Scheme)
+	if !ok {
+		return nil, fmt.Errorf("expected *runtime.Scheme, got %T", scheme)
+	}
+	return NewClusterPathResolver(cfg, s, log)
 }
 
 func PathForClusterFromConfigExported(clusterName string, cfg *rest.Config) (string, error) {
