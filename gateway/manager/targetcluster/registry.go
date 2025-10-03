@@ -191,28 +191,31 @@ func (cr *ClusterRegistry) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // handleAuth handles authentication for non-GET requests
 func (cr *ClusterRegistry) handleAuth(w http.ResponseWriter, r *http.Request, token string, cluster *TargetCluster) bool {
-	if !cr.appCfg.LocalDevelopment {
+	if cr.appCfg.LocalDevelopment {
+		return true
+	}
+
+	if cr.appCfg.Gateway.IntrospectionAuthentication {
 		if token == "" {
 			http.Error(w, "Authorization header is required", http.StatusUnauthorized)
 			return false
 		}
 
-		if cr.appCfg.IntrospectionAuthentication {
-			if IsIntrospectionQuery(r) {
-				valid, err := cr.validateToken(r.Context(), token, cluster)
-				if err != nil {
-					cr.log.Error().Err(err).Str("cluster", cluster.name).Msg("Error validating token")
-					http.Error(w, "Token validation failed", http.StatusUnauthorized)
-					return false
-				}
-				if !valid {
-					cr.log.Debug().Str("cluster", cluster.name).Msg("Invalid token for introspection query")
-					http.Error(w, "Invalid token", http.StatusUnauthorized)
-					return false
-				}
+		if IsIntrospectionQuery(r) {
+			valid, err := cr.validateToken(r.Context(), token, cluster)
+			if err != nil {
+				cr.log.Error().Err(err).Str("cluster", cluster.name).Msg("Error validating token")
+				http.Error(w, "Token validation failed", http.StatusUnauthorized)
+				return false
+			}
+			if !valid {
+				cr.log.Debug().Str("cluster", cluster.name).Msg("Invalid token for introspection query")
+				http.Error(w, "Invalid token", http.StatusUnauthorized)
+				return false
 			}
 		}
 	}
+
 	return true
 }
 

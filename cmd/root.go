@@ -56,7 +56,6 @@ func initConfig() {
 	v.SetDefault("openapi-definitions-path", "./bin/definitions")
 	v.SetDefault("enable-kcp", true)
 	v.SetDefault("local-development", false)
-	v.SetDefault("introspection-authentication", false)
 
 	// Listener
 	v.SetDefault("listener-apiexport-workspace", ":root")
@@ -64,17 +63,20 @@ func initConfig() {
 
 	// Gateway
 	v.SetDefault("gateway-port", "8080")
-
 	v.SetDefault("gateway-username-claim", "email")
 	v.SetDefault("gateway-should-impersonate", true)
+	v.SetDefault("gateway-introspection-authentication", false)
+
 	// Gateway Handler config
 	v.SetDefault("gateway-handler-pretty", true)
 	v.SetDefault("gateway-handler-playground", true)
 	v.SetDefault("gateway-handler-graphiql", true)
+
 	// Gateway CORS
 	v.SetDefault("gateway-cors-enabled", false)
 	v.SetDefault("gateway-cors-allowed-origins", "*")
 	v.SetDefault("gateway-cors-allowed-headers", "*")
+
 	// Gateway URL
 	v.SetDefault("gateway-url-virtual-workspace-prefix", "virtual-workspace")
 	v.SetDefault("gateway-url-default-kcp-workspace", "root")

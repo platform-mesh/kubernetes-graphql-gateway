@@ -1,10 +1,9 @@
 package config
 
 type Config struct {
-	OpenApiDefinitionsPath      string `mapstructure:"openapi-definitions-path"`
-	EnableKcp                   bool   `mapstructure:"enable-kcp"`
-	LocalDevelopment            bool   `mapstructure:"local-development"`
-	IntrospectionAuthentication bool   `mapstructure:"introspection-authentication"`
+	OpenApiDefinitionsPath string `mapstructure:"openapi-definitions-path"`
+	EnableKcp              bool   `mapstructure:"enable-kcp"`
+	LocalDevelopment       bool   `mapstructure:"local-development"`
 
 	Url struct {
 		VirtualWorkspacePrefix string `mapstructure:"gateway-url-virtual-workspace-prefix"`
@@ -17,9 +16,10 @@ type Config struct {
 	} `mapstructure:",squash"`
 
 	Gateway struct {
-		Port              string `mapstructure:"gateway-port"`
-		UsernameClaim     string `mapstructure:"gateway-username-claim"`
-		ShouldImpersonate bool   `mapstructure:"gateway-should-impersonate"`
+		Port                        string `mapstructure:"gateway-port"`
+		UsernameClaim               string `mapstructure:"gateway-username-claim"`
+		ShouldImpersonate           bool   `mapstructure:"gateway-should-impersonate"`
+		IntrospectionAuthentication bool   `mapstructure:"gateway-introspection-authentication"`
 
 		HandlerCfg struct {
 			Pretty     bool `mapstructure:"gateway-handler-pretty"`

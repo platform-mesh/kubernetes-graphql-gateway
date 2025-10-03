@@ -510,10 +510,6 @@ func TestRoundTripper_InvalidTokenSecurityFix(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 }
 
-func TestRoundTripper_ExistingAuthHeadersAreCleanedBeforeTokenAuth(t *testing.T) {
-	t.Skip("Test requires mocking baseRT which is internal implementation detail")
-}
-
 func TestRoundTripper_ExistingAuthHeadersAreCleanedBeforeImpersonation(t *testing.T) {
 	// This test verifies that existing Authorization headers are properly cleaned
 	// before setting the bearer token in impersonation mode

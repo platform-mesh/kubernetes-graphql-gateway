@@ -123,7 +123,7 @@ func (suite *CommonTestSuite) SetupTest() {
 
 	suite.appCfg.LocalDevelopment = suite.LocalDevelopment
 	suite.appCfg.Gateway.Cors.Enabled = true
-	suite.appCfg.IntrospectionAuthentication = suite.AuthenticateSchemaRequests
+	suite.appCfg.Gateway.IntrospectionAuthentication = suite.AuthenticateSchemaRequests
 
 	// Set URL configuration for the gateway tests
 	suite.appCfg.Url.VirtualWorkspacePrefix = "virtual-workspace"

@@ -13,7 +13,7 @@ func TestConfig_StructInitialization(t *testing.T) {
 	assert.Empty(t, cfg.OpenApiDefinitionsPath)
 	assert.False(t, cfg.EnableKcp)
 	assert.False(t, cfg.LocalDevelopment)
-	assert.False(t, cfg.IntrospectionAuthentication)
+	assert.False(t, cfg.Gateway.IntrospectionAuthentication)
 
 	// Test nested struct fields
 	assert.Empty(t, cfg.Url.VirtualWorkspacePrefix)
@@ -37,10 +37,9 @@ func TestConfig_StructInitialization(t *testing.T) {
 
 func TestConfig_FieldAssignment(t *testing.T) {
 	cfg := Config{
-		OpenApiDefinitionsPath:      "/path/to/definitions",
-		EnableKcp:                   true,
-		LocalDevelopment:            true,
-		IntrospectionAuthentication: true,
+		OpenApiDefinitionsPath: "/path/to/definitions",
+		EnableKcp:              true,
+		LocalDevelopment:       true,
 	}
 
 	cfg.Url.VirtualWorkspacePrefix = "workspace"
@@ -52,6 +51,7 @@ func TestConfig_FieldAssignment(t *testing.T) {
 	cfg.Gateway.Port = "8080"
 	cfg.Gateway.UsernameClaim = "email"
 	cfg.Gateway.ShouldImpersonate = true
+	cfg.Gateway.IntrospectionAuthentication = true
 
 	cfg.Gateway.HandlerCfg.Pretty = true
 	cfg.Gateway.HandlerCfg.Playground = true
@@ -65,7 +65,7 @@ func TestConfig_FieldAssignment(t *testing.T) {
 	assert.Equal(t, "/path/to/definitions", cfg.OpenApiDefinitionsPath)
 	assert.True(t, cfg.EnableKcp)
 	assert.True(t, cfg.LocalDevelopment)
-	assert.True(t, cfg.IntrospectionAuthentication)
+	assert.True(t, cfg.Gateway.IntrospectionAuthentication)
 
 	assert.Equal(t, "workspace", cfg.Url.VirtualWorkspacePrefix)
 	assert.Equal(t, "default", cfg.Url.DefaultKcpWorkspace)
