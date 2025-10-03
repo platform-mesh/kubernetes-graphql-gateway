@@ -6,6 +6,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/platform-mesh/golang-commons/logger"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/client-go/transport"
 
 	"github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
@@ -16,15 +17,17 @@ type TokenKey struct{}
 type roundTripper struct {
 	log                     *logger.Logger
 	adminRT, unauthorizedRT http.RoundTripper
+	baseRT                  http.RoundTripper
 	appCfg                  config.Config
 }
 
 type unauthorizedRoundTripper struct{}
 
-func New(log *logger.Logger, appCfg config.Config, adminRoundTripper, unauthorizedRT http.RoundTripper) http.RoundTripper {
+func New(log *logger.Logger, appCfg config.Config, adminRoundTripper, baseRoundTripper, unauthorizedRT http.RoundTripper) http.RoundTripper {
 	return &roundTripper{
 		log:            log,
 		adminRT:        adminRoundTripper,
+		baseRT:         baseRoundTripper,
 		unauthorizedRT: unauthorizedRT,
 		appCfg:         appCfg,
 	}
@@ -64,17 +67,14 @@ func (rt *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 		return rt.unauthorizedRT.RoundTrip(req)
 	}
 
-	// No we are going to use token based auth only, so we are reassigning the headers
+	req = utilnet.CloneRequest(req)
 	req.Header.Del("Authorization")
-	req.Header.Set("Authorization", "Bearer "+token)
 
 	if !rt.appCfg.Gateway.ShouldImpersonate {
 		rt.log.Debug().Str("path", req.URL.Path).Msg("Using bearer token authentication")
-
-		return rt.adminRT.RoundTrip(req)
+		return transport.NewBearerAuthRoundTripper(token, rt.baseRT).RoundTrip(req)
 	}
 
-	// Impersonation mode: extract user from token and impersonate
 	rt.log.Debug().Str("path", req.URL.Path).Msg("Using impersonation mode")
 	claims := jwt.MapClaims{}
 	_, _, err := jwt.NewParser().ParseUnverified(token, claims)
@@ -113,38 +113,32 @@ func (u *unauthorizedRoundTripper) RoundTrip(req *http.Request) (*http.Response,
 }
 
 func isDiscoveryRequest(req *http.Request) bool {
-	// Only GET requests can be discovery requests
 	if req.Method != http.MethodGet {
 		return false
 	}
 
-	// Parse and clean the URL path
 	path := req.URL.Path
-	path = strings.Trim(path, "/") // remove leading and trailing slashes
+	path = strings.Trim(path, "/")
 	if path == "" {
 		return false
 	}
 	parts := strings.Split(path, "/")
 
-	// Remove workspace prefixes to get the actual API path
 	if len(parts) >= 5 && parts[0] == "services" && parts[2] == "clusters" {
-		// Handle virtual workspace prefixes first: /services/<service>/clusters/<workspace>/api
-		parts = parts[4:] // Remove /services/<service>/clusters/<workspace> prefix
+		parts = parts[4:]
 	} else if len(parts) >= 3 && parts[0] == "clusters" {
-		// Handle KCP workspace prefixes: /clusters/<workspace>/api
-		parts = parts[2:] // Remove /clusters/<workspace> prefix
+		parts = parts[2:]
 	}
 
-	// Check if the remaining path matches Kubernetes discovery API patterns
 	switch {
 	case len(parts) == 1 && (parts[0] == "api" || parts[0] == "apis"):
-		return true // /api or /apis (root discovery endpoints)
+		return true
 	case len(parts) == 2 && parts[0] == "apis":
-		return true // /apis/<group> (group discovery)
+		return true
 	case len(parts) == 2 && parts[0] == "api":
-		return true // /api/v1 (core API version discovery)
+		return true
 	case len(parts) == 3 && parts[0] == "apis":
-		return true // /apis/<group>/<version> (group version discovery)
+		return true
 	default:
 		return false
 	}

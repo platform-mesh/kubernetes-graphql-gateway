@@ -15,6 +15,7 @@ import (
 
 	"github.com/platform-mesh/kubernetes-graphql-gateway/common/auth"
 	appConfig "github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/roundtripper"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/resolver"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/schema"
 )
@@ -64,7 +65,6 @@ func NewTargetCluster(
 	schemaFilePath string,
 	log *logger.Logger,
 	appCfg appConfig.Config,
-	roundTripperFactory func(http.RoundTripper, rest.TLSClientConfig) http.RoundTripper,
 ) (*TargetCluster, error) {
 	fileData, err := readSchemaFile(schemaFilePath)
 	if err != nil {
@@ -78,7 +78,7 @@ func NewTargetCluster(
 	}
 
 	// Connect to cluster - use metadata if available, otherwise fall back to standard config
-	if err := cluster.connect(appCfg, fileData.ClusterMetadata, roundTripperFactory); err != nil {
+	if err := cluster.connect(appCfg, fileData.ClusterMetadata); err != nil {
 		return nil, fmt.Errorf("failed to connect to cluster: %w", err)
 	}
 
@@ -96,7 +96,7 @@ func NewTargetCluster(
 }
 
 // connect establishes connection to the target cluster
-func (tc *TargetCluster) connect(appCfg appConfig.Config, metadata *ClusterMetadata, roundTripperFactory func(http.RoundTripper, rest.TLSClientConfig) http.RoundTripper) error {
+func (tc *TargetCluster) connect(appCfg appConfig.Config, metadata *ClusterMetadata) error {
 	// All clusters now use metadata from schema files to get kubeconfig
 	if metadata == nil {
 		return fmt.Errorf("cluster %s requires cluster metadata in schema file", tc.name)
@@ -114,11 +114,16 @@ func (tc *TargetCluster) connect(appCfg appConfig.Config, metadata *ClusterMetad
 		return fmt.Errorf("failed to build config from metadata: %w", err)
 	}
 
-	if roundTripperFactory != nil {
-		tc.restCfg.Wrap(func(rt http.RoundTripper) http.RoundTripper {
-			return roundTripperFactory(rt, tc.restCfg.TLSClientConfig)
-		})
-	}
+	tc.restCfg.Wrap(func(adminRT http.RoundTripper) http.RoundTripper {
+		baseRT := unwrapToBaseTransport(adminRT)
+		return roundtripper.New(
+			tc.log,
+			tc.appCfg,
+			adminRT,
+			baseRT,
+			roundtripper.NewUnauthorizedRoundTripper(),
+		)
+	})
 
 	// Create client - use KCP-aware client only for KCP mode, standard client otherwise
 	if appCfg.EnableKcp {
@@ -162,6 +167,21 @@ func buildConfigFromMetadata(metadata *ClusterMetadata, log *logger.Logger) (*re
 		Msg("configured cluster from metadata")
 
 	return config, nil
+}
+
+// unwrapToBaseTransport recursively unwraps a RoundTripper chain to find the base HTTP transport
+func unwrapToBaseTransport(rt http.RoundTripper) http.RoundTripper {
+	type unwrapper interface {
+		WrappedRoundTripper() http.RoundTripper
+	}
+
+	for {
+		if unwrap, ok := rt.(unwrapper); ok {
+			rt = unwrap.WrappedRoundTripper()
+		} else {
+			return rt
+		}
+	}
 }
 
 // createHandler creates the GraphQL schema and handler

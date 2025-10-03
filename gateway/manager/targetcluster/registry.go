@@ -22,29 +22,23 @@ type contextKey string
 // kcpWorkspaceKey is the context key for storing KCP workspace information
 const kcpWorkspaceKey contextKey = "kcpWorkspace"
 
-// RoundTripperFactory creates HTTP round trippers for authentication
-type RoundTripperFactory func(http.RoundTripper, rest.TLSClientConfig) http.RoundTripper
-
 // ClusterRegistry manages multiple target clusters and handles HTTP routing to them
 type ClusterRegistry struct {
-	mu                  sync.RWMutex
-	clusters            map[string]*TargetCluster
-	log                 *logger.Logger
-	appCfg              appConfig.Config
-	roundTripperFactory RoundTripperFactory
+	mu       sync.RWMutex
+	clusters map[string]*TargetCluster
+	log      *logger.Logger
+	appCfg   appConfig.Config
 }
 
 // NewClusterRegistry creates a new cluster registry
 func NewClusterRegistry(
 	log *logger.Logger,
 	appCfg appConfig.Config,
-	roundTripperFactory RoundTripperFactory,
 ) *ClusterRegistry {
 	return &ClusterRegistry{
-		clusters:            make(map[string]*TargetCluster),
-		log:                 log,
-		appCfg:              appCfg,
-		roundTripperFactory: roundTripperFactory,
+		clusters: make(map[string]*TargetCluster),
+		log:      log,
+		appCfg:   appCfg,
 	}
 }
 
@@ -62,7 +56,7 @@ func (cr *ClusterRegistry) LoadCluster(schemaFilePath string) error {
 		Msg("Loading target cluster")
 
 	// Create or update cluster
-	cluster, err := NewTargetCluster(name, schemaFilePath, cr.log, cr.appCfg, cr.roundTripperFactory)
+	cluster, err := NewTargetCluster(name, schemaFilePath, cr.log, cr.appCfg)
 	if err != nil {
 		return fmt.Errorf("failed to create target cluster %s: %w", name, err)
 	}
