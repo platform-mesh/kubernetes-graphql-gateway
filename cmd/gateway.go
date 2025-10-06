@@ -13,6 +13,7 @@ import (
 	"github.com/platform-mesh/golang-commons/traces"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/cobra"
+	"golang.org/x/sync/errgroup"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager"
@@ -121,61 +122,65 @@ func createServers(gatewayInstance http.Handler) (*http.Server, *http.Server, *h
 	return mainServer, metricsServer, healthServer
 }
 
-func shutdownServers(ctx context.Context, log *logger.Logger, mainServer, metricsServer, healthServer *http.Server) {
+func shutdownServers(ctx context.Context, log *logger.Logger, servers ...*http.Server) {
 	log.Info().Msg("Shutting down HTTP servers...")
 
-	if err := mainServer.Shutdown(ctx); err != nil {
-		log.Error().Err(err).Msg("Main HTTP server shutdown failed")
-	}
-
-	if err := metricsServer.Shutdown(ctx); err != nil {
-		log.Error().Err(err).Msg("Metrics HTTP server shutdown failed")
-	}
-
-	if err := healthServer.Shutdown(ctx); err != nil {
-		log.Error().Err(err).Msg("Health HTTP server shutdown failed")
+	for _, srv := range servers {
+		if err := srv.Shutdown(ctx); err != nil {
+			log.Error().Err(err).Str("addr", srv.Addr).Msg("HTTP server shutdown failed")
+		}
 	}
 }
 
 func runServers(ctx context.Context, log *logger.Logger, gatewayInstance http.Handler) error {
 	mainServer, metricsServer, healthServer := createServers(gatewayInstance)
 
-	// Start main server (GraphQL)
-	go func() {
+	eg, egCtx := errgroup.WithContext(ctx)
+
+	eg.Go(func() error {
 		log.Info().Str("addr", mainServer.Addr).Msg("Starting main HTTP server")
 		if err := mainServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Error().Err(err).Msg("Error starting main HTTP server")
+			return fmt.Errorf("main server error: %w", err)
 		}
-	}()
+		return nil
+	})
 
-	// Start metrics server
-	go func() {
+	eg.Go(func() error {
 		log.Info().Str("addr", metricsServer.Addr).Msg("Starting metrics HTTP server")
 		if err := metricsServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Error().Err(err).Msg("Error starting metrics HTTP server")
+			return fmt.Errorf("metrics server error: %w", err)
 		}
-	}()
+		return nil
+	})
 
-	// Start health server
-	go func() {
+	eg.Go(func() error {
 		log.Info().Str("addr", healthServer.Addr).Msg("Starting health HTTP server")
 		if err := healthServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Error().Err(err).Msg("Error starting health HTTP server")
+			return fmt.Errorf("health server error: %w", err)
 		}
-	}()
+		return nil
+	})
 
-	// Wait for shutdown signal
-	<-ctx.Done()
+	eg.Go(func() error {
+		<-egCtx.Done()
+		log.Info().Msg("Shutdown signal received")
 
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), defaultCfg.ShutdownTimeout)
-	defer cancel()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), defaultCfg.ShutdownTimeout)
+		defer cancel()
 
-	shutdownServers(shutdownCtx, log, mainServer, metricsServer, healthServer)
+		shutdownServers(shutdownCtx, log, mainServer, metricsServer, healthServer)
 
-	if closer, ok := gatewayInstance.(interface{ Close() error }); ok {
-		if err := closer.Close(); err != nil {
-			log.Error().Err(err).Msg("Error closing gateway services")
+		if closer, ok := gatewayInstance.(interface{ Close() error }); ok {
+			if err := closer.Close(); err != nil {
+				log.Error().Err(err).Msg("Error closing gateway services")
+			}
 		}
+
+		return nil
+	})
+
+	if err := eg.Wait(); err != nil {
+		return err
 	}
 
 	log.Info().Msg("Server shut down successfully")
