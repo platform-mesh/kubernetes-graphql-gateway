@@ -205,9 +205,9 @@ func TestPathForCluster(t *testing.T) {
 	}{
 		{
 			name:        "root_cluster_returns_root",
-			clusterName: "root",
+			clusterName: kcp.RootClusterName,
 			mockSetup:   func(m *mocks.MockClient) {},
-			want:        "root",
+			want:        kcp.RootClusterName,
 			wantErr:     false,
 		},
 		{
@@ -333,9 +333,9 @@ func TestPathForClusterFromConfig(t *testing.T) {
 	}{
 		{
 			name:        "root_cluster_returns_root",
-			clusterName: "root",
+			clusterName: kcp.RootClusterName,
 			config:      &rest.Config{Host: "https://kcp.example.com"},
-			want:        "root",
+			want:        kcp.RootClusterName,
 		},
 		{
 			name:        "nil_config_returns_cluster_name",
@@ -401,7 +401,7 @@ func TestPathForClusterFromConfig(t *testing.T) {
 			name:        "apiexport_url_with_fragment",
 			clusterName: "hash123",
 			config:      &rest.Config{Host: "https://kcp.example.com/services/apiexport/root/export#section"},
-			want:        "root",
+			want:        kcp.RootClusterName,
 		},
 		{
 			name:        "cluster_url_with_query_params",
@@ -411,9 +411,9 @@ func TestPathForClusterFromConfig(t *testing.T) {
 		},
 		{
 			name:        "apiexport_url_workspace_equals_cluster_name",
-			clusterName: "root",
+			clusterName: kcp.RootClusterName,
 			config:      &rest.Config{Host: "https://kcp.example.com/services/apiexport/root/export"},
-			want:        "root",
+			want:        kcp.RootClusterName,
 		},
 		{
 			name:        "apiexport_url_malformed_fallback_to_extractAPIExportRef",

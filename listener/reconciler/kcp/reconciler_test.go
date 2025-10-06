@@ -243,7 +243,7 @@ func TestKCPManager_ResolveWorkspacePath(t *testing.T) {
 		},
 		{
 			name:        "root_cluster",
-			clusterName: "root",
+			clusterName: kcp.RootClusterName,
 			expectErr:   false,
 			expectedLen: 1,
 		},
@@ -289,8 +289,8 @@ func TestKCPManager_GenerateAndWriteSchemaForWorkspace(t *testing.T) {
 		},
 		{
 			name:          "root_workspace",
-			workspacePath: "root",
-			clusterName:   "root",
+			workspacePath: kcp.RootClusterName,
+			clusterName:   kcp.RootClusterName,
 			expectErr:     false,
 		},
 		{

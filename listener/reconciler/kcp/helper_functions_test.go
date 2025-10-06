@@ -85,7 +85,7 @@ func TestExtractAPIExportRef(t *testing.T) {
 		{
 			name:              "valid_simple_apiexport",
 			input:             "https://kcp.example.com/services/apiexport/root/core.platform-mesh.io",
-			expectedWorkspace: "root",
+			expectedWorkspace: kcp.RootClusterName,
 			expectedExport:    "core.platform-mesh.io",
 			expectErr:         false,
 		},
@@ -99,21 +99,21 @@ func TestExtractAPIExportRef(t *testing.T) {
 		{
 			name:              "valid_with_port",
 			input:             "https://kcp.example.com:6443/services/apiexport/root/core.platform-mesh.io",
-			expectedWorkspace: "root",
+			expectedWorkspace: kcp.RootClusterName,
 			expectedExport:    "core.platform-mesh.io",
 			expectErr:         false,
 		},
 		{
 			name:              "valid_with_trailing_slash",
 			input:             "https://kcp.example.com/services/apiexport/root/core.platform-mesh.io/",
-			expectedWorkspace: "root",
+			expectedWorkspace: kcp.RootClusterName,
 			expectedExport:    "core.platform-mesh.io",
 			expectErr:         false,
 		},
 		{
 			name:              "valid_with_query_params",
 			input:             "https://kcp.example.com/services/apiexport/root/core.platform-mesh.io?timeout=30s",
-			expectedWorkspace: "root",
+			expectedWorkspace: kcp.RootClusterName,
 			expectedExport:    "core.platform-mesh.io",
 			expectErr:         false,
 		},

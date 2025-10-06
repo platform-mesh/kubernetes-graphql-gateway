@@ -16,6 +16,10 @@ import (
 	"github.com/platform-mesh/golang-commons/logger"
 )
 
+const (
+	RootClusterName = "root"
+)
+
 var (
 	ErrNilConfig             = errors.New("config cannot be nil")
 	ErrNilScheme             = errors.New("scheme should not be nil")
@@ -89,7 +93,7 @@ func (cp *ClusterPathResolverProvider) ClientForCluster(name string) (client.Cli
 }
 
 func (cp *ClusterPathResolverProvider) PathForCluster(name string, clt client.Client) (string, error) {
-	if name == "root" {
+	if name == RootClusterName {
 		return name, nil
 	}
 
@@ -143,7 +147,7 @@ func (cp *ClusterPathResolverProvider) PathForCluster(name string, clt client.Cl
 // Returns either a workspace path or cluster hash depending on the URL type.
 // This is an alternative approach when LogicalCluster resource is not accessible.
 func PathForClusterFromConfig(clusterName string, cfg *rest.Config) (string, error) {
-	if clusterName == "root" {
+	if clusterName == RootClusterName {
 		return clusterName, nil
 	}
 

@@ -704,7 +704,7 @@ func TestVirtualWorkspaceReconciler_ProcessVirtualWorkspace(t *testing.T) {
 
 			appCfg := config.Config{}
 			appCfg.Url.VirtualWorkspacePrefix = "virtual-workspace"
-			appCfg.Url.DefaultKcpWorkspace = "root"
+			appCfg.Url.DefaultKcpWorkspace = RootClusterName
 			appCfg.Url.KcpWorkspacePattern = "root:orgs:{org}"
 
 			manager := NewVirtualWorkspaceManager(appCfg)
