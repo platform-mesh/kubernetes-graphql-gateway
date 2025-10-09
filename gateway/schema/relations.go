@@ -96,7 +96,7 @@ func (g *Gateway) findRelationTarget(baseName string) (graphql.Output, *schema.G
 		if g.matchesTargetKind(defSchema, targetKind) {
 			// Resolve or build the GraphQL type
 			var fieldType graphql.Output
-			if existingType, exists := g.typesCache[defKey]; exists {
+			if existingType, exists := g.typesCache[defKey]; exists && existingType != nil {
 				fieldType = existingType
 			} else {
 				ft, _, err := g.convertSwaggerTypeToGraphQL(defSchema, defKey, []string{}, make(map[string]bool))
@@ -104,6 +104,10 @@ func (g *Gateway) findRelationTarget(baseName string) (graphql.Output, *schema.G
 					continue
 				}
 				fieldType = ft
+			}
+
+			if fieldType == nil {
+				continue
 			}
 
 			// Extract GVK from the schema definition
