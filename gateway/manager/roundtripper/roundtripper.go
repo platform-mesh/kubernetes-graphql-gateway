@@ -67,6 +67,7 @@ func (rt *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 		return rt.unauthorizedRT.RoundTrip(req)
 	}
 
+	// No we are going to use token based auth only, so we are reassigning the headers
 	req = utilnet.CloneRequest(req)
 	req.Header.Del("Authorization")
 
@@ -75,6 +76,7 @@ func (rt *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 		return transport.NewBearerAuthRoundTripper(token, rt.baseRT).RoundTrip(req)
 	}
 
+	// Impersonation mode: extract user from token and impersonate
 	rt.log.Debug().Str("path", req.URL.Path).Msg("Using impersonation mode")
 	claims := jwt.MapClaims{}
 	_, _, err := jwt.NewParser().ParseUnverified(token, claims)
@@ -113,32 +115,38 @@ func (u *unauthorizedRoundTripper) RoundTrip(req *http.Request) (*http.Response,
 }
 
 func isDiscoveryRequest(req *http.Request) bool {
+	// Only GET requests can be discovery requests
 	if req.Method != http.MethodGet {
 		return false
 	}
 
+	// Parse and clean the URL path
 	path := req.URL.Path
-	path = strings.Trim(path, "/")
+	path = strings.Trim(path, "/") // remove leading and trailing slashes
 	if path == "" {
 		return false
 	}
 	parts := strings.Split(path, "/")
 
+	// Remove workspace prefixes to get the actual API path
 	if len(parts) >= 5 && parts[0] == "services" && parts[2] == "clusters" {
-		parts = parts[4:]
+		// Handle virtual workspace prefixes first: /services/<service>/clusters/<workspace>/api
+		parts = parts[4:] // Remove /services/<service>/clusters/<workspace> prefix
 	} else if len(parts) >= 3 && parts[0] == "clusters" {
-		parts = parts[2:]
+		// Handle KCP workspace prefixes: /clusters/<workspace>/api
+		parts = parts[2:] // Remove /clusters/<workspace> prefix
 	}
 
+	// Check if the remaining path matches Kubernetes discovery API patterns
 	switch {
 	case len(parts) == 1 && (parts[0] == "api" || parts[0] == "apis"):
-		return true
+		return true // /api or /apis (root discovery endpoints)
 	case len(parts) == 2 && parts[0] == "apis":
-		return true
+		return true // /apis/<group> (group discovery)
 	case len(parts) == 2 && parts[0] == "api":
-		return true
+		return true // /api/v1 (core API version discovery)
 	case len(parts) == 3 && parts[0] == "apis":
-		return true
+		return true // /apis/<group>/<version> (group version discovery)
 	default:
 		return false
 	}
