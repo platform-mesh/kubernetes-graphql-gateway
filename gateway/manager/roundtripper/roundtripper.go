@@ -1,12 +1,14 @@
 package roundtripper
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/platform-mesh/golang-commons/logger"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
 
 	"github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
@@ -36,6 +38,18 @@ func New(log *logger.Logger, appCfg config.Config, adminRoundTripper, baseRoundT
 // NewUnauthorizedRoundTripper returns a RoundTripper that always returns 401 Unauthorized
 func NewUnauthorizedRoundTripper() http.RoundTripper {
 	return &unauthorizedRoundTripper{}
+}
+
+// NewBaseRoundTripper creates a base HTTP transport with only TLS configuration (no authentication)
+func NewBaseRoundTripper(tlsConfig rest.TLSClientConfig) (http.RoundTripper, error) {
+	return rest.TransportFor(&rest.Config{
+		TLSClientConfig: rest.TLSClientConfig{
+			Insecure:   tlsConfig.Insecure,
+			ServerName: tlsConfig.ServerName,
+			CAFile:     tlsConfig.CAFile,
+			CAData:     tlsConfig.CAData,
+		},
+	})
 }
 
 func (rt *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -73,6 +87,7 @@ func (rt *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	if !rt.appCfg.Gateway.ShouldImpersonate {
 		rt.log.Debug().Str("path", req.URL.Path).Msg("Using bearer token authentication")
+		fmt.Println(token)
 		return transport.NewBearerAuthRoundTripper(token, rt.baseRT).RoundTrip(req)
 	}
 

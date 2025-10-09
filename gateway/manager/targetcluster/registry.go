@@ -213,7 +213,14 @@ func (cr *ClusterRegistry) handleAuth(w http.ResponseWriter, r *http.Request, to
 				http.Error(w, "Invalid token", http.StatusUnauthorized)
 				return false
 			}
+
+			return true
 		}
+	}
+
+	if token == "" {
+		http.Error(w, "Authorization header is required", http.StatusUnauthorized)
+		return false
 	}
 
 	return true

@@ -115,7 +115,11 @@ func (tc *TargetCluster) connect(appCfg appConfig.Config, metadata *ClusterMetad
 	}
 
 	tc.restCfg.Wrap(func(adminRT http.RoundTripper) http.RoundTripper {
-		baseRT := unwrapToBaseTransport(adminRT)
+		baseRT, err := roundtripper.NewBaseRoundTripper(tc.restCfg.TLSClientConfig)
+		if err != nil {
+			tc.log.Error().Err(err).Msg("Failed to create base transport, falling back to default transport")
+			baseRT = http.DefaultTransport
+		}
 		return roundtripper.New(
 			tc.log,
 			tc.appCfg,
@@ -167,21 +171,6 @@ func buildConfigFromMetadata(metadata *ClusterMetadata, log *logger.Logger) (*re
 		Msg("configured cluster from metadata")
 
 	return config, nil
-}
-
-// unwrapToBaseTransport recursively unwraps a RoundTripper chain to find the base HTTP transport
-func unwrapToBaseTransport(rt http.RoundTripper) http.RoundTripper {
-	type unwrapper interface {
-		WrappedRoundTripper() http.RoundTripper
-	}
-
-	for {
-		if unwrap, ok := rt.(unwrapper); ok {
-			rt = unwrap.WrappedRoundTripper()
-		} else {
-			return rt
-		}
-	}
 }
 
 // createHandler creates the GraphQL schema and handler
