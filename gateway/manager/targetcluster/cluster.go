@@ -120,6 +120,7 @@ func (tc *TargetCluster) connect(appCfg appConfig.Config, metadata *ClusterMetad
 			tc.log.Error().Err(err).Msg("Failed to create base transport, falling back to default transport")
 			baseRT = http.DefaultTransport
 		}
+
 		return roundtripper.New(
 			tc.log,
 			tc.appCfg,
