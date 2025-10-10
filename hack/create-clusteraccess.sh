@@ -128,6 +128,9 @@ ensure_crd_installed() {
 cleanup_existing_resources() {
     log_info "Checking for existing ClusterAccess resource '$CLUSTER_NAME'..."
     
+    SA_NAME="kubernetes-graphql-gateway-admin"
+    SA_NAMESPACE="default"
+    
     # Check if ClusterAccess exists in management cluster
     if KUBECONFIG="$MANAGEMENT_KUBECONFIG" kubectl get clusteraccess "$CLUSTER_NAME" &>/dev/null; then
         log_warn "ClusterAccess '$CLUSTER_NAME' already exists. Cleaning up existing resources..."
@@ -145,6 +148,14 @@ cleanup_existing_resources() {
         log_info "Cleanup completed. Creating fresh resources..."
     else
         log_info "No existing ClusterAccess found. Creating new resources..."
+    fi
+    
+    # Clean up ServiceAccount and related resources in target cluster
+    if KUBECONFIG="$TARGET_KUBECONFIG" kubectl get serviceaccount "$SA_NAME" -n "$SA_NAMESPACE" &>/dev/null; then
+        log_info "Cleaning up existing ServiceAccount and related resources in target cluster..."
+        KUBECONFIG="$TARGET_KUBECONFIG" kubectl delete secret "${SA_NAME}-token" -n "$SA_NAMESPACE" --ignore-not-found=true
+        KUBECONFIG="$TARGET_KUBECONFIG" kubectl delete clusterrolebinding "${SA_NAME}-cluster-admin" --ignore-not-found=true
+        KUBECONFIG="$TARGET_KUBECONFIG" kubectl delete serviceaccount "$SA_NAME" -n "$SA_NAMESPACE" --ignore-not-found=true
     fi
 }
 
@@ -200,6 +211,51 @@ if ! KUBECONFIG="$MANAGEMENT_KUBECONFIG" kubectl cluster-info &>/dev/null; then
 fi
 log_info "Management cluster is accessible"
 
+# Create ServiceAccount with admin access in target cluster
+log_info "Creating ServiceAccount with admin access in target cluster..."
+SA_NAME="kubernetes-graphql-gateway-admin"
+SA_NAMESPACE="default"
+
+cat <<EOF | KUBECONFIG="$TARGET_KUBECONFIG" kubectl apply -f -
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: $SA_NAME
+  namespace: $SA_NAMESPACE
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: $SA_NAME-cluster-admin
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+- kind: ServiceAccount
+  name: $SA_NAME
+  namespace: $SA_NAMESPACE
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: $SA_NAME-token
+  namespace: $SA_NAMESPACE
+  annotations:
+    kubernetes.io/service-account.name: $SA_NAME
+type: kubernetes.io/service-account-token
+EOF
+
+log_info "Waiting for token to be populated..."
+sleep 2
+
+ADMIN_TOKEN=$(KUBECONFIG="$TARGET_KUBECONFIG" kubectl get secret $SA_NAME-token -n $SA_NAMESPACE -o jsonpath='{.data.token}' | base64 -d)
+if [[ -z "$ADMIN_TOKEN" ]]; then
+    log_error "Failed to retrieve admin token"
+    exit 1
+fi
+log_info "Admin token created successfully"
+
 # Ensure CRD is installed in management cluster
 ensure_crd_installed
 
@@ -248,10 +304,21 @@ echo "  - CA secret: $NAMESPACE/${CLUSTER_NAME}-ca (in management cluster)"
 echo "  - ClusterAccess: $CLUSTER_NAME"
 echo "  - Server URL: $SERVER_URL"
 echo "  - Access level: Full cluster admin (can access all resources including ClusterRoles, etc.)"
+echo "  - ServiceAccount: $SA_NAME (in target cluster namespace: $SA_NAMESPACE)"
+
+
+
+echo ""
+echo ""
+log_info "Admin access token for direct API access (copy-paste ready):"
+echo '```'
+echo '{'
+echo "  \"Authorization\": \"Bearer $ADMIN_TOKEN\""
+echo '}'
+echo '```' 
 
 echo ""
 log_info "You can now run the listener to generate the schema:"
 echo "  export ENABLE_KCP=false"
-echo "  export LOCAL_DEVELOPMENT=false"
-echo "  export KUBECONFIG=\"$MANAGEMENT_KUBECONFIG\""
-echo "  task listener" 
+echo "  export GATEWAY_SHOULD_IMPERSONATE=false"
+echo "  task listener"
