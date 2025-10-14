@@ -105,16 +105,6 @@ The gateway:
   - Serves GraphQL API at `/{cluster-name}/graphql`
 - **Does NOT require KUBECONFIG** - all connection info comes from schema files
 
-## Testing
-
-Use the provided integration test:
-
-```bash
-./scripts/test-clusteraccess-integration.sh
-```
-
-This test verifies the end-to-end flow with kubeconfig-based authentication.
-
 ## Troubleshooting
 
 ### Schema files not generated
