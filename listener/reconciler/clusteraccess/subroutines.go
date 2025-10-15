@@ -17,7 +17,11 @@ import (
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler"
 )
 
-const lastSchemaFilenameAnnotation = "platform-mesh.io/last-schema-filename"
+// generateSchemaSubroutine processes ClusterAccess resources and generates schemas
+const (
+	finalizerName            = "gateway.openmfp.org/clusteraccess-finalizer"
+	lastSchemaPathAnnotation = "gateway.openmfp.org/last-schema-path"
+)
 
 // generateSchemaSubroutine processes ClusterAccess resources and generates schemas
 type generateSchemaSubroutine struct {
@@ -74,17 +78,15 @@ func (s *generateSchemaSubroutine) Process(ctx context.Context, instance runtime
 		return ctrl.Result{}, commonserrors.NewOperatorError(err, false, false)
 	}
 
-	// Before writing, check if the schema filename changed compared to previous reconcile.
-	ann := clusterAccess.GetAnnotations()
-	if ann == nil {
-		ann = map[string]string{}
+	// If path changed, delete the old schema file referenced in the annotation
+	prevPath := ""
+	if ann := clusterAccess.GetAnnotations(); ann != nil {
+		prevPath = ann[lastSchemaPathAnnotation]
 	}
-	prevFile := ann[lastSchemaFilenameAnnotation]
-	if prevFile != "" && prevFile != clusterName {
-		if err := s.reconciler.ioHandler.Delete(prevFile); err != nil {
-			s.reconciler.log.Warn().Err(err).Str("prevFile", prevFile).Str("clusterAccess", clusterAccessName).Msg("failed to delete previous schema file; continuing")
-		} else {
-			s.reconciler.log.Info().Str("deletedFile", prevFile).Str("clusterAccess", clusterAccessName).Msg("deleted previous schema file after path change")
+	if prevPath != "" && prevPath != clusterName {
+		if err := s.reconciler.ioHandler.Delete(prevPath); err != nil {
+			// Log and continue; do not fail reconciliation on cleanup issues
+			s.reconciler.log.Warn().Err(err).Str("previousPath", prevPath).Str("clusterAccess", clusterAccessName).Msg("failed to delete previous schema file")
 		}
 	}
 
@@ -94,16 +96,24 @@ func (s *generateSchemaSubroutine) Process(ctx context.Context, instance runtime
 		return ctrl.Result{}, commonserrors.NewOperatorError(err, false, false)
 	}
 
-	// Update the annotation to reflect the current schema filename
-	if prevFile != clusterName {
-		ann[lastSchemaFilenameAnnotation] = clusterName
-		clusterAccess.SetAnnotations(ann)
-		if err := s.reconciler.opts.Client.Update(ctx, clusterAccess); err != nil {
-			s.reconciler.log.Warn().Err(err).Str("clusterAccess", clusterAccessName).Msg("failed to update annotation with last schema filename")
+	// Ensure annotation reflects the current path for future cleanups
+	needUpdate := prevPath != clusterName
+	if needUpdate {
+		obj := clusterAccess.DeepCopy()
+		if obj.Annotations == nil {
+			obj.Annotations = map[string]string{}
+		}
+		obj.Annotations[lastSchemaPathAnnotation] = clusterName
+		if err := s.reconciler.opts.Client.Update(ctx, obj); err != nil {
+			// Log but do not fail reconciliation; file has been written already
+			s.reconciler.log.Warn().Err(err).Str("clusterAccess", clusterAccessName).Msg("failed to update last schema path annotation")
+		} else {
+			// Reflect update locally too to avoid future confusion in this reconcile loop
+			clusterAccess.Annotations = obj.Annotations
 		}
 	}
 
-	s.reconciler.log.Info().Str("clusterAccess", clusterAccessName).Str("schemaFile", clusterName).Msg("successfully processed ClusterAccess resource")
+	s.reconciler.log.Info().Str("clusterAccess", clusterAccessName).Msg("successfully processed ClusterAccess resource")
 	return ctrl.Result{}, nil
 }
 
@@ -128,30 +138,30 @@ func (s *generateSchemaSubroutine) Finalize(ctx context.Context, instance runtim
 		return ctrl.Result{}, commonserrors.NewOperatorError(errors.New("invalid resource type"), false, false)
 	}
 
-	// Determine which file to delete: prefer the recorded annotation, fallback to computed name
-	ann := clusterAccess.GetAnnotations()
-	var filename string
-	if ann != nil && ann[lastSchemaFilenameAnnotation] != "" {
-		filename = ann[lastSchemaFilenameAnnotation]
-	} else {
-		// compute from spec.path or name
-		filename = clusterAccess.Spec.Path
-		if filename == "" {
-			filename = clusterAccess.GetName()
+	// Determine current and previously used paths
+	currentPath := clusterAccess.Spec.Path
+	if currentPath == "" {
+		currentPath = clusterAccess.GetName()
+	}
+	prevPath := ""
+	if ann := clusterAccess.GetAnnotations(); ann != nil {
+		prevPath = ann[lastSchemaPathAnnotation]
+	}
+
+	// Try deleting current path file
+	if currentPath != "" {
+		if err := s.reconciler.ioHandler.Delete(currentPath); err != nil {
+			// Log and continue; do not block finalization just because file was missing or deletion failed
+			s.reconciler.log.Warn().Err(err).Str("path", currentPath).Str("clusterAccess", clusterAccess.GetName()).Msg("failed to delete schema file during finalization")
+		}
+	}
+	// If previous differs, try deleting it as well
+	if prevPath != "" && prevPath != currentPath {
+		if err := s.reconciler.ioHandler.Delete(prevPath); err != nil {
+			s.reconciler.log.Warn().Err(err).Str("path", prevPath).Str("clusterAccess", clusterAccess.GetName()).Msg("failed to delete previous schema file during finalization")
 		}
 	}
 
-	if filename == "" {
-		return ctrl.Result{}, nil
-	}
-
-	if err := s.reconciler.ioHandler.Delete(filename); err != nil {
-		s.reconciler.log.Warn().Err(err).Str("clusterAccess", clusterAccess.GetName()).Str("file", filename).Msg("failed to delete schema file on finalize")
-		// Do not block finalization
-		return ctrl.Result{}, nil
-	}
-
-	s.reconciler.log.Info().Str("clusterAccess", clusterAccess.GetName()).Str("file", filename).Msg("deleted schema file on finalize")
 	return ctrl.Result{}, nil
 }
 
@@ -160,5 +170,5 @@ func (s *generateSchemaSubroutine) GetName() string {
 }
 
 func (s *generateSchemaSubroutine) Finalizers() []string {
-	return nil
+	return []string{finalizerName}
 }
