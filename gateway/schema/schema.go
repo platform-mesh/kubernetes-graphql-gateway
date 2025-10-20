@@ -76,7 +76,7 @@ func (g *Gateway) generateGraphqlSchema() error {
 
 	newSchema, err := graphql.NewSchema(graphql.SchemaConfig{
 		Query: graphql.NewObject(graphql.ObjectConfig{
-			Name:   "PrivateNameForQuery", // we must keep those name unique to avoid collision with objects having the same names
+			Name:   "PrivateNameForQuery",
 			Fields: rootQueryFields,
 		}),
 		Mutation: graphql.NewObject(graphql.ObjectConfig{
@@ -352,7 +352,7 @@ func (g *Gateway) convertSwaggerTypeToGraphQL(schema spec.Schema, typePrefix str
 			// Check if type is already being processed
 			if processingTypes[refKey] {
 				// Return existing type to prevent infinite recursion
-				if existingType, exists := g.typesCache[refKey]; exists {
+				if existingType, exists := g.typesCache[refKey]; exists && existingType != nil {
 					existingInputType := g.inputTypesCache[refKey]
 					return existingType, existingInputType, nil
 				}
@@ -418,8 +418,13 @@ func (g *Gateway) handleObjectFieldSpecType(fieldSpec spec.Schema, typePrefix st
 		typeName := g.generateTypeName(typePrefix, fieldPath)
 
 		// Check if type already generated
-		if existingType, exists := g.typesCache[typeName]; exists {
+		if existingType, exists := g.typesCache[typeName]; exists && existingType != nil {
 			return existingType, g.inputTypesCache[typeName], nil
+		}
+
+		// If type is being processed (nil in cache), return placeholder to prevent recursion
+		if _, exists := g.typesCache[typeName]; exists {
+			return graphql.String, graphql.String, nil
 		}
 
 		// Store placeholder to prevent recursion
