@@ -1,6 +1,7 @@
 package targetcluster
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -9,6 +10,8 @@ import (
 
 	"github.com/go-openapi/spec"
 	"github.com/platform-mesh/golang-commons/logger"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/kcp"
@@ -17,7 +20,7 @@ import (
 	appConfig "github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/roundtripper"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/resolver"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/schema"
+	gwschema "github.com/platform-mesh/kubernetes-graphql-gateway/gateway/schema"
 )
 
 // FileData represents the data extracted from a schema file
@@ -186,7 +189,7 @@ func (tc *TargetCluster) createHandler(definitions map[string]interface{}, appCf
 	resolverProvider := resolver.New(tc.log, tc.client)
 
 	// Create schema gateway
-	schemaGateway, err := schema.New(tc.log, specDefs, resolverProvider)
+	schemaGateway, err := gwschema.New(tc.log, specDefs, resolverProvider)
 	if err != nil {
 		return fmt.Errorf("failed to create GraphQL schema: %w", err)
 	}
@@ -224,6 +227,32 @@ func (tc *TargetCluster) GetEndpoint(appCfg appConfig.Config) string {
 	}
 
 	return fmt.Sprintf("/%s/%s", path, appCfg.Url.GraphqlSuffix)
+}
+
+// ValidateToken validates a token by making an API call using the cluster's client
+func (tc *TargetCluster) ValidateToken(ctx context.Context, token string) (bool, error) {
+	newCtx := context.WithValue(ctx, roundtripper.TokenKey{}, token)
+
+	list := &unstructured.UnstructuredList{}
+	list.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "platform-mesh.io",
+		Version: "v1alpha1",
+		Kind:    "AccountInfoList",
+	})
+
+	err := tc.client.List(newCtx, list)
+	if err != nil {
+		errStr := err.Error()
+		if strings.Contains(errStr, "Unauthorized") || strings.Contains(errStr, "401") {
+			return false, nil
+		}
+		if strings.Contains(errStr, "Forbidden") || strings.Contains(errStr, "403") {
+			return true, nil
+		}
+		return false, err
+	}
+
+	return true, nil
 }
 
 // ServeHTTP handles HTTP requests for this cluster
