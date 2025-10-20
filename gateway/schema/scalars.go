@@ -81,19 +81,27 @@ var stringMapScalar = graphql.NewScalar(graphql.ScalarConfig{
 					return nil
 				}
 
+				// Process each object to extract key-value pair
+				var currentKey, currentValue string
+				var hasKey, hasValue bool
 				for _, field := range obj.Fields {
 					switch field.Name.Value {
 					case "key":
 						if key, ok := field.Value.GetValue().(string); ok {
-							result[key] = ""
+							currentKey = key
+							hasKey = true
 						}
 					case "value":
 						if val, ok := field.Value.GetValue().(string); ok {
-							for key := range result {
-								result[key] = val
-							}
+							currentValue = val
+							hasValue = true
 						}
 					}
+				}
+
+				// Only set the key-value pair if both key and value are present and valid
+				if hasKey && hasValue && currentKey != "" {
+					result[currentKey] = currentValue
 				}
 			}
 

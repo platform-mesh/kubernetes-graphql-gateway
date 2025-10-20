@@ -77,7 +77,7 @@ func TestVirtualWorkspaceManager_GetWorkspacePath(t *testing.T) {
 			prefix: "virtual-workspace",
 			workspace: VirtualWorkspace{
 				Name: "test-workspace",
-				URL:  "https://example.com",
+				URL:  "https://example.com/services/apiexport/root/configmaps-view",
 			},
 			expectedPath: "virtual-workspace/test-workspace",
 		},
@@ -86,7 +86,7 @@ func TestVirtualWorkspaceManager_GetWorkspacePath(t *testing.T) {
 			prefix: "vw",
 			workspace: VirtualWorkspace{
 				Name: "test-workspace_123.domain",
-				URL:  "https://example.com",
+				URL:  "https://example.com/services/apiexport/root/configmaps-view",
 			},
 			expectedPath: "vw/test-workspace_123.domain",
 		},
@@ -95,7 +95,7 @@ func TestVirtualWorkspaceManager_GetWorkspacePath(t *testing.T) {
 			prefix: "",
 			workspace: VirtualWorkspace{
 				Name: "test-workspace",
-				URL:  "https://example.com",
+				URL:  "https://example.com/services/apiexport/root/configmaps-view",
 			},
 			expectedPath: "/test-workspace",
 		},
@@ -125,7 +125,7 @@ func TestCreateVirtualConfig(t *testing.T) {
 			name: "valid_workspace_without_kubeconfig",
 			workspace: VirtualWorkspace{
 				Name: "test-workspace",
-				URL:  "https://example.com",
+				URL:  "https://example.com/services/apiexport/root/configmaps-view",
 			},
 			expectError: false,
 		},
@@ -168,7 +168,7 @@ func TestCreateVirtualConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			config, err := createVirtualConfig(tt.workspace)
+			config, err := createVirtualConfig(tt.workspace, "root:orgs:default")
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -179,7 +179,7 @@ func TestCreateVirtualConfig(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				assert.NotNil(t, config)
-				assert.Equal(t, tt.workspace.URL+"/clusters/root", config.Host)
+				assert.Equal(t, tt.workspace.URL+"/clusters/root:orgs:default", config.Host)
 				if tt.workspace.Kubeconfig == "" {
 					assert.True(t, config.TLSClientConfig.Insecure)
 					assert.Equal(t, "kubernetes-graphql-gateway-listener", config.UserAgent)
@@ -223,10 +223,10 @@ users:
 		Kubeconfig: kubeconfigPath,
 	}
 
-	config, err := createVirtualConfig(workspace)
+	config, err := createVirtualConfig(workspace, "root:orgs:default")
 	assert.NoError(t, err)
 	assert.NotNil(t, config)
-	assert.Equal(t, workspace.URL+"/clusters/root", config.Host)
+	assert.Equal(t, workspace.URL+"/clusters/root:orgs:default", config.Host)
 	assert.Equal(t, "test-token", config.BearerToken)
 }
 
@@ -240,7 +240,7 @@ func TestVirtualWorkspaceManager_CreateDiscoveryClient(t *testing.T) {
 			name: "valid_workspace",
 			workspace: VirtualWorkspace{
 				Name: "test-workspace",
-				URL:  "https://example.com",
+				URL:  "https://example.com/services/apiexport/root/configmaps-view",
 			},
 			expectError: false,
 		},
@@ -302,7 +302,7 @@ users:
 			appCfg := config.Config{}
 			manager := NewVirtualWorkspaceManager(appCfg)
 
-			client, err := manager.CreateDiscoveryClient(tt.workspace)
+			client, err := manager.CreateDiscoveryClient(tt.workspace, "root:orgs:default")
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -325,7 +325,7 @@ func TestVirtualWorkspaceManager_CreateRESTConfig(t *testing.T) {
 			name: "valid_workspace",
 			workspace: VirtualWorkspace{
 				Name: "test-workspace",
-				URL:  "https://example.com",
+				URL:  "https://example.com/services/apiexport/root/configmaps-view",
 			},
 			expectError: false,
 		},
@@ -387,7 +387,7 @@ users:
 			appCfg := config.Config{}
 			manager := NewVirtualWorkspaceManager(appCfg)
 
-			config, err := manager.CreateRESTConfig(tt.workspace)
+			config, err := manager.CreateRESTConfig(tt.workspace, "root:orgs:default")
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -395,7 +395,7 @@ users:
 			} else {
 				assert.NoError(t, err)
 				assert.NotNil(t, config)
-				assert.Equal(t, tt.workspace.URL+"/clusters/root", config.Host)
+				assert.Equal(t, tt.workspace.URL+"/clusters/root:orgs:default", config.Host)
 			}
 		})
 	}
@@ -427,7 +427,7 @@ func TestVirtualWorkspaceManager_LoadConfig(t *testing.T) {
 			configContent: `
 virtualWorkspaces:
   - name: "test-workspace"
-    url: "https://example.com"
+    url: "https://example.com/services/apiexport/root/configmaps-view"
 `,
 			expectError:   false,
 			expectedCount: 1,
@@ -438,10 +438,9 @@ virtualWorkspaces:
 			configContent: `
 virtualWorkspaces:
   - name: "workspace1"
-    url: "https://example.com"
+    url: "https://example.com/services/apiexport/root/configmaps-view"
   - name: "workspace2"
     url: "https://example.org"
-    kubeconfig: "/path/to/kubeconfig"
 `,
 			expectError:   false,
 			expectedCount: 2,
@@ -452,7 +451,7 @@ virtualWorkspaces:
 			configContent: `
 virtualWorkspaces:
   - name: "test-workspace"
-    url: "https://example.com"
+    url: "https://example.com/services/apiexport/root/configmaps-view"
   invalid yaml content
 `,
 			expectError: true,
@@ -547,7 +546,7 @@ users:
 				if tt.expectedCount == 2 {
 					assert.Equal(t, "workspace1", config.VirtualWorkspaces[0].Name)
 					assert.Equal(t, "workspace2", config.VirtualWorkspaces[1].Name)
-					assert.Equal(t, "/path/to/kubeconfig", config.VirtualWorkspaces[1].Kubeconfig)
+					assert.Equal(t, "", config.VirtualWorkspaces[1].Kubeconfig)
 				}
 			}
 		})
@@ -584,7 +583,7 @@ func TestVirtualWorkspaceReconciler_ReconcileConfig_Simple(t *testing.T) {
 			initialWorkspaces: make(map[string]VirtualWorkspace),
 			newConfig: &VirtualWorkspacesConfig{
 				VirtualWorkspaces: []VirtualWorkspace{
-					{Name: "new-ws", URL: "https://example.com"},
+					{Name: "new-ws", URL: "https://example.com/services/apiexport/root/configmaps-view"},
 				},
 			},
 			expectCurrentCount: 1,
@@ -661,7 +660,7 @@ func TestVirtualWorkspaceReconciler_ProcessVirtualWorkspace(t *testing.T) {
 			name: "successful_processing",
 			workspace: VirtualWorkspace{
 				Name: "test-ws",
-				URL:  "https://example.com",
+				URL:  "https://example.com/services/apiexport/root/configmaps-view",
 			},
 			expectError:        true, // Expected due to kubeconfig dependency in metadata injection
 			expectedWriteCalls: 0,    // Won't reach write due to metadata injection failure
@@ -671,7 +670,7 @@ func TestVirtualWorkspaceReconciler_ProcessVirtualWorkspace(t *testing.T) {
 			name: "io_write_error",
 			workspace: VirtualWorkspace{
 				Name: "test-ws",
-				URL:  "https://example.com",
+				URL:  "https://example.com/services/apiexport/root/configmaps-view",
 			},
 			ioWriteError:       errors.New("write failed"),
 			expectError:        true, // Expected due to kubeconfig dependency in metadata injection
@@ -682,7 +681,7 @@ func TestVirtualWorkspaceReconciler_ProcessVirtualWorkspace(t *testing.T) {
 			name: "api_resolve_error",
 			workspace: VirtualWorkspace{
 				Name: "test-ws",
-				URL:  "https://example.com",
+				URL:  "https://example.com/services/apiexport/root/configmaps-view",
 			},
 			apiResolveError:    errors.New("resolve failed"),
 			expectError:        true,
@@ -705,6 +704,8 @@ func TestVirtualWorkspaceReconciler_ProcessVirtualWorkspace(t *testing.T) {
 
 			appCfg := config.Config{}
 			appCfg.Url.VirtualWorkspacePrefix = "virtual-workspace"
+			appCfg.Url.DefaultKcpWorkspace = RootClusterName
+			appCfg.Url.KcpWorkspacePattern = "root:orgs:{org}"
 
 			manager := NewVirtualWorkspaceManager(appCfg)
 
@@ -801,6 +802,142 @@ func TestVirtualWorkspaceReconciler_RemoveVirtualWorkspace(t *testing.T) {
 			}
 			assert.Equal(t, 1, deleteCalls)
 			assert.Equal(t, "virtual-workspace/"+tt.workspaceName, deletedPath)
+		})
+	}
+}
+
+func TestVirtualWorkspace_Validate(t *testing.T) {
+	tests := []struct {
+		name        string
+		workspace   VirtualWorkspace
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name: "valid_workspace",
+			workspace: VirtualWorkspace{
+				Name: "test-workspace",
+				URL:  "https://example.com/services/apiexport/root/configmaps-view",
+			},
+			expectError: false,
+		},
+		{
+			name: "empty_name",
+			workspace: VirtualWorkspace{
+				Name: "",
+				URL:  "https://example.com/services/apiexport/root/configmaps-view",
+			},
+			expectError: true,
+			errorMsg:    "virtual workspace name cannot be empty",
+		},
+		{
+			name: "empty_url",
+			workspace: VirtualWorkspace{
+				Name: "test-workspace",
+				URL:  "",
+			},
+			expectError: true,
+			errorMsg:    "virtual workspace URL cannot be empty",
+		},
+		{
+			name: "invalid_apiexport_url",
+			workspace: VirtualWorkspace{
+				Name: "test-workspace",
+				URL:  "https://example.com/services/apiexport/incomplete",
+			},
+			expectError: true,
+			errorMsg:    "invalid APIExport URL format",
+		},
+		{
+			name: "nonexistent_kubeconfig",
+			workspace: VirtualWorkspace{
+				Name:       "test-workspace",
+				URL:        "https://example.com/services/apiexport/root/configmaps-view",
+				Kubeconfig: "/nonexistent/kubeconfig",
+			},
+			expectError: true,
+			errorMsg:    "kubeconfig file not found",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.workspace.Validate()
+
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errorMsg)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestVirtualWorkspaceManager_LoadConfig_WithValidation(t *testing.T) {
+	tests := []struct {
+		name        string
+		configYAML  string
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name: "valid_config",
+			configYAML: `
+virtualWorkspaces:
+- name: test-workspace
+  url: https://example.com/services/apiexport/root/configmaps-view
+`,
+			expectError: false,
+		},
+		{
+			name: "invalid_workspace_name",
+			configYAML: `
+virtualWorkspaces:
+- name: ""
+  url: https://example.com/services/apiexport/root/configmaps-view
+`,
+			expectError: true,
+			errorMsg:    "validation failed for virtual workspace at index 0",
+		},
+		{
+			name: "invalid_apiexport_url",
+			configYAML: `
+virtualWorkspaces:
+- name: test-workspace
+  url: https://example.com/services/apiexport/incomplete
+`,
+			expectError: true,
+			errorMsg:    "invalid APIExport URL format",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create temporary config file
+			tempFile, err := os.CreateTemp("", "test-config-*.yaml")
+			require.NoError(t, err)
+			defer os.Remove(tempFile.Name())
+
+			_, err = tempFile.WriteString(tt.configYAML)
+			require.NoError(t, err)
+			tempFile.Close()
+
+			// Test loading config
+			appCfg := config.Config{}
+			manager := NewVirtualWorkspaceManager(appCfg)
+
+			config, err := manager.LoadConfig(tempFile.Name())
+
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errorMsg)
+				assert.Nil(t, config)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, config)
+				assert.Len(t, config.VirtualWorkspaces, 1)
+			}
 		})
 	}
 }

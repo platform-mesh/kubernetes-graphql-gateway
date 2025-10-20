@@ -8,6 +8,7 @@ import (
 	kcpcore "github.com/kcp-dev/kcp/sdk/apis/core/v1alpha1"
 	kcptenancy "github.com/kcp-dev/kcp/sdk/apis/tenancy/v1alpha1"
 	"github.com/spf13/cobra"
+	"golang.org/x/sync/errgroup"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -77,7 +78,9 @@ var listenCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		log.Info().Str("LogLevel", log.GetLevel().String()).Msg("Starting the Listener...")
 
-		ctx := ctrl.SetupSignalHandler()
+		signalCtx := ctrl.SetupSignalHandler()
+		eg, ctx := errgroup.WithContext(signalCtx)
+
 		restCfg := ctrl.GetConfigOrDie()
 
 		mgrOpts := ctrl.Options{
@@ -104,24 +107,19 @@ var listenCmd = &cobra.Command{
 			OpenAPIDefinitionsPath: appCfg.OpenApiDefinitionsPath,
 		}
 
-		// Create the appropriate reconciler based on configuration
-		var reconcilerInstance reconciler.CustomReconciler
+		var reconcilerInstance reconciler.ControllerProvider
 		if appCfg.EnableKcp {
-			kcpReconciler, err := kcp.NewKCPReconciler(appCfg, reconcilerOpts, log)
+			kcpManager, err := kcp.NewKCPManager(appCfg, reconcilerOpts, log)
 			if err != nil {
-				log.Fatal().Err(err).Msg("unable to create KCP reconciler")
+				log.Fatal().Err(err).Msg("unable to create KCP manager")
 			}
+			reconcilerInstance = kcpManager
 
-			// Start virtual workspace watching if path is configured
 			if appCfg.Listener.VirtualWorkspacesConfigPath != "" {
-				go func() {
-					if err := kcpReconciler.StartVirtualWorkspaceWatching(ctx, appCfg.Listener.VirtualWorkspacesConfigPath); err != nil {
-						log.Fatal().Err(err).Msg("failed to start virtual workspace watching")
-					}
-				}()
+				eg.Go(func() error {
+					return kcpManager.StartVirtualWorkspaceWatching(ctx, appCfg.Listener.VirtualWorkspacesConfigPath)
+				})
 			}
-
-			reconcilerInstance = kcpReconciler
 		} else {
 			ioHandler, err := workspacefile.NewIOHandler(appCfg.OpenApiDefinitionsPath)
 			if err != nil {
@@ -134,37 +132,33 @@ var listenCmd = &cobra.Command{
 			}
 		}
 
-		// Setup reconciler with its own manager and start everything
-		if err := startManagerWithReconciler(ctx, reconcilerInstance); err != nil {
-			log.Fatal().Err(err).Msg("failed to start manager with reconciler")
+		eg.Go(func() error {
+			return startManagerWithReconciler(ctx, reconcilerInstance)
+		})
+
+		if err := eg.Wait(); err != nil {
+			log.Fatal().Err(err).Msg("exiting due to critical component failure")
 		}
+
+		log.Info().Msg("graceful shutdown complete")
 	},
 }
 
-// startManagerWithReconciler handles the common manager setup and start operations
-func startManagerWithReconciler(ctx context.Context, reconciler reconciler.CustomReconciler) error {
+func startManagerWithReconciler(ctx context.Context, reconciler reconciler.ControllerProvider) error {
 	mgr := reconciler.GetManager()
 
 	if err := reconciler.SetupWithManager(mgr); err != nil {
-		log.Error().Err(err).Msg("unable to setup reconciler with manager")
 		return err
 	}
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
-		log.Error().Err(err).Msg("unable to set up health check")
 		return err
 	}
 
 	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
-		log.Error().Err(err).Msg("unable to set up ready check")
 		return err
 	}
 
 	log.Info().Msg("starting manager")
-	if err := mgr.Start(ctx); err != nil {
-		log.Error().Err(err).Msg("problem running manager")
-		return err
-	}
-
-	return nil
+	return mgr.Start(ctx)
 }

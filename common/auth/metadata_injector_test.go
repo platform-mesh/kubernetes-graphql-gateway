@@ -623,3 +623,97 @@ users:
 		assert.Nil(t, result)
 	})
 }
+
+func TestMetadataInjector_ExtractCAFromKubeconfigB64(t *testing.T) {
+	log := testlogger.New().HideLogOutput().Logger
+	injector := NewMetadataInjector(log, nil)
+
+	tests := []struct {
+		name           string
+		kubeconfigB64  string
+		expectedResult bool // true if CA data should be extracted, false if nil
+		expectError    bool // true if we expect a warning to be logged
+	}{
+		{
+			name: "valid_kubeconfig_with_ca_data",
+			kubeconfigB64: base64.StdEncoding.EncodeToString([]byte(`
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    certificate-authority-data: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0t
+    server: https://example.com
+  name: test-cluster
+contexts:
+- context:
+    cluster: test-cluster
+    user: test-user
+  name: test-context
+current-context: test-context
+users:
+- name: test-user
+  user:
+    token: test-token
+`)),
+			expectedResult: true,
+			expectError:    false,
+		},
+		{
+			name: "valid_kubeconfig_without_ca_data",
+			kubeconfigB64: base64.StdEncoding.EncodeToString([]byte(`
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    server: https://example.com
+  name: test-cluster
+contexts:
+- context:
+    cluster: test-cluster
+    user: test-user
+  name: test-context
+current-context: test-context
+users:
+- name: test-user
+  user:
+    token: test-token
+`)),
+			expectedResult: false,
+			expectError:    false,
+		},
+		{
+			name:           "invalid_base64",
+			kubeconfigB64:  "invalid-base64-!@#$%",
+			expectedResult: false,
+			expectError:    true,
+		},
+		{
+			name:           "empty_string",
+			kubeconfigB64:  "",
+			expectedResult: false,
+			expectError:    false,
+		},
+		{
+			name: "invalid_yaml_content",
+			kubeconfigB64: base64.StdEncoding.EncodeToString([]byte(`
+invalid yaml content
+not a kubeconfig
+`)),
+			expectedResult: false,
+			expectError:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := injector.ExtractCAFromKubeconfigB64ForTest(tt.kubeconfigB64)
+
+			if tt.expectedResult {
+				assert.NotNil(t, result, "Expected CA data to be extracted")
+				assert.Greater(t, len(result), 0, "Expected non-empty CA data")
+			} else {
+				assert.Nil(t, result, "Expected no CA data to be extracted")
+			}
+		})
+	}
+}

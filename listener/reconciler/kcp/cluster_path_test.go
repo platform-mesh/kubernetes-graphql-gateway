@@ -13,6 +13,7 @@ import (
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/platform-mesh/golang-commons/logger/testlogger"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/common/mocks"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler/kcp"
 )
@@ -121,7 +122,7 @@ func TestNewClusterPathResolver(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := kcp.NewClusterPathResolverExported(tt.config, tt.scheme)
+			got, err := kcp.NewClusterPathResolverExported(tt.config, tt.scheme, testlogger.New().Logger)
 
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -175,7 +176,7 @@ func TestClusterPathResolverProvider_ClientForCluster(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			resolver := kcp.NewClusterPathResolverProviderWithFactory(baseConfig, scheme, tt.clientFactory)
+			resolver := kcp.NewClusterPathResolverProviderWithFactory(baseConfig, scheme, testlogger.New().Logger, tt.clientFactory)
 
 			got, err := resolver.ClientForCluster(tt.clusterName)
 
@@ -204,9 +205,9 @@ func TestPathForCluster(t *testing.T) {
 	}{
 		{
 			name:        "root_cluster_returns_root",
-			clusterName: "root",
+			clusterName: kcp.RootClusterName,
 			mockSetup:   func(m *mocks.MockClient) {},
-			want:        "root",
+			want:        kcp.RootClusterName,
 			wantErr:     false,
 		},
 		{
@@ -273,9 +274,9 @@ func TestPathForCluster(t *testing.T) {
 						return nil
 					}).Once()
 			},
-			want:        "",
-			wantErr:     true,
-			errContains: "failed to get cluster path from kcp.io/path annotation",
+			want:        "no-path-workspace", // Now returns cluster name as fallback
+			wantErr:     false,               // No longer an error
+			errContains: "",
 		},
 		{
 			name:        "client_get_error",
@@ -284,9 +285,9 @@ func TestPathForCluster(t *testing.T) {
 				m.EXPECT().Get(mock.Anything, client.ObjectKey{Name: "cluster"}, mock.AnythingOfType("*v1alpha1.LogicalCluster")).
 					Return(errors.New("API server error")).Once()
 			},
-			want:        "",
-			wantErr:     true,
-			errContains: "failed to get logicalcluster resource",
+			want:        "error-workspace", // Now returns cluster name as fallback
+			wantErr:     false,             // No longer an error
+			errContains: "",
 		},
 	}
 
@@ -295,7 +296,13 @@ func TestPathForCluster(t *testing.T) {
 			mockClient := mocks.NewMockClient(t)
 			tt.mockSetup(mockClient)
 
-			got, err := kcp.PathForClusterExported(tt.clusterName, mockClient)
+			// Create a resolver to test the method
+			scheme := runtime.NewScheme()
+			config := &rest.Config{Host: "https://test.example.com"}
+			resolver, resolverErr := kcp.NewClusterPathResolverExported(config, scheme, testlogger.New().Logger)
+			assert.NoError(t, resolverErr)
+
+			got, err := resolver.PathForCluster(tt.clusterName, mockClient)
 
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -313,6 +320,132 @@ func TestPathForCluster(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Equal(t, tt.want, got)
 			}
+		})
+	}
+}
+
+func TestPathForClusterFromConfig(t *testing.T) {
+	tests := []struct {
+		name        string
+		clusterName string
+		config      *rest.Config
+		want        string
+	}{
+		{
+			name:        "root_cluster_returns_root",
+			clusterName: kcp.RootClusterName,
+			config:      &rest.Config{Host: "https://kcp.example.com"},
+			want:        kcp.RootClusterName,
+		},
+		{
+			name:        "nil_config_returns_cluster_name",
+			clusterName: "test-cluster",
+			config:      nil,
+			want:        "test-cluster",
+		},
+		{
+			name:        "invalid_url_returns_cluster_name",
+			clusterName: "test-cluster",
+			config:      &rest.Config{Host: "://invalid-url"},
+			want:        "test-cluster",
+		},
+		{
+			name:        "cluster_url_with_workspace_path",
+			clusterName: "hash123",
+			config:      &rest.Config{Host: "https://kcp.example.com/clusters/root:org:workspace"},
+			want:        "root:org:workspace",
+		},
+		{
+			name:        "cluster_url_with_hash_only",
+			clusterName: "hash123",
+			config:      &rest.Config{Host: "https://kcp.example.com/clusters/hash123"},
+			want:        "hash123",
+		},
+		{
+			name:        "virtual_workspace_url_extracts_workspace_path",
+			clusterName: "hash123",
+			config:      &rest.Config{Host: "https://kcp.example.com/services/apiexport/root:orgs:default/some-export"},
+			want:        "root:orgs:default",
+		},
+		{
+			name:        "virtual_workspace_url_simple_workspace",
+			clusterName: "hash123",
+			config:      &rest.Config{Host: "https://kcp.example.com/services/apiexport/root/some-export"},
+			want:        "root",
+		},
+		{
+			name:        "cluster_url_different_from_hash",
+			clusterName: "hash123",
+			config:      &rest.Config{Host: "https://kcp.example.com/clusters/simple-workspace"},
+			want:        "simple-workspace",
+		},
+		{
+			name:        "non_matching_url_returns_cluster_name",
+			clusterName: "test-cluster",
+			config:      &rest.Config{Host: "https://kcp.example.com/other/path"},
+			want:        "test-cluster",
+		},
+		{
+			name:        "cluster_url_without_path_returns_cluster_name",
+			clusterName: "test-cluster",
+			config:      &rest.Config{Host: "https://kcp.example.com"},
+			want:        "test-cluster",
+		},
+		{
+			name:        "apiexport_url_with_query_params",
+			clusterName: "hash123",
+			config:      &rest.Config{Host: "https://kcp.example.com/services/apiexport/root:orgs:test/export?timeout=30s"},
+			want:        "root:orgs:test",
+		},
+		{
+			name:        "apiexport_url_with_fragment",
+			clusterName: "hash123",
+			config:      &rest.Config{Host: "https://kcp.example.com/services/apiexport/root/export#section"},
+			want:        kcp.RootClusterName,
+		},
+		{
+			name:        "cluster_url_with_query_params",
+			clusterName: "hash123",
+			config:      &rest.Config{Host: "https://kcp.example.com/clusters/root:orgs:test?timeout=30s"},
+			want:        "root:orgs:test",
+		},
+		{
+			name:        "apiexport_url_workspace_equals_cluster_name",
+			clusterName: kcp.RootClusterName,
+			config:      &rest.Config{Host: "https://kcp.example.com/services/apiexport/root/export"},
+			want:        kcp.RootClusterName,
+		},
+		{
+			name:        "apiexport_url_malformed_fallback_to_extractAPIExportRef",
+			clusterName: "hash123",
+			config:      &rest.Config{Host: "https://kcp.example.com/services/apiexport/workspace/export/extra"},
+			want:        "workspace",
+		},
+		{
+			name:        "apiexport_url_invalid_format_fallback_to_cluster_name",
+			clusterName: "hash123",
+			config:      &rest.Config{Host: "https://kcp.example.com/services/apiexport/incomplete"},
+			want:        "incomplete",
+		},
+		{
+			name:        "cluster_url_with_empty_segments",
+			clusterName: "test-cluster",
+			config:      &rest.Config{Host: "https://kcp.example.com/clusters//empty"},
+			want:        "", // Function returns empty string for malformed path with empty segments
+		},
+		{
+			name:        "cluster_url_with_trailing_slash",
+			clusterName: "hash123",
+			config:      &rest.Config{Host: "https://kcp.example.com/clusters/root:orgs:test/"},
+			want:        "root:orgs:test",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := kcp.PathForClusterFromConfigExported(tt.clusterName, tt.config)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }

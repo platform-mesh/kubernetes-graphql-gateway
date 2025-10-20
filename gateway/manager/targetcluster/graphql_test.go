@@ -11,12 +11,11 @@ import (
 
 	"github.com/graphql-go/graphql"
 	"github.com/kcp-dev/logicalcluster/v3"
-	"sigs.k8s.io/controller-runtime/pkg/kontext"
 
 	"github.com/platform-mesh/golang-commons/logger/testlogger"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/common"
 	appConfig "github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/roundtripper"
+	ctxkeys "github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/context"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/targetcluster"
 )
 
@@ -190,15 +189,15 @@ func TestSetContexts(t *testing.T) {
 			result := targetcluster.SetContexts(req, tt.workspace, tt.token, tt.enableKcp)
 
 			// Check token context
-			tokenFromCtx := result.Context().Value(roundtripper.TokenKey{})
+			tokenFromCtx, _ := ctxkeys.TokenFromContext(result.Context())
 			if tokenFromCtx != tt.token {
 				t.Errorf("expected token %q in context, got %q", tt.token, tokenFromCtx)
 			}
 
 			// Check KCP context
 			if tt.expectKcp {
-				clusterFromCtx, _ := kontext.ClusterFrom(result.Context())
-				if clusterFromCtx != logicalcluster.Name(tt.workspace) {
+				clusterFromCtx, ok := ctxkeys.ClusterNameFromContext(result.Context())
+				if !ok || clusterFromCtx != logicalcluster.Name(tt.workspace) {
 					t.Errorf("expected cluster %q in context, got %q", tt.workspace, clusterFromCtx)
 				}
 			}

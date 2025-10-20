@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strings"
 	"sync"
 
 	"gopkg.in/yaml.v3"
@@ -33,6 +34,33 @@ type VirtualWorkspace struct {
 	Kubeconfig string `yaml:"kubeconfig,omitempty"` // Optional path to kubeconfig for authentication
 }
 
+// Validate validates the virtual workspace configuration
+func (v *VirtualWorkspace) Validate() error {
+	if v.Name == "" {
+		return fmt.Errorf("virtual workspace name cannot be empty")
+	}
+
+	if v.URL == "" {
+		return fmt.Errorf("virtual workspace URL cannot be empty")
+	}
+
+	// Validate APIExport URL format if it looks like an APIExport URL
+	if strings.Contains(v.URL, "/services/apiexport/") {
+		if _, _, err := extractAPIExportRef(v.URL); err != nil {
+			return fmt.Errorf("invalid APIExport URL format for workspace %s: %w", v.Name, err)
+		}
+	}
+
+	// Validate kubeconfig file exists if specified
+	if v.Kubeconfig != "" {
+		if _, err := os.Stat(v.Kubeconfig); os.IsNotExist(err) {
+			return fmt.Errorf("kubeconfig file not found for workspace %s: %s", v.Name, v.Kubeconfig)
+		}
+	}
+
+	return nil
+}
+
 // VirtualWorkspacesConfig represents the configuration file structure
 type VirtualWorkspacesConfig struct {
 	VirtualWorkspaces []VirtualWorkspace `yaml:"virtualWorkspaces"`
@@ -53,8 +81,22 @@ func (v *VirtualWorkspaceManager) GetWorkspacePath(workspace VirtualWorkspace) s
 	return fmt.Sprintf("%s/%s", v.appCfg.Url.VirtualWorkspacePrefix, workspace.Name)
 }
 
-// createVirtualConfig creates a REST config for a virtual workspace
-func createVirtualConfig(workspace VirtualWorkspace) (*rest.Config, error) {
+// resolveDefaultWorkspace resolves the default workspace using configuration
+func resolveDefaultWorkspace(appCfg config.Config) string {
+	// Use configuration values for default workspace resolution
+	defaultOrg := appCfg.Url.DefaultKcpWorkspace
+
+	// If the default workspace already contains ":", use it as-is (full path)
+	if strings.Contains(defaultOrg, ":") {
+		return defaultOrg
+	}
+
+	// Replace {org} placeholder with the organization name
+	return strings.ReplaceAll(appCfg.Url.KcpWorkspacePattern, "{org}", defaultOrg)
+}
+
+// createVirtualConfig creates a REST config for a virtual workspace with a specific target workspace
+func createVirtualConfig(workspace VirtualWorkspace, targetWorkspace string) (*rest.Config, error) {
 	if workspace.URL == "" {
 		return nil, fmt.Errorf("%w: empty URL for workspace %s", ErrInvalidVirtualWorkspaceURL, workspace.Name)
 	}
@@ -63,6 +105,11 @@ func createVirtualConfig(workspace VirtualWorkspace) (*rest.Config, error) {
 	_, err := url.Parse(workspace.URL)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrParseVirtualWorkspaceURL, err)
+	}
+
+	// Use the provided target workspace
+	if targetWorkspace == "" {
+		return nil, fmt.Errorf("target workspace cannot be empty for virtual workspace %s", workspace.Name)
 	}
 
 	var virtualConfig *rest.Config
@@ -80,11 +127,11 @@ func createVirtualConfig(workspace VirtualWorkspace) (*rest.Config, error) {
 		}
 
 		virtualConfig = restConfig
-		virtualConfig.Host = workspace.URL + "/clusters/root"
+		virtualConfig.Host = workspace.URL + "/clusters/" + targetWorkspace
 	} else {
 		// Use minimal configuration for virtual workspaces without authentication
 		virtualConfig = &rest.Config{
-			Host:      workspace.URL + "/clusters/root",
+			Host:      workspace.URL + "/clusters/" + targetWorkspace,
 			UserAgent: "kubernetes-graphql-gateway-listener",
 			TLSClientConfig: rest.TLSClientConfig{
 				Insecure: true,
@@ -95,9 +142,9 @@ func createVirtualConfig(workspace VirtualWorkspace) (*rest.Config, error) {
 	return virtualConfig, nil
 }
 
-// CreateDiscoveryClient creates a discovery client for the virtual workspace
-func (v *VirtualWorkspaceManager) CreateDiscoveryClient(workspace VirtualWorkspace) (discovery.DiscoveryInterface, error) {
-	virtualConfig, err := createVirtualConfig(workspace)
+// CreateDiscoveryClient creates a discovery client for the virtual workspace with a specific target workspace
+func (v *VirtualWorkspaceManager) CreateDiscoveryClient(workspace VirtualWorkspace, targetWorkspace string) (discovery.DiscoveryInterface, error) {
+	virtualConfig, err := createVirtualConfig(workspace, targetWorkspace)
 	if err != nil {
 		return nil, err
 	}
@@ -111,9 +158,9 @@ func (v *VirtualWorkspaceManager) CreateDiscoveryClient(workspace VirtualWorkspa
 	return discoveryClient, nil
 }
 
-// CreateRESTConfig creates a REST config for the virtual workspace (for REST mappers)
-func (v *VirtualWorkspaceManager) CreateRESTConfig(workspace VirtualWorkspace) (*rest.Config, error) {
-	return createVirtualConfig(workspace)
+// CreateRESTConfig creates a REST config for the virtual workspace with a specific target workspace
+func (v *VirtualWorkspaceManager) CreateRESTConfig(workspace VirtualWorkspace, targetWorkspace string) (*rest.Config, error) {
+	return createVirtualConfig(workspace, targetWorkspace)
 }
 
 // LoadConfig loads the virtual workspaces configuration from a file
@@ -133,6 +180,13 @@ func (v *VirtualWorkspaceManager) LoadConfig(configPath string) (*VirtualWorkspa
 	var config VirtualWorkspacesConfig
 	if err := yaml.Unmarshal(data, &config); err != nil {
 		return nil, fmt.Errorf("failed to parse virtual workspaces config: %w", err)
+	}
+
+	// Validate all virtual workspaces
+	for i, workspace := range config.VirtualWorkspaces {
+		if err := workspace.Validate(); err != nil {
+			return nil, fmt.Errorf("validation failed for virtual workspace at index %d: %w", i, err)
+		}
 	}
 
 	return &config, nil
@@ -188,6 +242,8 @@ func (r *VirtualWorkspaceReconciler) ReconcileConfig(ctx context.Context, config
 
 			if err := r.processVirtualWorkspace(ctx, workspace); err != nil {
 				r.log.Error().Err(err).Str("workspace", name).Msg("failed to process virtual workspace")
+				// Don't fail the entire reconciliation if one workspace fails
+				// This allows other workspaces to be processed and the listener to continue running
 				continue
 			}
 		}
@@ -210,7 +266,8 @@ func (r *VirtualWorkspaceReconciler) ReconcileConfig(ctx context.Context, config
 	return nil
 }
 
-// processVirtualWorkspace generates schema for a single virtual workspace
+// processVirtualWorkspace generates a generic schema for a virtual workspace
+// The schema will be workspace-agnostic and the actual workspace will be resolved at request time
 func (r *VirtualWorkspaceReconciler) processVirtualWorkspace(ctx context.Context, workspace VirtualWorkspace) error {
 	workspacePath := r.virtualWSManager.GetWorkspacePath(workspace)
 
@@ -218,18 +275,25 @@ func (r *VirtualWorkspaceReconciler) processVirtualWorkspace(ctx context.Context
 		Str("workspace", workspace.Name).
 		Str("url", workspace.URL).
 		Str("path", workspacePath).
-		Msg("generating schema for virtual workspace")
+		Msg("generating generic schema for virtual workspace")
 
-	// Create discovery client for the virtual workspace
-	discoveryClient, err := r.virtualWSManager.CreateDiscoveryClient(workspace)
+	// Use a default workspace for schema generation - but the gateway will override it at request time
+	defaultWorkspace := resolveDefaultWorkspace(r.virtualWSManager.appCfg)
+
+	// Create discovery client for the virtual workspace with default workspace
+	discoveryClient, err := r.virtualWSManager.CreateDiscoveryClient(workspace, defaultWorkspace)
 	if err != nil {
+		r.log.Warn().Err(err).
+			Str("workspace", workspace.Name).
+			Str("url", workspace.URL).
+			Msg("failed to create discovery client for virtual workspace, will retry later")
 		return fmt.Errorf("failed to create discovery client: %w", err)
 	}
 
 	r.log.Debug().Str("workspace", workspace.Name).Str("url", workspace.URL).Msg("created discovery client for virtual workspace")
 
-	// Create REST config and mapper for the virtual workspace
-	virtualConfig, err := r.virtualWSManager.CreateRESTConfig(workspace)
+	// Create REST config and mapper for the virtual workspace with default workspace
+	virtualConfig, err := r.virtualWSManager.CreateRESTConfig(workspace, defaultWorkspace)
 	if err != nil {
 		return fmt.Errorf("failed to create REST config: %w", err)
 	}
@@ -244,13 +308,14 @@ func (r *VirtualWorkspaceReconciler) processVirtualWorkspace(ctx context.Context
 		return fmt.Errorf("failed to create REST mapper for virtual workspace: %w", err)
 	}
 
-	// Use shared schema generation logic
+	// Use shared schema generation logic with generic virtual workspace URL
+	// The actual workspace will be resolved at request time by the roundtripper
 	schemaWithMetadata, err := generateSchemaWithMetadata(
 		SchemaGenerationParams{
 			ClusterPath:     workspacePath,
 			DiscoveryClient: discoveryClient,
 			RESTMapper:      restMapper,
-			HostOverride:    workspace.URL, // Use virtual workspace URL as host override
+			HostOverride:    workspace.URL, // Use base virtual workspace URL without specific workspace
 		},
 		r.apiSchemaResolver,
 		r.log,
@@ -268,7 +333,7 @@ func (r *VirtualWorkspaceReconciler) processVirtualWorkspace(ctx context.Context
 		Str("workspace", workspace.Name).
 		Str("path", workspacePath).
 		Int("schemaSize", len(schemaWithMetadata)).
-		Msg("successfully generated schema for virtual workspace")
+		Msg("successfully generated generic schema for virtual workspace")
 
 	return nil
 }

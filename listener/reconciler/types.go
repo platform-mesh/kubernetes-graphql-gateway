@@ -9,8 +9,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// CustomReconciler defines the interface that all reconcilers must implement
-type CustomReconciler interface {
+// ControllerProvider defines the interface for components that provide controller-runtime managers
+// and can set up controllers. This includes both actual reconcilers and manager/coordinator components.
+type ControllerProvider interface {
 	Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
 	SetupWithManager(mgr ctrl.Manager) error
 	GetManager() ctrl.Manager
