@@ -21,7 +21,7 @@ virtualWorkspaces:
 - `virtualWorkspaces`: Array of virtual workspace definitions
   - `name`: Unique identifier for the virtual workspace (used in URL paths)
   - `url`: Full URL to the virtual workspace or API export
-  - `kubeconfig`: path to kcp kubeconfig
+  - `kubeconfig`: Path to KCP kubeconfig
 
 ## Environment Variables
 
