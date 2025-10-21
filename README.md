@@ -16,37 +16,17 @@ This repository contains two main components:
 - [Listener](./docs/listener.md): watches a cluster and stores its openAPI spec in a directory.
 - [Gateway](./docs/gateway.md): exposes the openAPI spec as a GraphQL endpoints.
 
-## MultiCluster Support
+## Operation Modes
 
-The system supports three modes of operation:
+The system supports two modes of operation:
 
-1. **Single Cluster** (`ENABLE_KCP=false`, `MULTICLUSTER=false`): Gateway connects to the same cluster as the listener
-2. **KCP Mode** (`ENABLE_KCP=true`): Designed for KCP-based multi-cluster scenarios  
-3. **MultiCluster Mode** (`ENABLE_KCP=false`, `MULTICLUSTER=true`): Gateway connects to multiple external clusters via ClusterAccess resources
+1. **KCP Mode** (`ENABLE_KCP=true`): Designed for KCP-based multi-cluster scenarios
+   - See [Virtual Workspaces](./docs/virtual-workspaces.md) for advanced KCP configuration
+2. **ClusterAccess Mode** (`ENABLE_KCP=false`): Designed for support of multiple standard clusters.
 
-### MultiCluster with ClusterAccess
+## ClusterAccess
 
-In MultiCluster mode, the system uses ClusterAccess resources to store kubeconfig data and connection information. The listener processes these resources and embeds connection metadata into schema files, which the gateway then uses to establish cluster-specific connections.
-
-For complete setup instructions, see:
-- [ClusterAccess documentation](./docs/clusteraccess.md) - Manual setup
-- [MultiCluster Kubeconfig Flow](./docs/multicluster-kubeconfig-flow.md) - Detailed flow explanation
-
-### Quick Setup Scripts
-
-```bash
-# Create ClusterAccess with secure token authentication  
-./scripts/create-clusteraccess.sh --target-kubeconfig ~/.kube/prod-config
-
-# Test end-to-end integration
-./scripts/test-clusteraccess-integration.sh
-```
-
-### Gateway Requirements
-
-- **Single Cluster Mode**: Requires KUBECONFIG to connect to the local cluster
-- **KCP Mode**: Requires KUBECONFIG to connect to KCP management cluster  
-- **MultiCluster Mode**: Does NOT require KUBECONFIG - gets all connection info from schema files
+For detailed information, see [Clusteraccess](./docs/clusteraccess.md) section.
 
 ## Authorization
 
@@ -71,3 +51,4 @@ If you find any bug that may be a security problem, please follow our instructio
 ## Licensing
 
 Copyright 2025 SAP SE or an SAP affiliate company and platform-mesh contributors. Please see our [LICENSE](LICENSE) for copyright and license information. Detailed information including third-party components and their licensing/copyright information is available [via the REUSE tool](https://api.reuse.software/info/github.com/platform-mesh/kubernetes-graphql-gateway).
+
