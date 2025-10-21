@@ -10,8 +10,7 @@ import (
 
 	"github.com/go-openapi/spec"
 	"github.com/platform-mesh/golang-commons/logger"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/kcp"
@@ -229,29 +228,30 @@ func (tc *TargetCluster) GetEndpoint(appCfg appConfig.Config) string {
 	return fmt.Sprintf("/%s/%s", path, appCfg.Url.GraphqlSuffix)
 }
 
-// ValidateToken validates a token by making an API call using the cluster's client
 func (tc *TargetCluster) ValidateToken(ctx context.Context, token string) (bool, error) {
 	newCtx := context.WithValue(ctx, roundtripper.TokenKey{}, token)
 
-	list := &unstructured.UnstructuredList{}
-	list.SetGroupVersionKind(schema.GroupVersionKind{
-		Group:   "platform-mesh.io",
-		Version: "v1alpha1",
-		Kind:    "AccountInfoList",
-	})
+	configMapList := &corev1.ConfigMapList{}
+	listOpts := &client.ListOptions{
+		Limit: 1,
+	}
 
-	err := tc.client.List(newCtx, list)
+	err := tc.client.List(newCtx, configMapList, listOpts)
 	if err != nil {
-		errStr := err.Error()
-		if strings.Contains(errStr, "Unauthorized") || strings.Contains(errStr, "401") {
+		errStrLower := strings.ToLower(err.Error())
+		if strings.Contains(errStrLower, "unauthorized") || strings.Contains(errStrLower, "401") {
+			tc.log.Debug().Err(err).Str("cluster", tc.name).Msg("Token is invalid - unauthorized")
 			return false, nil
 		}
-		if strings.Contains(errStr, "Forbidden") || strings.Contains(errStr, "403") {
+		if strings.Contains(errStrLower, "forbidden") || strings.Contains(errStrLower, "403") || strings.Contains(errStrLower, "access denied") {
+			tc.log.Debug().Str("cluster", tc.name).Msg("Token is valid but user has no permission to list configmaps")
 			return true, nil
 		}
+		tc.log.Error().Err(err).Str("cluster", tc.name).Msg("Unexpected error during token validation")
 		return false, err
 	}
 
+	tc.log.Debug().Str("cluster", tc.name).Msg("Token validated successfully")
 	return true, nil
 }
 

@@ -162,12 +162,13 @@ func (cr *ClusterRegistry) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Extract and validate token for non-GET requests
 	token := GetToken(r)
-	if !cr.handleAuth(w, r, token, cluster) {
-		return
-	}
 
 	// Set contexts for KCP and authentication
 	r = SetContexts(r, clusterName, token, cr.appCfg.EnableKcp)
+
+	if !cr.handleAuth(w, r, token, cluster) {
+		return
+	}
 
 	// Handle subscription requests
 	if r.Header.Get("Accept") == "text/event-stream" {
