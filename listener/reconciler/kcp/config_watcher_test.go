@@ -95,9 +95,10 @@ func TestConfigWatcher_OnFileChanged(t *testing.T) {
 			// Track change handler calls
 			var handlerCalled bool
 			var receivedConfig *VirtualWorkspacesConfig
-			changeHandler := func(config *VirtualWorkspacesConfig) {
+			changeHandler := func(config *VirtualWorkspacesConfig) error {
 				handlerCalled = true
 				receivedConfig = config
+				return nil
 			}
 			watcher.changeHandler = changeHandler
 
@@ -180,9 +181,10 @@ func TestConfigWatcher_LoadAndNotify(t *testing.T) {
 			var handlerCalled bool
 			var receivedConfig *VirtualWorkspacesConfig
 			if tt.name != "no_change_handler" {
-				changeHandler := func(config *VirtualWorkspacesConfig) {
+				changeHandler := func(config *VirtualWorkspacesConfig) error {
 					handlerCalled = true
 					receivedConfig = config
+					return nil
 				}
 				watcher.changeHandler = changeHandler
 			}
@@ -222,8 +224,9 @@ func TestConfigWatcher_Watch_EmptyPath(t *testing.T) {
 	defer cancel()
 
 	var handlerCalled bool
-	changeHandler := func(config *VirtualWorkspacesConfig) {
+	changeHandler := func(config *VirtualWorkspacesConfig) error {
 		handlerCalled = true
+		return nil
 	}
 
 	// Test with empty config path - should not try to load initial config

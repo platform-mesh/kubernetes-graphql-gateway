@@ -188,7 +188,7 @@ func (r *VirtualWorkspaceReconciler) ReconcileConfig(ctx context.Context, config
 
 			if err := r.processVirtualWorkspace(ctx, workspace); err != nil {
 				r.log.Error().Err(err).Str("workspace", name).Msg("failed to process virtual workspace")
-				continue
+				return err
 			}
 		}
 	}

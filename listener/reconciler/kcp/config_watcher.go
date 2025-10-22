@@ -18,7 +18,7 @@ type ConfigWatcher struct {
 	fileWatcher      *watcher.FileWatcher
 	virtualWSManager VirtualWorkspaceConfigManager
 	log              *logger.Logger
-	changeHandler    func(*VirtualWorkspacesConfig)
+	changeHandler    func(*VirtualWorkspacesConfig) error
 }
 
 // NewConfigWatcher creates a new config file watcher
@@ -38,7 +38,7 @@ func NewConfigWatcher(virtualWSManager VirtualWorkspaceConfigManager, log *logge
 }
 
 // Watch starts watching the configuration file and blocks until context is cancelled
-func (c *ConfigWatcher) Watch(ctx context.Context, configPath string, changeHandler func(*VirtualWorkspacesConfig)) error {
+func (c *ConfigWatcher) Watch(ctx context.Context, configPath string, changeHandler func(*VirtualWorkspacesConfig) error) error {
 	// Store change handler for use in event callbacks
 	c.changeHandler = changeHandler
 
@@ -46,10 +46,11 @@ func (c *ConfigWatcher) Watch(ctx context.Context, configPath string, changeHand
 	if configPath != "" {
 		if err := c.loadAndNotify(configPath); err != nil {
 			c.log.Error().Err(err).Msg("failed to load initial virtual workspaces config")
+			return err
 		}
 	}
 
-	// Watch optional configuration file with 500ms debouncing
+	// Watch the optional configuration file with 500 ms debouncing
 	return c.fileWatcher.WatchOptionalFile(ctx, configPath, 500)
 }
 
@@ -75,7 +76,10 @@ func (c *ConfigWatcher) loadAndNotify(configPath string) error {
 	c.log.Info().Int("virtualWorkspaces", len(config.VirtualWorkspaces)).Msg("loaded virtual workspaces config")
 
 	if c.changeHandler != nil {
-		c.changeHandler(config)
+		err = c.changeHandler(config)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
