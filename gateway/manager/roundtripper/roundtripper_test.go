@@ -510,14 +510,44 @@ func TestRoundTripper_InvalidTokenSecurityFix(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 }
 
-func TestRoundTripper_ExistingAuthHeadersAreCleanedBeforeImpersonation(t *testing.T) {
-	// This test verifies that existing Authorization headers are properly cleaned
-	// before setting the bearer token in impersonation mode
-
+func TestRoundTripper_ExistingAuthHeadersAreCleanedBeforeTokenAuth(t *testing.T) {
 	mockAdmin := &mocks.MockRoundTripper{}
+	mockBase := &mocks.MockRoundTripper{}
 	mockUnauthorized := &mocks.MockRoundTripper{}
 
-	// Capture the request that gets sent to the impersonation round tripper (which uses adminRT)
+	var capturedRequest *http.Request
+	mockBase.EXPECT().RoundTrip(mock.Anything).Return(&http.Response{StatusCode: http.StatusOK}, nil).Run(func(req *http.Request) {
+		capturedRequest = req
+	})
+
+	appCfg := appConfig.Config{}
+	appCfg.Gateway.ShouldImpersonate = false
+	appCfg.Gateway.UsernameClaim = "sub"
+
+	rt := roundtripper.New(testlogger.New().Logger, appCfg, mockAdmin, mockBase, mockUnauthorized)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/pods", nil)
+
+	req.Header.Set("Authorization", "Bearer admin-token-that-should-be-removed")
+
+	req = req.WithContext(context.WithValue(req.Context(), roundtripper.TokenKey{}, "user-token"))
+
+	resp, err := rt.RoundTrip(req)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	require.NotNil(t, capturedRequest)
+	authHeader := capturedRequest.Header.Get("Authorization")
+	assert.Equal(t, "Bearer user-token", authHeader)
+
+	assert.NotContains(t, authHeader, "admin-token-that-should-be-removed")
+}
+
+func TestRoundTripper_ExistingAuthHeadersAreCleanedBeforeImpersonation(t *testing.T) {
+	mockAdmin := &mocks.MockRoundTripper{}
+	mockBase := &mocks.MockRoundTripper{}
+	mockUnauthorized := &mocks.MockRoundTripper{}
+
 	var capturedRequest *http.Request
 	mockAdmin.EXPECT().RoundTrip(mock.Anything).Return(&http.Response{StatusCode: http.StatusOK}, nil).Run(func(req *http.Request) {
 		capturedRequest = req
@@ -527,7 +557,7 @@ func TestRoundTripper_ExistingAuthHeadersAreCleanedBeforeImpersonation(t *testin
 	appCfg.Gateway.ShouldImpersonate = true
 	appCfg.Gateway.UsernameClaim = "sub"
 
-	rt := roundtripper.New(testlogger.New().Logger, appCfg, mockAdmin, mockAdmin, mockUnauthorized)
+	rt := roundtripper.New(testlogger.New().Logger, appCfg, mockAdmin, mockBase, mockUnauthorized)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/pods", nil)
 
@@ -550,11 +580,9 @@ func TestRoundTripper_ExistingAuthHeadersAreCleanedBeforeImpersonation(t *testin
 
 	require.NotNil(t, capturedRequest)
 
-	// Verify malicious Authorization header was removed
 	authHeader := capturedRequest.Header.Get("Authorization")
 	assert.NotContains(t, authHeader, "admin-token-that-should-be-removed")
 
-	// Verify impersonation header is set (adminRT provides admin auth, not user token)
 	impersonateHeader := capturedRequest.Header.Get("Impersonate-User")
 	assert.Equal(t, "test-user", impersonateHeader)
 }

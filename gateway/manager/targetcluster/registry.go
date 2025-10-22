@@ -2,7 +2,6 @@ package targetcluster
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"path/filepath"
@@ -195,9 +194,9 @@ func (cr *ClusterRegistry) handleAuth(w http.ResponseWriter, r *http.Request, to
 
 	if IsIntrospectionQuery(r) {
 		if cr.appCfg.Gateway.IntrospectionAuthentication {
-			valid, err := cr.validateToken(r.Context(), token, cluster)
+			valid, err := cluster.ValidateToken(r.Context(), token)
 			if err != nil {
-				cr.log.Error().Err(err).Str("cluster", cluster.name).Msg("Error validating token")
+				cr.log.Error().Err(err).Str("cluster", cluster.name).Msg("Token validation failed")
 				http.Error(w, "Token validation failed", http.StatusUnauthorized)
 				return false
 			}
@@ -231,28 +230,6 @@ func (cr *ClusterRegistry) handleCORS(w http.ResponseWriter, r *http.Request) bo
 		}
 	}
 	return false
-}
-
-func (cr *ClusterRegistry) validateToken(ctx context.Context, token string, cluster *TargetCluster) (bool, error) {
-	if token == "" {
-		return false, errors.New("empty token")
-	}
-
-	cr.log.Debug().Str("cluster", cluster.name).Msg("Validating token for introspection query")
-
-	valid, err := cluster.ValidateToken(ctx, token)
-	if err != nil {
-		cr.log.Error().Err(err).Str("cluster", cluster.name).Msg("Token validation request failed")
-		return false, err
-	}
-
-	if !valid {
-		cr.log.Debug().Str("cluster", cluster.name).Msg("Token validation failed - unauthorized")
-		return false, nil
-	}
-
-	cr.log.Debug().Str("cluster", cluster.name).Msg("Token validation successful")
-	return true, nil
 }
 
 // extractClusterName extracts the cluster name from the request path using pattern matching
