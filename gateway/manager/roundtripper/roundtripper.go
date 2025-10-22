@@ -1,7 +1,6 @@
 package roundtripper
 
 import (
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -87,7 +86,6 @@ func (rt *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	if !rt.appCfg.Gateway.ShouldImpersonate {
 		rt.log.Debug().Str("path", req.URL.Path).Msg("Using bearer token authentication")
-		fmt.Println(token)
 		return transport.NewBearerAuthRoundTripper(token, rt.baseRT).RoundTrip(req)
 	}
 

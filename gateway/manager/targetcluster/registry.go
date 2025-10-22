@@ -193,23 +193,27 @@ func (cr *ClusterRegistry) handleAuth(w http.ResponseWriter, r *http.Request, to
 		return true
 	}
 
+	if IsIntrospectionQuery(r) {
+		if cr.appCfg.Gateway.IntrospectionAuthentication {
+			valid, err := cr.validateToken(r.Context(), token, cluster)
+			if err != nil {
+				cr.log.Error().Err(err).Str("cluster", cluster.name).Msg("Error validating token")
+				http.Error(w, "Token validation failed", http.StatusUnauthorized)
+				return false
+			}
+			if !valid {
+				cr.log.Debug().Str("cluster", cluster.name).Msg("Invalid token for introspection query")
+				http.Error(w, "Invalid token", http.StatusUnauthorized)
+				return false
+			}
+		}
+
+		return true
+	}
+
 	if token == "" {
 		http.Error(w, "Authorization header is required", http.StatusUnauthorized)
 		return false
-	}
-
-	if cr.appCfg.Gateway.IntrospectionAuthentication && IsIntrospectionQuery(r) {
-		valid, err := cr.validateToken(r.Context(), token, cluster)
-		if err != nil {
-			cr.log.Error().Err(err).Str("cluster", cluster.name).Msg("Error validating token")
-			http.Error(w, "Token validation failed", http.StatusUnauthorized)
-			return false
-		}
-		if !valid {
-			cr.log.Debug().Str("cluster", cluster.name).Msg("Invalid token for introspection query")
-			http.Error(w, "Invalid token", http.StatusUnauthorized)
-			return false
-		}
 	}
 
 	return true

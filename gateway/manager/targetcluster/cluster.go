@@ -116,13 +116,12 @@ func (tc *TargetCluster) connect(appCfg appConfig.Config, metadata *ClusterMetad
 		return fmt.Errorf("failed to build config from metadata: %w", err)
 	}
 
-	tc.restCfg.Wrap(func(adminRT http.RoundTripper) http.RoundTripper {
-		baseRT, err := roundtripper.NewBaseRoundTripper(tc.restCfg.TLSClientConfig)
-		if err != nil {
-			tc.log.Error().Err(err).Msg("Failed to create base transport, falling back to default transport")
-			baseRT = http.DefaultTransport
-		}
+	baseRT, err := roundtripper.NewBaseRoundTripper(tc.restCfg.TLSClientConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create base transport: %w", err)
+	}
 
+	tc.restCfg.Wrap(func(adminRT http.RoundTripper) http.RoundTripper {
 		return roundtripper.New(
 			tc.log,
 			tc.appCfg,

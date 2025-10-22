@@ -33,7 +33,6 @@ func init() {
 	cobra.OnInitialize(func() {
 		initConfig()
 
-		defaultCfg.Log.Level = "DEBUG"
 		var err error
 		log, err = setupLogger(defaultCfg.Log.Level)
 		if err != nil {
