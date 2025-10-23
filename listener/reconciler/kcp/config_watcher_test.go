@@ -23,6 +23,18 @@ func (m *MockVirtualWorkspaceConfigManager) LoadConfig(configPath string) (*Virt
 	return &VirtualWorkspacesConfig{}, nil
 }
 
+// MockVirtualWorkspaceReconciler for testing
+type MockVirtualWorkspaceReconciler struct {
+	ReconcileConfigFunc func(ctx context.Context, config *VirtualWorkspacesConfig) error
+}
+
+func (m *MockVirtualWorkspaceReconciler) ReconcileConfig(ctx context.Context, config *VirtualWorkspacesConfig) error {
+	if m.ReconcileConfigFunc != nil {
+		return m.ReconcileConfigFunc(ctx, config)
+	}
+	return nil
+}
+
 func TestNewConfigWatcher(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -37,8 +49,9 @@ func TestNewConfigWatcher(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			virtualWSManager := &MockVirtualWorkspaceConfigManager{}
+			reconciler := &MockVirtualWorkspaceReconciler{}
 
-			watcher, err := NewConfigWatcher(virtualWSManager, testlogger.New().Logger)
+			watcher, err := NewConfigWatcher(virtualWSManager, reconciler, testlogger.New().Logger)
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -47,6 +60,7 @@ func TestNewConfigWatcher(t *testing.T) {
 				assert.NoError(t, err)
 				assert.NotNil(t, watcher)
 				assert.Equal(t, virtualWSManager, watcher.virtualWSManager)
+				assert.Equal(t, reconciler, watcher.reconciler)
 				assert.Equal(t, testlogger.New().Logger, watcher.log)
 				assert.NotNil(t, watcher.fileWatcher)
 			}
@@ -56,10 +70,10 @@ func TestNewConfigWatcher(t *testing.T) {
 
 func TestConfigWatcher_OnFileChanged(t *testing.T) {
 	tests := []struct {
-		name              string
-		filepath          string
-		loadConfigFunc    func(configPath string) (*VirtualWorkspacesConfig, error)
-		expectHandlerCall bool
+		name                 string
+		filepath             string
+		loadConfigFunc       func(configPath string) (*VirtualWorkspacesConfig, error)
+		expectReconcilerCall bool
 	}{
 		{
 			name:     "successful_file_change",
@@ -71,7 +85,7 @@ func TestConfigWatcher_OnFileChanged(t *testing.T) {
 					},
 				}, nil
 			},
-			expectHandlerCall: true,
+			expectReconcilerCall: true,
 		},
 		{
 			name:     "failed_config_load",
@@ -79,7 +93,7 @@ func TestConfigWatcher_OnFileChanged(t *testing.T) {
 			loadConfigFunc: func(configPath string) (*VirtualWorkspacesConfig, error) {
 				return nil, errors.New("failed to load config")
 			},
-			expectHandlerCall: false,
+			expectReconcilerCall: false,
 		},
 	}
 
@@ -89,28 +103,29 @@ func TestConfigWatcher_OnFileChanged(t *testing.T) {
 				LoadConfigFunc: tt.loadConfigFunc,
 			}
 
-			watcher, err := NewConfigWatcher(virtualWSManager, testlogger.New().Logger)
-			require.NoError(t, err)
-
-			// Track change handler calls
-			var handlerCalled bool
+			var reconcilerCalled bool
 			var receivedConfig *VirtualWorkspacesConfig
-			changeHandler := func(config *VirtualWorkspacesConfig) error {
-				handlerCalled = true
-				receivedConfig = config
-				return nil
+			reconciler := &MockVirtualWorkspaceReconciler{
+				ReconcileConfigFunc: func(ctx context.Context, config *VirtualWorkspacesConfig) error {
+					reconcilerCalled = true
+					receivedConfig = config
+					return nil
+				},
 			}
-			watcher.changeHandler = changeHandler
+
+			watcher, err := NewConfigWatcher(virtualWSManager, reconciler, testlogger.New().Logger)
+			require.NoError(t, err)
+			watcher.ctx = context.Background()
 
 			watcher.OnFileChanged(tt.filepath)
 
-			if tt.expectHandlerCall {
-				assert.True(t, handlerCalled)
+			if tt.expectReconcilerCall {
+				assert.True(t, reconcilerCalled)
 				assert.NotNil(t, receivedConfig)
 				assert.Equal(t, 1, len(receivedConfig.VirtualWorkspaces))
 				assert.Equal(t, "test-ws", receivedConfig.VirtualWorkspaces[0].Name)
 			} else {
-				assert.False(t, handlerCalled)
+				assert.False(t, reconcilerCalled)
 			}
 		})
 	}
@@ -118,21 +133,21 @@ func TestConfigWatcher_OnFileChanged(t *testing.T) {
 
 func TestConfigWatcher_OnFileDeleted(t *testing.T) {
 	virtualWSManager := &MockVirtualWorkspaceConfigManager{}
+	reconciler := &MockVirtualWorkspaceReconciler{}
 
-	watcher, err := NewConfigWatcher(virtualWSManager, testlogger.New().Logger)
+	watcher, err := NewConfigWatcher(virtualWSManager, reconciler, testlogger.New().Logger)
 	require.NoError(t, err)
 
-	// Should not panic or error
 	watcher.OnFileDeleted("/test/config.yaml")
 }
 
 func TestConfigWatcher_LoadAndNotify(t *testing.T) {
 	tests := []struct {
-		name           string
-		configPath     string
-		loadConfigFunc func(configPath string) (*VirtualWorkspacesConfig, error)
-		expectError    bool
-		expectCall     bool
+		name                 string
+		configPath           string
+		loadConfigFunc       func(configPath string) (*VirtualWorkspacesConfig, error)
+		expectError          bool
+		expectReconcilerCall bool
 	}{
 		{
 			name:       "successful_load_and_notify",
@@ -145,8 +160,8 @@ func TestConfigWatcher_LoadAndNotify(t *testing.T) {
 					},
 				}, nil
 			},
-			expectError: false,
-			expectCall:  true,
+			expectError:          false,
+			expectReconcilerCall: true,
 		},
 		{
 			name:       "failed_config_load",
@@ -154,17 +169,8 @@ func TestConfigWatcher_LoadAndNotify(t *testing.T) {
 			loadConfigFunc: func(configPath string) (*VirtualWorkspacesConfig, error) {
 				return nil, errors.New("config load error")
 			},
-			expectError: true,
-			expectCall:  false,
-		},
-		{
-			name:       "no_change_handler",
-			configPath: "/test/config.yaml",
-			loadConfigFunc: func(configPath string) (*VirtualWorkspacesConfig, error) {
-				return &VirtualWorkspacesConfig{}, nil
-			},
-			expectError: false,
-			expectCall:  false,
+			expectError:          true,
+			expectReconcilerCall: false,
 		},
 	}
 
@@ -174,20 +180,19 @@ func TestConfigWatcher_LoadAndNotify(t *testing.T) {
 				LoadConfigFunc: tt.loadConfigFunc,
 			}
 
-			watcher, err := NewConfigWatcher(virtualWSManager, testlogger.New().Logger)
-			require.NoError(t, err)
-
-			// Track change handler calls
-			var handlerCalled bool
+			var reconcilerCalled bool
 			var receivedConfig *VirtualWorkspacesConfig
-			if tt.name != "no_change_handler" {
-				changeHandler := func(config *VirtualWorkspacesConfig) error {
-					handlerCalled = true
+			reconciler := &MockVirtualWorkspaceReconciler{
+				ReconcileConfigFunc: func(ctx context.Context, config *VirtualWorkspacesConfig) error {
+					reconcilerCalled = true
 					receivedConfig = config
 					return nil
-				}
-				watcher.changeHandler = changeHandler
+				},
 			}
+
+			watcher, err := NewConfigWatcher(virtualWSManager, reconciler, testlogger.New().Logger)
+			require.NoError(t, err)
+			watcher.ctx = context.Background()
 
 			err = watcher.loadAndNotify(tt.configPath)
 
@@ -197,14 +202,14 @@ func TestConfigWatcher_LoadAndNotify(t *testing.T) {
 				assert.NoError(t, err)
 			}
 
-			if tt.expectCall {
-				assert.True(t, handlerCalled)
+			if tt.expectReconcilerCall {
+				assert.True(t, reconcilerCalled)
 				assert.NotNil(t, receivedConfig)
 				if tt.name == "successful_load_and_notify" {
 					assert.Equal(t, 2, len(receivedConfig.VirtualWorkspaces))
 				}
 			} else {
-				assert.False(t, handlerCalled)
+				assert.False(t, reconcilerCalled)
 			}
 		})
 	}
@@ -217,22 +222,22 @@ func TestConfigWatcher_Watch_EmptyPath(t *testing.T) {
 		},
 	}
 
-	watcher, err := NewConfigWatcher(virtualWSManager, testlogger.New().Logger)
+	var reconcilerCalled bool
+	reconciler := &MockVirtualWorkspaceReconciler{
+		ReconcileConfigFunc: func(ctx context.Context, config *VirtualWorkspacesConfig) error {
+			reconcilerCalled = true
+			return nil
+		},
+	}
+
+	watcher, err := NewConfigWatcher(virtualWSManager, reconciler, testlogger.New().Logger)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithTimeout(t.Context(), common.ShortTimeout)
 	defer cancel()
 
-	var handlerCalled bool
-	changeHandler := func(config *VirtualWorkspacesConfig) error {
-		handlerCalled = true
-		return nil
-	}
+	err = watcher.Watch(ctx, "")
 
-	// Test with empty config path - should not try to load initial config
-	err = watcher.Watch(ctx, "", changeHandler)
-
-	// Should complete gracefully without error since graceful termination is not an error
 	assert.NoError(t, err)
-	assert.False(t, handlerCalled) // Should not call handler for empty path initial load
+	assert.False(t, reconcilerCalled)
 }

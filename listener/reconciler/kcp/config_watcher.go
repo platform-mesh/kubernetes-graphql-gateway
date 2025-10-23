@@ -13,18 +13,25 @@ type VirtualWorkspaceConfigManager interface {
 	LoadConfig(configPath string) (*VirtualWorkspacesConfig, error)
 }
 
+// VirtualWorkspaceConfigReconciler interface for reconciling virtual workspace configurations
+type VirtualWorkspaceConfigReconciler interface {
+	ReconcileConfig(ctx context.Context, config *VirtualWorkspacesConfig) error
+}
+
 // ConfigWatcher watches the virtual workspaces configuration file for changes
 type ConfigWatcher struct {
 	fileWatcher      *watcher.FileWatcher
 	virtualWSManager VirtualWorkspaceConfigManager
+	reconciler       VirtualWorkspaceConfigReconciler
 	log              *logger.Logger
-	changeHandler    func(*VirtualWorkspacesConfig) error
+	ctx              context.Context
 }
 
 // NewConfigWatcher creates a new config file watcher
-func NewConfigWatcher(virtualWSManager VirtualWorkspaceConfigManager, log *logger.Logger) (*ConfigWatcher, error) {
+func NewConfigWatcher(virtualWSManager VirtualWorkspaceConfigManager, reconciler VirtualWorkspaceConfigReconciler, log *logger.Logger) (*ConfigWatcher, error) {
 	c := &ConfigWatcher{
 		virtualWSManager: virtualWSManager,
+		reconciler:       reconciler,
 		log:              log,
 	}
 
@@ -38,19 +45,18 @@ func NewConfigWatcher(virtualWSManager VirtualWorkspaceConfigManager, log *logge
 }
 
 // Watch starts watching the configuration file and blocks until context is cancelled
-func (c *ConfigWatcher) Watch(ctx context.Context, configPath string, changeHandler func(*VirtualWorkspacesConfig) error) error {
-	// Store change handler for use in event callbacks
-	c.changeHandler = changeHandler
-
-	// Load initial configuration
-	if configPath != "" {
-		if err := c.loadAndNotify(configPath); err != nil {
-			c.log.Error().Err(err).Msg("failed to load initial virtual workspaces config")
-			return err
-		}
+func (c *ConfigWatcher) Watch(ctx context.Context, configPath string) error {
+	if configPath == "" {
+		return nil
 	}
 
-	// Watch the optional configuration file with 500 ms debouncing
+	c.ctx = ctx
+
+	if err := c.loadAndNotify(configPath); err != nil {
+		c.log.Error().Err(err).Msg("failed to load initial virtual workspaces config")
+		return err
+	}
+
 	return c.fileWatcher.WatchOptionalFile(ctx, configPath, 500)
 }
 
@@ -66,7 +72,7 @@ func (c *ConfigWatcher) OnFileDeleted(filepath string) {
 	c.log.Warn().Str("configPath", filepath).Msg("virtual workspaces config file deleted")
 }
 
-// loadAndNotify loads the config and notifies the change handler
+// loadAndNotify loads the config and reconciles it
 func (c *ConfigWatcher) loadAndNotify(configPath string) error {
 	config, err := c.virtualWSManager.LoadConfig(configPath)
 	if err != nil {
@@ -75,11 +81,9 @@ func (c *ConfigWatcher) loadAndNotify(configPath string) error {
 
 	c.log.Info().Int("virtualWorkspaces", len(config.VirtualWorkspaces)).Msg("loaded virtual workspaces config")
 
-	if c.changeHandler != nil {
-		err = c.changeHandler(config)
-		if err != nil {
-			return err
-		}
+	if err := c.reconciler.ReconcileConfig(c.ctx, config); err != nil {
+		c.log.Error().Err(err).Msg("failed to reconcile virtual workspaces config")
+		return err
 	}
 	return nil
 }
