@@ -1,8 +1,11 @@
 package targetcluster
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -192,7 +195,7 @@ func (cr *ClusterRegistry) handleAuth(w http.ResponseWriter, r *http.Request, to
 		return true
 	}
 
-	if IsIntrospectionQuery(r) {
+	if isIntrospectionQuery(r) {
 		if cr.appCfg.Gateway.IntrospectionAuthentication {
 			if token == "" {
 				http.Error(w, "Authorization header is required for introspection queries", http.StatusUnauthorized)
@@ -222,6 +225,25 @@ func (cr *ClusterRegistry) handleAuth(w http.ResponseWriter, r *http.Request, to
 	}
 
 	return true
+}
+
+// isIntrospectionQuery checks if the request contains a GraphQL introspection query
+func isIntrospectionQuery(r *http.Request) bool {
+	var params struct {
+		Query string `json:"query"`
+	}
+	bodyBytes, err := io.ReadAll(r.Body)
+	r.Body.Close()
+	if err == nil {
+		if err = json.Unmarshal(bodyBytes, &params); err == nil {
+			if strings.Contains(params.Query, "__schema") || strings.Contains(params.Query, "__type") {
+				r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+				return true
+			}
+		}
+	}
+	r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+	return false
 }
 
 // handleCORS handles CORS preflight requests and headers
