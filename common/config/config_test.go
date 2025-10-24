@@ -89,16 +89,9 @@ func TestConfig_FieldAssignment(t *testing.T) {
 func TestConfig_NestedStructModification(t *testing.T) {
 	cfg := Config{}
 
-	// Test direct modification of nested structs
-	cfg.Gateway.HandlerCfg = struct {
-		Pretty     bool `mapstructure:"gateway-handler-pretty"`
-		Playground bool `mapstructure:"gateway-handler-playground"`
-		GraphiQL   bool `mapstructure:"gateway-handler-graphiql"`
-	}{
-		Pretty:     true,
-		Playground: false,
-		GraphiQL:   true,
-	}
+	cfg.Gateway.HandlerCfg.Pretty = true
+	cfg.Gateway.HandlerCfg.Playground = false
+	cfg.Gateway.HandlerCfg.GraphiQL = true
 
 	assert.True(t, cfg.Gateway.HandlerCfg.Pretty)
 	assert.False(t, cfg.Gateway.HandlerCfg.Playground)
