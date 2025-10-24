@@ -31,8 +31,6 @@ func init() {
 	}
 
 	cobra.OnInitialize(func() {
-		initConfig()
-
 		var err error
 		log, err = setupLogger(defaultCfg.Log.Level)
 		if err != nil {
@@ -49,36 +47,6 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-}
-
-func initConfig() {
-	// Top-level defaults
-	v.SetDefault("openapi-definitions-path", "./bin/definitions")
-	v.SetDefault("enable-kcp", true)
-	v.SetDefault("local-development", false)
-	v.SetDefault("introspection-authentication", false)
-
-	// Listener
-	v.SetDefault("listener-apiexport-workspace", ":root")
-	v.SetDefault("listener-apiexport-name", "kcp.io")
-
-	// Gateway
-	v.SetDefault("gateway-port", "8080")
-
-	v.SetDefault("gateway-username-claim", "email")
-	v.SetDefault("gateway-should-impersonate", true)
-	// Gateway Handler config
-	v.SetDefault("gateway-handler-pretty", true)
-	v.SetDefault("gateway-handler-playground", true)
-	v.SetDefault("gateway-handler-graphiql", true)
-	// Gateway CORS
-	v.SetDefault("gateway-cors-enabled", false)
-	v.SetDefault("gateway-cors-allowed-origins", "*")
-	v.SetDefault("gateway-cors-allowed-headers", "*")
-	// Gateway URL
-	v.SetDefault("gateway-url-virtual-workspace-prefix", "virtual-workspace")
-	v.SetDefault("gateway-url-default-kcp-workspace", "root")
-	v.SetDefault("gateway-url-graphql-suffix", "graphql")
 }
 
 // setupLogger initializes the logger with the given log level

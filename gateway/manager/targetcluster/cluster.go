@@ -1,6 +1,7 @@
 package targetcluster
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -9,14 +10,16 @@ import (
 
 	"github.com/go-openapi/spec"
 	"github.com/platform-mesh/golang-commons/logger"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/kcp"
 
 	"github.com/platform-mesh/kubernetes-graphql-gateway/common/auth"
 	appConfig "github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/roundtripper"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/resolver"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/schema"
+	gwschema "github.com/platform-mesh/kubernetes-graphql-gateway/gateway/schema"
 )
 
 // FileData represents the data extracted from a schema file
@@ -64,7 +67,6 @@ func NewTargetCluster(
 	schemaFilePath string,
 	log *logger.Logger,
 	appCfg appConfig.Config,
-	roundTripperFactory func(http.RoundTripper, rest.TLSClientConfig) http.RoundTripper,
 ) (*TargetCluster, error) {
 	fileData, err := readSchemaFile(schemaFilePath)
 	if err != nil {
@@ -78,7 +80,7 @@ func NewTargetCluster(
 	}
 
 	// Connect to cluster - use metadata if available, otherwise fall back to standard config
-	if err := cluster.connect(appCfg, fileData.ClusterMetadata, roundTripperFactory); err != nil {
+	if err := cluster.connect(appCfg, fileData.ClusterMetadata); err != nil {
 		return nil, fmt.Errorf("failed to connect to cluster: %w", err)
 	}
 
@@ -96,7 +98,7 @@ func NewTargetCluster(
 }
 
 // connect establishes connection to the target cluster
-func (tc *TargetCluster) connect(appCfg appConfig.Config, metadata *ClusterMetadata, roundTripperFactory func(http.RoundTripper, rest.TLSClientConfig) http.RoundTripper) error {
+func (tc *TargetCluster) connect(appCfg appConfig.Config, metadata *ClusterMetadata) error {
 	// All clusters now use metadata from schema files to get kubeconfig
 	if metadata == nil {
 		return fmt.Errorf("cluster %s requires cluster metadata in schema file", tc.name)
@@ -114,11 +116,20 @@ func (tc *TargetCluster) connect(appCfg appConfig.Config, metadata *ClusterMetad
 		return fmt.Errorf("failed to build config from metadata: %w", err)
 	}
 
-	if roundTripperFactory != nil {
-		tc.restCfg.Wrap(func(rt http.RoundTripper) http.RoundTripper {
-			return roundTripperFactory(rt, tc.restCfg.TLSClientConfig)
-		})
+	baseRT, err := roundtripper.NewBaseRoundTripper(tc.restCfg.TLSClientConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create base transport: %w", err)
 	}
+
+	tc.restCfg.Wrap(func(adminRT http.RoundTripper) http.RoundTripper {
+		return roundtripper.New(
+			tc.log,
+			tc.appCfg,
+			adminRT,
+			baseRT,
+			roundtripper.NewUnauthorizedRoundTripper(),
+		)
+	})
 
 	// Create client - use KCP-aware client only for KCP mode, standard client otherwise
 	if appCfg.EnableKcp {
@@ -176,7 +187,7 @@ func (tc *TargetCluster) createHandler(definitions map[string]interface{}, appCf
 	resolverProvider := resolver.New(tc.log, tc.client)
 
 	// Create schema gateway
-	schemaGateway, err := schema.New(tc.log, specDefs, resolverProvider)
+	schemaGateway, err := gwschema.New(tc.log, specDefs, resolverProvider)
 	if err != nil {
 		return fmt.Errorf("failed to create GraphQL schema: %w", err)
 	}
@@ -214,6 +225,33 @@ func (tc *TargetCluster) GetEndpoint(appCfg appConfig.Config) string {
 	}
 
 	return fmt.Sprintf("/%s/%s", path, appCfg.Url.GraphqlSuffix)
+}
+
+func (tc *TargetCluster) ValidateToken(ctx context.Context, token string) (bool, error) {
+	newCtx := context.WithValue(ctx, roundtripper.TokenKey{}, token)
+
+	configMapList := &corev1.ConfigMapList{}
+	listOpts := &client.ListOptions{
+		Limit: 1,
+	}
+
+	err := tc.client.List(newCtx, configMapList, listOpts)
+	if err != nil {
+		errStrLower := strings.ToLower(err.Error())
+		if strings.Contains(errStrLower, "unauthorized") || strings.Contains(errStrLower, "401") {
+			tc.log.Debug().Err(err).Str("cluster", tc.name).Msg("Token is invalid - unauthorized")
+			return false, nil
+		}
+		if strings.Contains(errStrLower, "forbidden") || strings.Contains(errStrLower, "403") || strings.Contains(errStrLower, "access denied") {
+			tc.log.Debug().Str("cluster", tc.name).Msg("Token is valid but user has no permission to list configmaps")
+			return true, nil
+		}
+		tc.log.Error().Err(err).Str("cluster", tc.name).Msg("Unexpected error during token validation")
+		return false, err
+	}
+
+	tc.log.Debug().Str("cluster", tc.name).Msg("Token validated successfully")
+	return true, nil
 }
 
 // ServeHTTP handles HTTP requests for this cluster

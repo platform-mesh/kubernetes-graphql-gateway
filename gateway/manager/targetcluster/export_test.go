@@ -1,6 +1,8 @@
 package targetcluster
 
 import (
+	"net/http"
+
 	"github.com/platform-mesh/golang-commons/logger"
 	"k8s.io/client-go/rest"
 
@@ -17,6 +19,10 @@ func NewTestTargetCluster(name string) *TargetCluster {
 	return &TargetCluster{
 		name: name,
 	}
+}
+
+func IsIntrospectionQuery(r *http.Request) bool {
+	return isIntrospectionQuery(r)
 }
 
 // CreateTestConfig creates an appConfig.Config for testing with the specified settings

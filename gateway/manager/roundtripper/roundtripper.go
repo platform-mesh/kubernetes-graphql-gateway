@@ -6,6 +6,8 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/platform-mesh/golang-commons/logger"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
 
 	"github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
@@ -16,15 +18,17 @@ type TokenKey struct{}
 type roundTripper struct {
 	log                     *logger.Logger
 	adminRT, unauthorizedRT http.RoundTripper
+	baseRT                  http.RoundTripper
 	appCfg                  config.Config
 }
 
 type unauthorizedRoundTripper struct{}
 
-func New(log *logger.Logger, appCfg config.Config, adminRoundTripper, unauthorizedRT http.RoundTripper) http.RoundTripper {
+func New(log *logger.Logger, appCfg config.Config, adminRoundTripper, baseRoundTripper, unauthorizedRT http.RoundTripper) http.RoundTripper {
 	return &roundTripper{
 		log:            log,
 		adminRT:        adminRoundTripper,
+		baseRT:         baseRoundTripper,
 		unauthorizedRT: unauthorizedRT,
 		appCfg:         appCfg,
 	}
@@ -33,6 +37,18 @@ func New(log *logger.Logger, appCfg config.Config, adminRoundTripper, unauthoriz
 // NewUnauthorizedRoundTripper returns a RoundTripper that always returns 401 Unauthorized
 func NewUnauthorizedRoundTripper() http.RoundTripper {
 	return &unauthorizedRoundTripper{}
+}
+
+// NewBaseRoundTripper creates a base HTTP transport with only TLS configuration (no authentication)
+func NewBaseRoundTripper(tlsConfig rest.TLSClientConfig) (http.RoundTripper, error) {
+	return rest.TransportFor(&rest.Config{
+		TLSClientConfig: rest.TLSClientConfig{
+			Insecure:   tlsConfig.Insecure,
+			ServerName: tlsConfig.ServerName,
+			CAFile:     tlsConfig.CAFile,
+			CAData:     tlsConfig.CAData,
+		},
+	})
 }
 
 func (rt *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -65,13 +81,12 @@ func (rt *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 
 	// No we are going to use token based auth only, so we are reassigning the headers
+	req = utilnet.CloneRequest(req)
 	req.Header.Del("Authorization")
-	req.Header.Set("Authorization", "Bearer "+token)
 
 	if !rt.appCfg.Gateway.ShouldImpersonate {
 		rt.log.Debug().Str("path", req.URL.Path).Msg("Using bearer token authentication")
-
-		return rt.adminRT.RoundTrip(req)
+		return transport.NewBearerAuthRoundTripper(token, rt.baseRT).RoundTrip(req)
 	}
 
 	// Impersonation mode: extract user from token and impersonate

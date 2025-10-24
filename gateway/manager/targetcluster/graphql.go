@@ -1,11 +1,9 @@
 package targetcluster
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 
@@ -75,25 +73,6 @@ func GetToken(r *http.Request) string {
 	token = strings.TrimPrefix(token, "Bearer ")
 	token = strings.TrimPrefix(token, "bearer ")
 	return token
-}
-
-// IsIntrospectionQuery checks if the request contains a GraphQL introspection query
-func IsIntrospectionQuery(r *http.Request) bool {
-	var params struct {
-		Query string `json:"query"`
-	}
-	bodyBytes, err := io.ReadAll(r.Body)
-	r.Body.Close()
-	if err == nil {
-		if err = json.Unmarshal(bodyBytes, &params); err == nil {
-			if strings.Contains(params.Query, "__schema") || strings.Contains(params.Query, "__type") {
-				r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
-				return true
-			}
-		}
-	}
-	r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
-	return false
 }
 
 // HandleSubscription handles GraphQL subscription requests using Server-Sent Events
