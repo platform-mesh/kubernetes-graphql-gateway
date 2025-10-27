@@ -74,3 +74,11 @@ packages:
     interfaces:
       ClusterManager:
       SchemaWatcher:
+
+  github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler/kcp:
+    config:
+      dir: listener/reconciler/kcp/mocks
+      outpkg: mocks
+    interfaces:
+      VirtualWorkspaceConfigManager:
+      VirtualWorkspaceConfigReconciler:

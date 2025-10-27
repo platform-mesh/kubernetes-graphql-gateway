@@ -1,4 +1,4 @@
-package kcp
+package kcp_test
 
 import (
 	"context"
@@ -7,33 +7,12 @@ import (
 
 	"github.com/platform-mesh/golang-commons/logger/testlogger"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/common"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler/kcp"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler/kcp/mocks"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
-
-// MockVirtualWorkspaceConfigManager for testing
-type MockVirtualWorkspaceConfigManager struct {
-	LoadConfigFunc func(configPath string) (*VirtualWorkspacesConfig, error)
-}
-
-func (m *MockVirtualWorkspaceConfigManager) LoadConfig(configPath string) (*VirtualWorkspacesConfig, error) {
-	if m.LoadConfigFunc != nil {
-		return m.LoadConfigFunc(configPath)
-	}
-	return &VirtualWorkspacesConfig{}, nil
-}
-
-// MockVirtualWorkspaceReconciler for testing
-type MockVirtualWorkspaceReconciler struct {
-	ReconcileConfigFunc func(ctx context.Context, config *VirtualWorkspacesConfig) error
-}
-
-func (m *MockVirtualWorkspaceReconciler) ReconcileConfig(ctx context.Context, config *VirtualWorkspacesConfig) error {
-	if m.ReconcileConfigFunc != nil {
-		return m.ReconcileConfigFunc(ctx, config)
-	}
-	return nil
-}
 
 func TestNewConfigWatcher(t *testing.T) {
 	tests := []struct {
@@ -48,10 +27,10 @@ func TestNewConfigWatcher(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			virtualWSManager := &MockVirtualWorkspaceConfigManager{}
-			reconciler := &MockVirtualWorkspaceReconciler{}
+			virtualWSManager := mocks.NewMockVirtualWorkspaceConfigManager(t)
+			reconciler := mocks.NewMockVirtualWorkspaceConfigReconciler(t)
 
-			watcher, err := NewConfigWatcher(virtualWSManager, reconciler, testlogger.New().Logger)
+			watcher, err := kcp.NewConfigWatcher(virtualWSManager, reconciler, testlogger.New().Logger)
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -59,10 +38,6 @@ func TestNewConfigWatcher(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				assert.NotNil(t, watcher)
-				assert.Equal(t, virtualWSManager, watcher.virtualWSManager)
-				assert.Equal(t, reconciler, watcher.reconciler)
-				assert.Equal(t, testlogger.New().Logger, watcher.log)
-				assert.NotNil(t, watcher.fileWatcher)
 			}
 		})
 	}
@@ -70,167 +45,62 @@ func TestNewConfigWatcher(t *testing.T) {
 
 func TestConfigWatcher_OnFileChanged(t *testing.T) {
 	tests := []struct {
-		name                 string
-		filepath             string
-		loadConfigFunc       func(configPath string) (*VirtualWorkspacesConfig, error)
-		expectReconcilerCall bool
+		name       string
+		filepath   string
+		setupMocks func(*mocks.MockVirtualWorkspaceConfigManager, *mocks.MockVirtualWorkspaceConfigReconciler)
 	}{
 		{
 			name:     "successful_file_change",
 			filepath: "/test/config.yaml",
-			loadConfigFunc: func(configPath string) (*VirtualWorkspacesConfig, error) {
-				return &VirtualWorkspacesConfig{
-					VirtualWorkspaces: []VirtualWorkspace{
+			setupMocks: func(manager *mocks.MockVirtualWorkspaceConfigManager, reconciler *mocks.MockVirtualWorkspaceConfigReconciler) {
+				config := &kcp.VirtualWorkspacesConfig{
+					VirtualWorkspaces: []kcp.VirtualWorkspace{
 						{Name: "test-ws", URL: "https://example.com"},
 					},
-				}, nil
+				}
+				manager.EXPECT().LoadConfig("/test/config.yaml").Return(config, nil)
+				reconciler.EXPECT().ReconcileConfig(mock.Anything, config).Return(nil)
 			},
-			expectReconcilerCall: true,
 		},
 		{
 			name:     "failed_config_load",
 			filepath: "/test/config.yaml",
-			loadConfigFunc: func(configPath string) (*VirtualWorkspacesConfig, error) {
-				return nil, errors.New("failed to load config")
+			setupMocks: func(manager *mocks.MockVirtualWorkspaceConfigManager, reconciler *mocks.MockVirtualWorkspaceConfigReconciler) {
+				manager.EXPECT().LoadConfig("/test/config.yaml").Return((*kcp.VirtualWorkspacesConfig)(nil), errors.New("failed to load config"))
 			},
-			expectReconcilerCall: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			virtualWSManager := &MockVirtualWorkspaceConfigManager{
-				LoadConfigFunc: tt.loadConfigFunc,
-			}
+			virtualWSManager := mocks.NewMockVirtualWorkspaceConfigManager(t)
+			reconciler := mocks.NewMockVirtualWorkspaceConfigReconciler(t)
 
-			var reconcilerCalled bool
-			var receivedConfig *VirtualWorkspacesConfig
-			reconciler := &MockVirtualWorkspaceReconciler{
-				ReconcileConfigFunc: func(ctx context.Context, config *VirtualWorkspacesConfig) error {
-					reconcilerCalled = true
-					receivedConfig = config
-					return nil
-				},
-			}
+			tt.setupMocks(virtualWSManager, reconciler)
 
-			watcher, err := NewConfigWatcher(virtualWSManager, reconciler, testlogger.New().Logger)
+			watcher, err := kcp.NewConfigWatcher(virtualWSManager, reconciler, testlogger.New().Logger)
 			require.NoError(t, err)
-			watcher.ctx = context.Background()
 
 			watcher.OnFileChanged(tt.filepath)
-
-			if tt.expectReconcilerCall {
-				assert.True(t, reconcilerCalled)
-				assert.NotNil(t, receivedConfig)
-				assert.Equal(t, 1, len(receivedConfig.VirtualWorkspaces))
-				assert.Equal(t, "test-ws", receivedConfig.VirtualWorkspaces[0].Name)
-			} else {
-				assert.False(t, reconcilerCalled)
-			}
 		})
 	}
 }
 
 func TestConfigWatcher_OnFileDeleted(t *testing.T) {
-	virtualWSManager := &MockVirtualWorkspaceConfigManager{}
-	reconciler := &MockVirtualWorkspaceReconciler{}
+	virtualWSManager := mocks.NewMockVirtualWorkspaceConfigManager(t)
+	reconciler := mocks.NewMockVirtualWorkspaceConfigReconciler(t)
 
-	watcher, err := NewConfigWatcher(virtualWSManager, reconciler, testlogger.New().Logger)
+	watcher, err := kcp.NewConfigWatcher(virtualWSManager, reconciler, testlogger.New().Logger)
 	require.NoError(t, err)
 
 	watcher.OnFileDeleted("/test/config.yaml")
 }
 
-func TestConfigWatcher_LoadAndNotify(t *testing.T) {
-	tests := []struct {
-		name                 string
-		configPath           string
-		loadConfigFunc       func(configPath string) (*VirtualWorkspacesConfig, error)
-		expectError          bool
-		expectReconcilerCall bool
-	}{
-		{
-			name:       "successful_load_and_notify",
-			configPath: "/test/config.yaml",
-			loadConfigFunc: func(configPath string) (*VirtualWorkspacesConfig, error) {
-				return &VirtualWorkspacesConfig{
-					VirtualWorkspaces: []VirtualWorkspace{
-						{Name: "ws1", URL: "https://example.com"},
-						{Name: "ws2", URL: "https://example.org"},
-					},
-				}, nil
-			},
-			expectError:          false,
-			expectReconcilerCall: true,
-		},
-		{
-			name:       "failed_config_load",
-			configPath: "/test/config.yaml",
-			loadConfigFunc: func(configPath string) (*VirtualWorkspacesConfig, error) {
-				return nil, errors.New("config load error")
-			},
-			expectError:          true,
-			expectReconcilerCall: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			virtualWSManager := &MockVirtualWorkspaceConfigManager{
-				LoadConfigFunc: tt.loadConfigFunc,
-			}
-
-			var reconcilerCalled bool
-			var receivedConfig *VirtualWorkspacesConfig
-			reconciler := &MockVirtualWorkspaceReconciler{
-				ReconcileConfigFunc: func(ctx context.Context, config *VirtualWorkspacesConfig) error {
-					reconcilerCalled = true
-					receivedConfig = config
-					return nil
-				},
-			}
-
-			watcher, err := NewConfigWatcher(virtualWSManager, reconciler, testlogger.New().Logger)
-			require.NoError(t, err)
-			watcher.ctx = context.Background()
-
-			err = watcher.loadAndNotify(tt.configPath)
-
-			if tt.expectError {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
-
-			if tt.expectReconcilerCall {
-				assert.True(t, reconcilerCalled)
-				assert.NotNil(t, receivedConfig)
-				if tt.name == "successful_load_and_notify" {
-					assert.Equal(t, 2, len(receivedConfig.VirtualWorkspaces))
-				}
-			} else {
-				assert.False(t, reconcilerCalled)
-			}
-		})
-	}
-}
-
 func TestConfigWatcher_Watch_EmptyPath(t *testing.T) {
-	virtualWSManager := &MockVirtualWorkspaceConfigManager{
-		LoadConfigFunc: func(configPath string) (*VirtualWorkspacesConfig, error) {
-			return &VirtualWorkspacesConfig{}, nil
-		},
-	}
+	virtualWSManager := mocks.NewMockVirtualWorkspaceConfigManager(t)
+	reconciler := mocks.NewMockVirtualWorkspaceConfigReconciler(t)
 
-	var reconcilerCalled bool
-	reconciler := &MockVirtualWorkspaceReconciler{
-		ReconcileConfigFunc: func(ctx context.Context, config *VirtualWorkspacesConfig) error {
-			reconcilerCalled = true
-			return nil
-		},
-	}
-
-	watcher, err := NewConfigWatcher(virtualWSManager, reconciler, testlogger.New().Logger)
+	watcher, err := kcp.NewConfigWatcher(virtualWSManager, reconciler, testlogger.New().Logger)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithTimeout(t.Context(), common.ShortTimeout)
@@ -239,5 +109,4 @@ func TestConfigWatcher_Watch_EmptyPath(t *testing.T) {
 	err = watcher.Watch(ctx, "")
 
 	assert.NoError(t, err)
-	assert.False(t, reconcilerCalled)
 }
