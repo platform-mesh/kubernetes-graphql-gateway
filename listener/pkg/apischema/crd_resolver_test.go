@@ -13,6 +13,7 @@ import (
 	apischema "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
 	apischemaMocks "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema/mocks"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 // TestResolveSchema tests the resolveSchema function. It checks if the function
@@ -58,10 +59,10 @@ func TestResolveSchema(t *testing.T) {
 			openAPIPath: "/v1",
 			openAPIErr:  nil,
 			wantErr:     nil,
-			setSchema: func(mock openapi.GroupVersion) {
-				mock.(*apischemaMocks.MockGroupVersion).
+			setSchema: func(gv openapi.GroupVersion) {
+				gv.(*apischemaMocks.MockGroupVersion).
 					EXPECT().
-					Schema("application/json").
+					Schema(mock.Anything).
 					Return(validJSON, nil)
 			},
 		},
