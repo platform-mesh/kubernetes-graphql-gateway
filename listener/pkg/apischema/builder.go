@@ -133,35 +133,6 @@ func (b *SchemaBuilder) WithScope(rm meta.RESTMapper) *SchemaBuilder {
 	return b
 }
 
-func (b *SchemaBuilder) WithCRDCategories(crd *apiextensionsv1.CustomResourceDefinition) *SchemaBuilder {
-	if crd == nil {
-		return b
-	}
-
-	categories := crd.Spec.Names.Categories
-	if len(categories) == 0 {
-		return b
-	}
-
-	gvk, err := getCRDGroupVersionKind(crd.Spec)
-	if err != nil {
-		b.err = multierror.Append(b.err, errors.Join(ErrGetCRDGVK, err))
-		return b
-	}
-
-	for _, v := range crd.Spec.Versions {
-		resourceKey := getOpenAPISchemaKey(metav1.GroupVersionKind{Group: gvk.Group, Version: v.Name, Kind: gvk.Kind})
-		resourceSchema, ok := b.schemas[resourceKey]
-		if !ok {
-			continue
-		}
-
-		resourceSchema.VendorExtensible.AddExtension(common.CategoriesExtensionKey, categories)
-		b.schemas[resourceKey] = resourceSchema
-	}
-	return b
-}
-
 func (b *SchemaBuilder) WithApiResourceCategories(list []*metav1.APIResourceList) *SchemaBuilder {
 	if len(list) == 0 {
 		return b
@@ -560,17 +531,4 @@ func getOpenAPISchemaKey(gvk metav1.GroupVersionKind) string {
 	reversedGroup := strings.Join(parts, ".")
 
 	return fmt.Sprintf("%s.%s.%s", reversedGroup, gvk.Version, gvk.Kind)
-}
-
-func getCRDGroupVersionKind(spec apiextensionsv1.CustomResourceDefinitionSpec) (*metav1.GroupVersionKind, error) {
-	if len(spec.Versions) == 0 {
-		return nil, ErrCRDNoVersions
-	}
-
-	// Use the first stored version as the preferred one
-	return &metav1.GroupVersionKind{
-		Group:   spec.Group,
-		Version: spec.Versions[0].Name,
-		Kind:    spec.Names.Kind,
-	}, nil
 }
