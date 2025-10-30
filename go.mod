@@ -1,14 +1,11 @@
 module github.com/platform-mesh/kubernetes-graphql-gateway
 
-go 1.24.3
+go 1.25
 
 replace (
-	github.com/google/cel-go => github.com/google/cel-go v0.26.1
 	// this PR introduces newer version of graphiQL that supports headers
 	// https://github.com/graphql-go/handler/pull/93
 	github.com/graphql-go/handler => github.com/vertex451/handler v0.0.0-20250124125145-ed328e3cf42a
-	k8s.io/api => k8s.io/api v0.33.3
-	k8s.io/apimachinery => k8s.io/apimachinery v0.33.3
 	k8s.io/client-go => k8s.io/client-go v0.32.4
 	sigs.k8s.io/controller-runtime => github.com/kcp-dev/controller-runtime v0.19.0-kcp.1.0.20250129100209-5eaf4c7b6056
 )
