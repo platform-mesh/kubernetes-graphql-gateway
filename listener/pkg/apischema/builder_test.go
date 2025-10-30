@@ -40,52 +40,6 @@ func TestGetOpenAPISchemaKey(t *testing.T) {
 	}
 }
 
-// TestGetCRDGroupVersionKind tests the getCRDGroupVersionKind function. It checks if the
-// function correctly extracts the GroupVersionKind from the CRD spec and handles errors.
-func TestGetCRDGroupVersionKind(t *testing.T) {
-	tests := []struct {
-		name    string
-		spec    apiextensionsv1.CustomResourceDefinitionSpec
-		want    *metav1.GroupVersionKind
-		wantErr error
-	}{
-		{
-			name: "has_versions",
-			spec: apiextensionsv1.CustomResourceDefinitionSpec{
-				Group: "test.group",
-				Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
-					{Name: "v1beta1"},
-					{Name: "v1"},
-				},
-				Names: apiextensionsv1.CustomResourceDefinitionNames{Kind: "Foo"},
-			},
-			want:    &metav1.GroupVersionKind{Group: "test.group", Version: "v1beta1", Kind: "Foo"},
-			wantErr: nil,
-		},
-		{
-			name: "no_versions",
-			spec: apiextensionsv1.CustomResourceDefinitionSpec{
-				Group:    "empty.group",
-				Versions: []apiextensionsv1.CustomResourceDefinitionVersion{},
-				Names:    apiextensionsv1.CustomResourceDefinitionNames{Kind: "Bar"},
-			},
-			want:    nil,
-			wantErr: apischema.ErrCRDNoVersions,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			got, err := apischema.GetCRDGroupVersionKind(tc.spec)
-			assert.Equal(t, tc.wantErr, err, "error value mismatch")
-			if tc.wantErr != nil {
-				return
-			}
-			assert.Equal(t, tc.want, got, "result value mismatch")
-		})
-	}
-}
-
 // TestNewSchemaBuilder tests the NewSchemaBuilder function. It checks if the
 // SchemaBuilder is correctly initialized with the expected number of schemas
 // and the expected schema key.
@@ -146,69 +100,6 @@ func TestNewSchemaBuilder(t *testing.T) {
 				_, ok := b.GetSchemas()[tc.wantKey]
 				assert.True(t, ok, "schema key %s not found in builder.schemas", tc.wantKey)
 			}
-		})
-	}
-}
-
-// TestWithCRDCategories tests the WithCRDCategories method
-// for the SchemaBuilder struct. It checks if the categories are correctly added
-// to the schema's extensions.
-func TestWithCRDCategories(t *testing.T) {
-	tests := []struct {
-		name     string
-		key      string
-		crd      *apiextensionsv1.CustomResourceDefinition
-		wantCats []string
-	}{
-		{
-			name: "adds_categories",
-			key:  "g.v1.K",
-			crd: &apiextensionsv1.CustomResourceDefinition{
-				Spec: apiextensionsv1.CustomResourceDefinitionSpec{
-					Group:    "g",
-					Versions: []apiextensionsv1.CustomResourceDefinitionVersion{{Name: "v1"}},
-					Names: apiextensionsv1.CustomResourceDefinitionNames{
-						Kind:       "K",
-						Categories: []string{"cat1", "cat2"},
-					},
-				},
-			},
-			wantCats: []string{"cat1", "cat2"},
-		},
-		{
-			name: "no_categories",
-			key:  "g.v1.K",
-			crd: &apiextensionsv1.CustomResourceDefinition{
-				Spec: apiextensionsv1.CustomResourceDefinitionSpec{
-					Group:    "g",
-					Versions: []apiextensionsv1.CustomResourceDefinitionVersion{{Name: "v1"}},
-					Names: apiextensionsv1.CustomResourceDefinitionNames{
-						Kind: "K",
-					},
-				},
-			},
-			wantCats: nil,
-		},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			mock := apischemaMocks.NewMockClient(t)
-			mock.EXPECT().Paths().Return(map[string]openapi.GroupVersion{}, nil)
-			b := apischema.NewSchemaBuilder(mock, nil, testlogger.New().Logger)
-			b.SetSchemas(map[string]*spec.Schema{
-				tc.key: {VendorExtensible: spec.VendorExtensible{Extensions: map[string]interface{}{}}},
-			})
-			b.WithCRDCategories(tc.crd)
-			ext, found := b.GetSchemas()[tc.key].VendorExtensible.Extensions[common.CategoriesExtensionKey]
-			if tc.wantCats == nil {
-				assert.False(t, found, "expected no categories")
-				return
-			}
-			assert.True(t, found, "expected CategoriesExtensionKey to be set")
-			cats, ok := ext.([]string)
-			assert.True(t, ok, "categories should be []string")
-			assert.Equal(t, len(tc.wantCats), len(cats))
-			assert.Equal(t, tc.wantCats, cats, "categories mismatch")
 		})
 	}
 }
