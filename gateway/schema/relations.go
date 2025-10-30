@@ -6,9 +6,9 @@ import (
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 
-	"github.com/go-openapi/spec"
 	"github.com/graphql-go/graphql"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 // addRelationFields adds relation fields to schemas that contain *Ref fields
@@ -99,7 +99,7 @@ func (g *Gateway) findRelationTarget(baseName string) (graphql.Output, *schema.G
 			if existingType, exists := g.typesCache[defKey]; exists && existingType != nil {
 				fieldType = existingType
 			} else {
-				ft, _, err := g.convertSwaggerTypeToGraphQL(defSchema, defKey, []string{}, make(map[string]bool))
+				ft, _, err := g.convertSwaggerTypeToGraphQL(*defSchema, defKey, []string{}, make(map[string]bool))
 				if err != nil {
 					continue
 				}
@@ -124,7 +124,7 @@ func (g *Gateway) findRelationTarget(baseName string) (graphql.Output, *schema.G
 }
 
 // matchesTargetKind checks if a schema definition matches the target kind
-func (g *Gateway) matchesTargetKind(defSchema spec.Schema, targetKind string) bool {
+func (g *Gateway) matchesTargetKind(defSchema *spec.Schema, targetKind string) bool {
 	gvkExt, ok := defSchema.Extensions["x-kubernetes-group-version-kind"]
 	if !ok {
 		return false

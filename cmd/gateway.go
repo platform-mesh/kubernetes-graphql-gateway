@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	openmfpcontext "github.com/platform-mesh/golang-commons/context"
+	pmcontext "github.com/platform-mesh/golang-commons/context"
 	"github.com/platform-mesh/golang-commons/logger"
 	"github.com/platform-mesh/golang-commons/sentry"
 	"github.com/platform-mesh/golang-commons/traces"
@@ -25,7 +25,7 @@ var gatewayCmd = &cobra.Command{
 	Run: func(_ *cobra.Command, _ []string) {
 		log.Info().Str("LogLevel", log.GetLevel().String()).Msg("Starting the Gateway...")
 
-		ctx, _, shutdown := openmfpcontext.StartContext(log, appCfg, 1*time.Second)
+		ctx, _, shutdown := pmcontext.StartContext(log, appCfg, 1*time.Second)
 		defer shutdown()
 
 		if err := initializeSentry(ctx, log); err != nil {
@@ -68,7 +68,7 @@ func initializeSentry(ctx context.Context, log *logger.Logger) error {
 		log.Fatal().Err(err).Msg("Sentry init failed")
 	}
 
-	defer openmfpcontext.Recover(log)
+	defer pmcontext.Recover(log)
 	return nil
 }
 

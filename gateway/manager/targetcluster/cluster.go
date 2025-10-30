@@ -7,9 +7,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/go-openapi/spec"
 	"github.com/platform-mesh/golang-commons/logger"
 	"k8s.io/client-go/rest"
+	"k8s.io/kube-openapi/pkg/spec3"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/kcp"
 
@@ -21,8 +22,8 @@ import (
 
 // FileData represents the data extracted from a schema file
 type FileData struct {
-	Definitions     map[string]any   `json:"definitions"`
-	ClusterMetadata *ClusterMetadata `json:"x-cluster-metadata,omitempty"`
+	Components      *spec3.Components `json:"components,omitempty"`
+	ClusterMetadata *ClusterMetadata  `json:"x-cluster-metadata,omitempty"`
 }
 
 // ClusterMetadata represents the cluster connection metadata stored in schema files
@@ -83,7 +84,7 @@ func NewTargetCluster(
 	}
 
 	// Create GraphQL schema and handler
-	if err := cluster.createHandler(fileData.Definitions, appCfg); err != nil {
+	if err := cluster.createHandler(fileData.Components.Schemas, appCfg); err != nil {
 		return nil, fmt.Errorf("failed to create GraphQL handler: %w", err)
 	}
 
@@ -165,18 +166,13 @@ func buildConfigFromMetadata(metadata *ClusterMetadata, log *logger.Logger) (*re
 }
 
 // createHandler creates the GraphQL schema and handler
-func (tc *TargetCluster) createHandler(definitions map[string]interface{}, appCfg appConfig.Config) error {
-	// Convert definitions to spec format
-	specDefs, err := convertToSpecDefinitions(definitions)
-	if err != nil {
-		return fmt.Errorf("failed to convert definitions: %w", err)
-	}
+func (tc *TargetCluster) createHandler(definitions map[string]*spec.Schema, appCfg appConfig.Config) error {
 
 	// Create resolver
 	resolverProvider := resolver.New(tc.log, tc.client)
 
 	// Create schema gateway
-	schemaGateway, err := schema.New(tc.log, specDefs, resolverProvider)
+	schemaGateway, err := schema.New(tc.log, definitions, resolverProvider)
 	if err != nil {
 		return fmt.Errorf("failed to create GraphQL schema: %w", err)
 	}
@@ -245,19 +241,4 @@ func readSchemaFile(filePath string) (*FileData, error) {
 	}
 
 	return &fileData, nil
-}
-
-// convertToSpecDefinitions converts map definitions to go-openapi spec format
-func convertToSpecDefinitions(definitions map[string]interface{}) (spec.Definitions, error) {
-	data, err := json.Marshal(definitions)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal definitions: %w", err)
-	}
-
-	var specDefs spec.Definitions
-	if err := json.Unmarshal(data, &specDefs); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal to spec definitions: %w", err)
-	}
-
-	return specDefs, nil
 }

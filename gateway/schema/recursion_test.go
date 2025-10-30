@@ -3,10 +3,10 @@ package schema_test
 import (
 	"testing"
 
-	"github.com/go-openapi/spec"
 	"github.com/graphql-go/graphql"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 
 	"github.com/platform-mesh/golang-commons/logger/testlogger"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/resolver"
@@ -19,15 +19,15 @@ func TestConvertSwaggerTypeToGraphQL_WithNilInCache(t *testing.T) {
 
 	tests := []struct {
 		name               string
-		definitions        spec.Definitions
+		definitions        map[string]*spec.Schema
 		setupCache         func(*gatewaySchema.Gateway)
 		expectedNoPanic    bool
 		expectedReturnType bool
 	}{
 		{
 			name: "handles_nil_in_cache_for_recursive_ref",
-			definitions: spec.Definitions{
-				"io.test.v1.RecursiveType": spec.Schema{
+			definitions: map[string]*spec.Schema{
+				"io.test.v1.RecursiveType": &spec.Schema{
 					SchemaProps: spec.SchemaProps{
 						Type: []string{"object"},
 						Properties: map[string]spec.Schema{
@@ -61,8 +61,8 @@ func TestConvertSwaggerTypeToGraphQL_WithNilInCache(t *testing.T) {
 		},
 		{
 			name: "handles_nested_object_with_nil_in_cache",
-			definitions: spec.Definitions{
-				"io.test.v1.NestedType": spec.Schema{
+			definitions: map[string]*spec.Schema{
+				"io.test.v1.NestedType": &spec.Schema{
 					SchemaProps: spec.SchemaProps{
 						Type: []string{"object"},
 						Properties: map[string]spec.Schema{
@@ -135,8 +135,8 @@ func TestHandleObjectFieldSpecType_WithNilInCache(t *testing.T) {
 	log := testlogger.New().Logger
 	mockResolver := &mockResolverProvider{}
 
-	definitions := spec.Definitions{
-		"io.test.v1.SelfReferencing": spec.Schema{
+	definitions := map[string]*spec.Schema{
+		"io.test.v1.SelfReferencing": &spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Type: []string{"object"},
 				Properties: map[string]spec.Schema{
@@ -221,8 +221,8 @@ func TestFindRelationTarget_WithNilInCache(t *testing.T) {
 	log := testlogger.New().Logger
 	mockResolver := &mockResolverProvider{}
 
-	definitions := spec.Definitions{
-		"io.test.v1.Parent": spec.Schema{
+	definitions := map[string]*spec.Schema{
+		"io.test.v1.Parent": &spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Type: []string{"object"},
 				Properties: map[string]spec.Schema{
@@ -253,7 +253,7 @@ func TestFindRelationTarget_WithNilInCache(t *testing.T) {
 				},
 			},
 		},
-		"io.test.v1.Child": spec.Schema{
+		"io.test.v1.Child": &spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Type: []string{"object"},
 				Properties: map[string]spec.Schema{
