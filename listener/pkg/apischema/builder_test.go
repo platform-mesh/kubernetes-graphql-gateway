@@ -9,6 +9,7 @@ import (
 	apischema "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
 	apischemaMocks "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema/mocks"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,13 +55,13 @@ func TestNewSchemaBuilder(t *testing.T) {
 		{
 			name: "populates_schemas",
 			client: func() openapi.Client {
-				mock := apischemaMocks.NewMockClient(t)
+				schemaClient := apischemaMocks.NewMockClient(t)
 				mockGV := apischemaMocks.NewMockGroupVersion(t)
 				paths := map[string]openapi.GroupVersion{
 					"/v1": mockGV,
 				}
-				mock.EXPECT().Paths().Return(paths, nil)
-				mockGV.EXPECT().Schema("application/json").Return([]byte(`{
+				schemaClient.EXPECT().Paths().Return(paths, nil)
+				mockGV.EXPECT().Schema(mock.Anything).Return([]byte(`{
 					"components": {
 						"schemas": {
 							"v1.Pod": {
@@ -70,7 +71,7 @@ func TestNewSchemaBuilder(t *testing.T) {
 						}
 					}
 				}`), nil)
-				return mock
+				return schemaClient
 			}(),
 			wantErr: nil,
 			wantLen: 1,
