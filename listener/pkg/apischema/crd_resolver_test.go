@@ -4,16 +4,16 @@ import (
 	"encoding/json"
 	"testing"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/openapi"
-	"k8s.io/kube-openapi/pkg/spec3"
-	"k8s.io/kube-openapi/pkg/validation/spec"
-
 	"github.com/platform-mesh/golang-commons/logger/testlogger"
 	apischema "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
 	apischemaMocks "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/openapi"
+	"k8s.io/kube-openapi/pkg/spec3"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 // TestResolveSchema tests the resolveSchema function. It checks if the function

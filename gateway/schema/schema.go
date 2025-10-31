@@ -8,13 +8,13 @@ import (
 
 	"github.com/gobuffalo/flect"
 	"github.com/graphql-go/graphql"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kube-openapi/pkg/validation/spec"
-
 	"github.com/platform-mesh/golang-commons/logger"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/common"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/resolver"
+
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 type Provider interface {
@@ -484,9 +484,9 @@ func (g *Gateway) getGroupVersionKind(resourceKey string) (*schema.GroupVersionK
 		return nil, errors.New("x-kubernetes-group-version-kind extension not found")
 	}
 	// xkGvk should be an array of maps
-	if gvkList, ok := xkGvk.([]interface{}); ok && len(gvkList) > 0 {
+	if gvkList, ok := xkGvk.([]any); ok && len(gvkList) > 0 {
 		// Use the first item in the list
-		if gvkMap, ok := gvkList[0].(map[string]interface{}); ok {
+		if gvkMap, ok := gvkList[0].(map[string]any); ok {
 			group, _ := gvkMap["group"].(string)
 			version, _ := gvkMap["version"].(string)
 			kind, _ := gvkMap["kind"].(string)
@@ -522,7 +522,7 @@ func (g *Gateway) storeCategory(
 		return fmt.Errorf("%s extension not found", common.CategoriesExtensionKey)
 	}
 
-	categoriesRawArray, ok := categoriesRaw.([]interface{})
+	categoriesRawArray, ok := categoriesRaw.([]any)
 	if !ok {
 		return fmt.Errorf("%s extension is not an array", common.CategoriesExtensionKey)
 	}

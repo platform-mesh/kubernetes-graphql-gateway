@@ -5,16 +5,16 @@ import (
 	"errors"
 	"testing"
 
+	gatewayv1alpha1 "github.com/platform-mesh/kubernetes-graphql-gateway/common/apis/v1alpha1"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/common/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd/api"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	gatewayv1alpha1 "github.com/platform-mesh/kubernetes-graphql-gateway/common/apis/v1alpha1"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/common/mocks"
 )
 
 func TestConfigureAuthentication(t *testing.T) {
@@ -162,8 +162,8 @@ clusters:
 			},
 			wantConfig: func(config *rest.Config) *rest.Config {
 				expected := *config
-				expected.TLSClientConfig.CertData = []byte("-----BEGIN CERTIFICATE-----\ncert-data\n-----END CERTIFICATE-----")
-				expected.TLSClientConfig.KeyData = []byte("-----BEGIN PRIVATE KEY-----\nkey-data\n-----END PRIVATE KEY-----")
+				expected.CertData = []byte("-----BEGIN CERTIFICATE-----\ncert-data\n-----END CERTIFICATE-----")
+				expected.KeyData = []byte("-----BEGIN PRIVATE KEY-----\nkey-data\n-----END PRIVATE KEY-----")
 				return &expected
 			},
 			wantErr: false,
@@ -300,8 +300,8 @@ func TestExtractAuthFromKubeconfig(t *testing.T) {
 			},
 			wantConfig: func(config *rest.Config) *rest.Config {
 				expected := *config
-				expected.TLSClientConfig.CertData = []byte("cert-data")
-				expected.TLSClientConfig.KeyData = []byte("key-data")
+				expected.CertData = []byte("cert-data")
+				expected.KeyData = []byte("key-data")
 				return &expected
 			},
 			wantErr: false,
@@ -314,8 +314,8 @@ func TestExtractAuthFromKubeconfig(t *testing.T) {
 			},
 			wantConfig: func(config *rest.Config) *rest.Config {
 				expected := *config
-				expected.TLSClientConfig.CertFile = "/path/to/cert.pem"
-				expected.TLSClientConfig.KeyFile = "/path/to/key.pem"
+				expected.CertFile = "/path/to/cert.pem"
+				expected.KeyFile = "/path/to/key.pem"
 				return &expected
 			},
 			wantErr: false,

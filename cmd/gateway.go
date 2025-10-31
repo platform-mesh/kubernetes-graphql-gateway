@@ -11,11 +11,11 @@ import (
 	"github.com/platform-mesh/golang-commons/logger"
 	"github.com/platform-mesh/golang-commons/sentry"
 	"github.com/platform-mesh/golang-commons/traces"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/cobra"
-	ctrl "sigs.k8s.io/controller-runtime"
 
-	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 var gatewayCmd = &cobra.Command{

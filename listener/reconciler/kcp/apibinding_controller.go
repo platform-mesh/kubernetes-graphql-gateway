@@ -7,7 +7,10 @@ import (
 	"io/fs"
 	"strings"
 
-	kcpapis "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
+	"github.com/platform-mesh/golang-commons/logger"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/workspacefile"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/discovery"
@@ -15,10 +18,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/platform-mesh/golang-commons/logger"
-
-	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/workspacefile"
+	kcpapis "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
 )
 
 // APIBindingReconciler reconciles an APIBinding object

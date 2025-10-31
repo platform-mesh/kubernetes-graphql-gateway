@@ -4,13 +4,13 @@ import (
 	"testing"
 
 	"github.com/graphql-go/graphql"
-	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kube-openapi/pkg/validation/spec"
-
 	"github.com/platform-mesh/golang-commons/logger/testlogger"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/resolver"
 	gatewaySchema "github.com/platform-mesh/kubernetes-graphql-gateway/gateway/schema"
+
+	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 func TestConvertSwaggerTypeToGraphQL_WithNilInCache(t *testing.T) {
@@ -27,7 +27,7 @@ func TestConvertSwaggerTypeToGraphQL_WithNilInCache(t *testing.T) {
 		{
 			name: "handles_nil_in_cache_for_recursive_ref",
 			definitions: map[string]*spec.Schema{
-				"io.test.v1.RecursiveType": &spec.Schema{
+				"io.test.v1.RecursiveType": {
 					SchemaProps: spec.SchemaProps{
 						Type: []string{"object"},
 						Properties: map[string]spec.Schema{
@@ -44,9 +44,9 @@ func TestConvertSwaggerTypeToGraphQL_WithNilInCache(t *testing.T) {
 						},
 					},
 					VendorExtensible: spec.VendorExtensible{
-						Extensions: map[string]interface{}{
-							"x-kubernetes-group-version-kind": []interface{}{
-								map[string]interface{}{
+						Extensions: map[string]any{
+							"x-kubernetes-group-version-kind": []any{
+								map[string]any{
 									"group":   "test",
 									"version": "v1",
 									"kind":    "RecursiveType",
@@ -62,7 +62,7 @@ func TestConvertSwaggerTypeToGraphQL_WithNilInCache(t *testing.T) {
 		{
 			name: "handles_nested_object_with_nil_in_cache",
 			definitions: map[string]*spec.Schema{
-				"io.test.v1.NestedType": &spec.Schema{
+				"io.test.v1.NestedType": {
 					SchemaProps: spec.SchemaProps{
 						Type: []string{"object"},
 						Properties: map[string]spec.Schema{
@@ -88,9 +88,9 @@ func TestConvertSwaggerTypeToGraphQL_WithNilInCache(t *testing.T) {
 						},
 					},
 					VendorExtensible: spec.VendorExtensible{
-						Extensions: map[string]interface{}{
-							"x-kubernetes-group-version-kind": []interface{}{
-								map[string]interface{}{
+						Extensions: map[string]any{
+							"x-kubernetes-group-version-kind": []any{
+								map[string]any{
 									"group":   "test",
 									"version": "v1",
 									"kind":    "NestedType",
@@ -136,7 +136,7 @@ func TestHandleObjectFieldSpecType_WithNilInCache(t *testing.T) {
 	mockResolver := &mockResolverProvider{}
 
 	definitions := map[string]*spec.Schema{
-		"io.test.v1.SelfReferencing": &spec.Schema{
+		"io.test.v1.SelfReferencing": {
 			SchemaProps: spec.SchemaProps{
 				Type: []string{"object"},
 				Properties: map[string]spec.Schema{
@@ -179,9 +179,9 @@ func TestHandleObjectFieldSpecType_WithNilInCache(t *testing.T) {
 				},
 			},
 			VendorExtensible: spec.VendorExtensible{
-				Extensions: map[string]interface{}{
-					"x-kubernetes-group-version-kind": []interface{}{
-						map[string]interface{}{
+				Extensions: map[string]any{
+					"x-kubernetes-group-version-kind": []any{
+						map[string]any{
 							"group":   "test",
 							"version": "v1",
 							"kind":    "SelfReferencing",
@@ -222,7 +222,7 @@ func TestFindRelationTarget_WithNilInCache(t *testing.T) {
 	mockResolver := &mockResolverProvider{}
 
 	definitions := map[string]*spec.Schema{
-		"io.test.v1.Parent": &spec.Schema{
+		"io.test.v1.Parent": {
 			SchemaProps: spec.SchemaProps{
 				Type: []string{"object"},
 				Properties: map[string]spec.Schema{
@@ -241,9 +241,9 @@ func TestFindRelationTarget_WithNilInCache(t *testing.T) {
 				},
 			},
 			VendorExtensible: spec.VendorExtensible{
-				Extensions: map[string]interface{}{
-					"x-kubernetes-group-version-kind": []interface{}{
-						map[string]interface{}{
+				Extensions: map[string]any{
+					"x-kubernetes-group-version-kind": []any{
+						map[string]any{
 							"group":   "test",
 							"version": "v1",
 							"kind":    "Parent",
@@ -253,7 +253,7 @@ func TestFindRelationTarget_WithNilInCache(t *testing.T) {
 				},
 			},
 		},
-		"io.test.v1.Child": &spec.Schema{
+		"io.test.v1.Child": {
 			SchemaProps: spec.SchemaProps{
 				Type: []string{"object"},
 				Properties: map[string]spec.Schema{
@@ -272,9 +272,9 @@ func TestFindRelationTarget_WithNilInCache(t *testing.T) {
 				},
 			},
 			VendorExtensible: spec.VendorExtensible{
-				Extensions: map[string]interface{}{
-					"x-kubernetes-group-version-kind": []interface{}{
-						map[string]interface{}{
+				Extensions: map[string]any{
+					"x-kubernetes-group-version-kind": []any{
+						map[string]any{
 							"group":   "test",
 							"version": "v1",
 							"kind":    "Child",
@@ -314,68 +314,68 @@ func TestFindRelationTarget_WithNilInCache(t *testing.T) {
 type mockResolverProvider struct{}
 
 func (m *mockResolverProvider) CommonResolver() graphql.FieldResolveFn {
-	return func(p graphql.ResolveParams) (interface{}, error) {
+	return func(p graphql.ResolveParams) (any, error) {
 		return nil, nil
 	}
 }
 
 func (m *mockResolverProvider) ListItems(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
-	return func(p graphql.ResolveParams) (interface{}, error) {
-		return []interface{}{}, nil
+	return func(p graphql.ResolveParams) (any, error) {
+		return []any{}, nil
 	}
 }
 
 func (m *mockResolverProvider) GetItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
-	return func(p graphql.ResolveParams) (interface{}, error) {
-		return map[string]interface{}{}, nil
+	return func(p graphql.ResolveParams) (any, error) {
+		return map[string]any{}, nil
 	}
 }
 
 func (m *mockResolverProvider) GetItemAsYAML(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
-	return func(p graphql.ResolveParams) (interface{}, error) {
+	return func(p graphql.ResolveParams) (any, error) {
 		return "", nil
 	}
 }
 
 func (m *mockResolverProvider) CreateItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
-	return func(p graphql.ResolveParams) (interface{}, error) {
-		return map[string]interface{}{}, nil
+	return func(p graphql.ResolveParams) (any, error) {
+		return map[string]any{}, nil
 	}
 }
 
 func (m *mockResolverProvider) UpdateItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
-	return func(p graphql.ResolveParams) (interface{}, error) {
-		return map[string]interface{}{}, nil
+	return func(p graphql.ResolveParams) (any, error) {
+		return map[string]any{}, nil
 	}
 }
 
 func (m *mockResolverProvider) DeleteItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
-	return func(p graphql.ResolveParams) (interface{}, error) {
+	return func(p graphql.ResolveParams) (any, error) {
 		return true, nil
 	}
 }
 
 func (m *mockResolverProvider) SubscribeItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
-	return func(p graphql.ResolveParams) (interface{}, error) {
+	return func(p graphql.ResolveParams) (any, error) {
 		return nil, nil
 	}
 }
 
 func (m *mockResolverProvider) SubscribeItems(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
-	return func(p graphql.ResolveParams) (interface{}, error) {
+	return func(p graphql.ResolveParams) (any, error) {
 		return nil, nil
 	}
 }
 
 func (m *mockResolverProvider) RelationResolver(baseName string, gvk schema.GroupVersionKind) graphql.FieldResolveFn {
-	return func(p graphql.ResolveParams) (interface{}, error) {
-		return map[string]interface{}{}, nil
+	return func(p graphql.ResolveParams) (any, error) {
+		return map[string]any{}, nil
 	}
 }
 
 func (m *mockResolverProvider) TypeByCategory(typeByCategory map[string][]resolver.TypeByCategory) graphql.FieldResolveFn {
-	return func(p graphql.ResolveParams) (interface{}, error) {
-		return []interface{}{}, nil
+	return func(p graphql.ResolveParams) (any, error) {
+		return []any{}, nil
 	}
 }
 

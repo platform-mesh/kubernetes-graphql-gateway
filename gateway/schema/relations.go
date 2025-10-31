@@ -3,10 +3,10 @@ package schema
 import (
 	"strings"
 
+	"github.com/graphql-go/graphql"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 
-	"github.com/graphql-go/graphql"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )

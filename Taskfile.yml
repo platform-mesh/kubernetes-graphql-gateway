@@ -7,6 +7,7 @@ vars:
   ENVTEST_VERSION: "release-0.20" # https://github.com/kubernetes-sigs/controller-runtime/releases
   MOCKERY_VERSION: v2.52.3 # https://github.com/vektra/mockery/releases
   CONTROLLER_GEN_VERSION: v0.18.0 # https://github.com/kubernetes-sigs/controller-tools/releases
+  GOLANGCI_LINT_VERSION: v2.6.0
 tasks:
   ## Setup
   setup:mockery:
@@ -24,7 +25,7 @@ tasks:
   setup:golangci-lint:
     internal: true
     cmds:
-      - test -s {{.LOCAL_BIN}}/golangci-lint || GOBIN=$(pwd)/{{.LOCAL_BIN}} go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+      - test -s {{.LOCAL_BIN}}/golangci-lint || GOBIN=$(pwd)/{{.LOCAL_BIN}} go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{{.GOLANGCI_LINT_VERSION}}
   setup:go-test-coverage:
     internal: true
     cmds:
@@ -48,7 +49,7 @@ tasks:
   ## Testing
   fmt:
     cmds:
-      - go fmt ./...
+      - "{{.LOCAL_BIN}}/golangci-lint fmt ./..."
   lint:
     deps: [setup:golangci-lint]
     cmds:

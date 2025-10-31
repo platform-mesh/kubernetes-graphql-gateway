@@ -7,12 +7,12 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/platform-mesh/golang-commons/logger"
-	"k8s.io/client-go/rest"
-
 	appConfig "github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/roundtripper"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/targetcluster"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/watcher"
+
+	"k8s.io/client-go/rest"
 )
 
 // Service orchestrates the domain-driven architecture with target clusters
@@ -63,7 +63,7 @@ func (g *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // Close gracefully shuts down the gateway and all its services
 func (g *Service) Close() error {
 	if g.clusterRegistry != nil {
-		g.clusterRegistry.Close()
+		g.clusterRegistry.Close() //nolint:errcheck
 	}
 	g.log.Info().Msg("The Gateway has been closed")
 	return nil

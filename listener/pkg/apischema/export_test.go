@@ -1,12 +1,12 @@
 package apischema
 
 import (
+	"github.com/platform-mesh/golang-commons/logger"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/discovery"
 	"k8s.io/kube-openapi/pkg/validation/spec"
-
-	"github.com/platform-mesh/golang-commons/logger"
 )
 
 func ResolveSchema(dc discovery.DiscoveryInterface, rm meta.RESTMapper, log *logger.Logger) ([]byte, error) {

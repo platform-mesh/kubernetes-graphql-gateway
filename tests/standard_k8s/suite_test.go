@@ -23,6 +23,7 @@ import (
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler/clusteraccess"
 	"github.com/stretchr/testify/suite"
+
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -57,19 +58,19 @@ type IntegrationTestSuite struct {
 }
 
 type GraphQLRequest struct {
-	Query         string                 `json:"query"`
-	Variables     map[string]interface{} `json:"variables,omitempty"`
-	OperationName string                 `json:"operationName,omitempty"`
+	Query         string         `json:"query"`
+	Variables     map[string]any `json:"variables,omitempty"`
+	OperationName string         `json:"operationName,omitempty"`
 }
 
 type GraphQLResponse struct {
-	Data   interface{}    `json:"data"`
+	Data   any            `json:"data"`
 	Errors []GraphQLError `json:"errors,omitempty"`
 }
 
 type GraphQLError struct {
-	Message string        `json:"message"`
-	Path    []interface{} `json:"path,omitempty"`
+	Message string `json:"message"`
+	Path    []any  `json:"path,omitempty"`
 }
 
 func TestIntegrationSuite(t *testing.T) {
@@ -194,7 +195,7 @@ func (s *IntegrationTestSuite) TearDownSuite() {
 
 	if s.gateway != nil {
 		testLog.Info("Closing gateway service")
-		s.gateway.Close()
+		s.gateway.Close() //nolint:errcheck
 	}
 
 	if s.cancel != nil {
@@ -247,7 +248,7 @@ func (s *IntegrationTestSuite) executeGraphQL(clusterName string, req GraphQLReq
 
 	res, err := http.DefaultClient.Do(httpReq)
 	s.Require().NoError(err)
-	defer res.Body.Close()
+	defer res.Body.Close() //nolint:errcheck
 
 	s.Require().Equal(http.StatusOK, res.StatusCode, "Expected 200 status code. URL: %s", reqURL)
 

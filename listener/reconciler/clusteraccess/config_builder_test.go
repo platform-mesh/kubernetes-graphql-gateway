@@ -5,18 +5,18 @@ import (
 	"errors"
 	"testing"
 
+	gatewayv1alpha1 "github.com/platform-mesh/kubernetes-graphql-gateway/common/apis/v1alpha1"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/common/auth"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/common/mocks"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler/clusteraccess"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	gatewayv1alpha1 "github.com/platform-mesh/kubernetes-graphql-gateway/common/apis/v1alpha1"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/common/auth"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/common/mocks"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler/clusteraccess"
 )
 
 func TestBuildTargetClusterConfigFromTyped(t *testing.T) {

@@ -5,10 +5,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/schema"
-
 	"github.com/graphql-go/graphql/language/ast"
 	"github.com/graphql-go/graphql/language/kinds"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/schema"
 )
 
 func TestStringMapScalar_ParseValue(t *testing.T) {

@@ -10,6 +10,7 @@ import (
 	apischemaMocks "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -140,10 +141,10 @@ func TestWithApiResourceCategories(t *testing.T) {
 			mock.EXPECT().Paths().Return(map[string]openapi.GroupVersion{}, nil)
 			b := apischema.NewSchemaBuilder(mock, nil, testlogger.New().Logger)
 			b.SetSchemas(map[string]*spec.Schema{
-				tc.key: {VendorExtensible: spec.VendorExtensible{Extensions: map[string]interface{}{}}},
+				tc.key: {VendorExtensible: spec.VendorExtensible{Extensions: map[string]any{}}},
 			})
 			b.WithApiResourceCategories(tc.list)
-			ext, found := b.GetSchemas()[tc.key].VendorExtensible.Extensions[common.CategoriesExtensionKey]
+			ext, found := b.GetSchemas()[tc.key].Extensions[common.CategoriesExtensionKey]
 			if tc.wantCats == nil {
 				assert.False(t, found, "expected no categories")
 				return
@@ -164,7 +165,7 @@ func TestWithScope(t *testing.T) {
 	// Create schema with GVK extension
 	s := &spec.Schema{
 		VendorExtensible: spec.VendorExtensible{
-			Extensions: map[string]interface{}{
+			Extensions: map[string]any{
 				common.GVKExtensionKey: []map[string]string{
 					{"group": gvk.Group, "version": gvk.Version, "kind": gvk.Kind},
 				},
@@ -186,6 +187,6 @@ func TestWithScope(t *testing.T) {
 	b.WithScope(mapper)
 
 	// Validate
-	scope := b.GetSchemas()["g.v1.K"].VendorExtensible.Extensions[common.ScopeExtensionKey]
+	scope := b.GetSchemas()["g.v1.K"].Extensions[common.ScopeExtensionKey]
 	assert.Equal(t, apiextensionsv1.NamespaceScoped, scope, "scope value mismatch")
 }

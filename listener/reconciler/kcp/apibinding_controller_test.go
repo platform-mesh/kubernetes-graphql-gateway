@@ -9,9 +9,15 @@ import (
 	"strings"
 	"testing"
 
-	kcpcore "github.com/kcp-dev/kcp/sdk/apis/core/v1alpha1"
+	"github.com/platform-mesh/golang-commons/logger"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/common/mocks"
+	apschemamocks "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema/mocks"
+	workspacefilemocks "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/workspacefile/mocks"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler/kcp"
+	kcpmocks "github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler/kcp/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -19,12 +25,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/platform-mesh/golang-commons/logger"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/common/mocks"
-	apschemamocks "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema/mocks"
-	workspacefilemocks "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/workspacefile/mocks"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler/kcp"
-	kcpmocks "github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler/kcp/mocks"
+	kcpcore "github.com/kcp-dev/kcp/sdk/apis/core/v1alpha1"
 )
 
 func TestAPIBindingReconciler_Reconcile(t *testing.T) {
@@ -33,7 +34,7 @@ func TestAPIBindingReconciler_Reconcile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer os.RemoveAll(tempDir) //nolint:errcheck
 
 	kubeconfigContent := `apiVersion: v1
 kind: Config
@@ -55,12 +56,12 @@ users:
 	}
 
 	originalKubeconfig := os.Getenv("KUBECONFIG")
-	os.Setenv("KUBECONFIG", kubeconfigPath)
+	os.Setenv("KUBECONFIG", kubeconfigPath) //nolint:errcheck
 	defer func() {
 		if originalKubeconfig != "" {
-			os.Setenv("KUBECONFIG", originalKubeconfig)
+			os.Setenv("KUBECONFIG", originalKubeconfig) //nolint:errcheck
 		} else {
-			os.Unsetenv("KUBECONFIG")
+			os.Unsetenv("KUBECONFIG") //nolint:errcheck
 		}
 	}()
 

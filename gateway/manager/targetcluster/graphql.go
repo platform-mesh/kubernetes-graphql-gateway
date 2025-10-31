@@ -11,13 +11,13 @@ import (
 
 	"github.com/graphql-go/graphql"
 	"github.com/graphql-go/handler"
-	"github.com/kcp-dev/logicalcluster/v3"
-	"sigs.k8s.io/controller-runtime/pkg/kontext"
-
 	"github.com/platform-mesh/golang-commons/logger"
-
 	appConfig "github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/roundtripper"
+
+	"sigs.k8s.io/controller-runtime/pkg/kontext"
+
+	"github.com/kcp-dev/logicalcluster/v3"
 )
 
 // GraphQLHandler wraps a GraphQL schema and HTTP handler
@@ -83,7 +83,7 @@ func IsIntrospectionQuery(r *http.Request) bool {
 		Query string `json:"query"`
 	}
 	bodyBytes, err := io.ReadAll(r.Body)
-	r.Body.Close()
+	r.Body.Close() //nolint:errcheck
 	if err == nil {
 		if err = json.Unmarshal(bodyBytes, &params); err == nil {
 			if strings.Contains(params.Query, "__schema") || strings.Contains(params.Query, "__type") {
@@ -115,7 +115,7 @@ func (s *GraphQLServer) HandleSubscription(w http.ResponseWriter, r *http.Reques
 	}
 
 	flusher := http.NewResponseController(w)
-	r.Body.Close()
+	r.Body.Close() //nolint:errcheck
 
 	subscriptionParams := graphql.Params{
 		Schema:         *schema,
@@ -137,9 +137,9 @@ func (s *GraphQLServer) HandleSubscription(w http.ResponseWriter, r *http.Reques
 			continue
 		}
 
-		fmt.Fprintf(w, "event: next\ndata: %s\n\n", data)
-		flusher.Flush()
+		fmt.Fprintf(w, "event: next\ndata: %s\n\n", data) //nolint:errcheck
+		flusher.Flush()                                   //nolint:errcheck
 	}
 
-	fmt.Fprint(w, "event: complete\n\n")
+	fmt.Fprint(w, "event: complete\n\n") //nolint:errcheck
 }

@@ -8,6 +8,9 @@ import (
 	"strings"
 
 	"github.com/hashicorp/go-multierror"
+	"github.com/platform-mesh/golang-commons/logger"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/common"
+
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -18,9 +21,6 @@ import (
 	"k8s.io/kube-openapi/pkg/spec3"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
-
-	"github.com/platform-mesh/golang-commons/logger"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/common"
 )
 
 var (
@@ -123,12 +123,12 @@ func (b *SchemaBuilder) WithScope(rm meta.RESTMapper) *SchemaBuilder {
 	for _, schema := range b.schemas {
 		//skip resources that do not have the GVK extension:
 		//assumption: sub-resources do not have GVKs
-		if schema.VendorExtensible.Extensions == nil {
+		if schema.Extensions == nil {
 			continue
 		}
 		var gvksVal any
 		var ok bool
-		if gvksVal, ok = schema.VendorExtensible.Extensions[common.GVKExtensionKey]; !ok {
+		if gvksVal, ok = schema.Extensions[common.GVKExtensionKey]; !ok {
 			continue
 		}
 		jsonBytes, err := json.Marshal(gvksVal)
@@ -163,9 +163,9 @@ func (b *SchemaBuilder) WithScope(rm meta.RESTMapper) *SchemaBuilder {
 		}
 
 		if namespaced {
-			schema.VendorExtensible.AddExtension(common.ScopeExtensionKey, apiextensionsv1.NamespaceScoped)
+			schema.AddExtension(common.ScopeExtensionKey, apiextensionsv1.NamespaceScoped)
 		} else {
-			schema.VendorExtensible.AddExtension(common.ScopeExtensionKey, apiextensionsv1.ClusterScoped)
+			schema.AddExtension(common.ScopeExtensionKey, apiextensionsv1.ClusterScoped)
 		}
 	}
 	return b
@@ -192,7 +192,7 @@ func (b *SchemaBuilder) WithApiResourceCategories(list []*metav1.APIResourceList
 			if !ok {
 				continue
 			}
-			resourceSchema.VendorExtensible.AddExtension(common.CategoriesExtensionKey, apiResource.Categories)
+			resourceSchema.AddExtension(common.CategoriesExtensionKey, apiResource.Categories)
 			b.schemas[resourceKey] = resourceSchema
 		}
 	}
@@ -279,11 +279,11 @@ func (b *SchemaBuilder) expandWithSimpleDepthControl() {
 func (b *SchemaBuilder) buildKindRegistry() {
 	for schemaKey, schema := range b.schemas {
 		// Extract GVK from schema
-		if schema.VendorExtensible.Extensions == nil {
+		if schema.Extensions == nil {
 			continue
 		}
 
-		gvksVal, ok := schema.VendorExtensible.Extensions[common.GVKExtensionKey]
+		gvksVal, ok := schema.Extensions[common.GVKExtensionKey]
 		if !ok {
 			continue
 		}

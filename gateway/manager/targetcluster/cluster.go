@@ -8,16 +8,16 @@ import (
 	"strings"
 
 	"github.com/platform-mesh/golang-commons/logger"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/common/auth"
+	appConfig "github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/resolver"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/schema"
+
 	"k8s.io/client-go/rest"
 	"k8s.io/kube-openapi/pkg/spec3"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/kcp"
-
-	"github.com/platform-mesh/kubernetes-graphql-gateway/common/auth"
-	appConfig "github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/resolver"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/schema"
 )
 
 // FileData represents the data extracted from a schema file

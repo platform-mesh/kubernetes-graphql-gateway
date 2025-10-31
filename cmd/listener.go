@@ -4,10 +4,14 @@ import (
 	"context"
 	"crypto/tls"
 
-	kcpapis "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
-	kcpcore "github.com/kcp-dev/kcp/sdk/apis/core/v1alpha1"
-	kcptenancy "github.com/kcp-dev/kcp/sdk/apis/tenancy/v1alpha1"
+	gatewayv1alpha1 "github.com/platform-mesh/kubernetes-graphql-gateway/common/apis/v1alpha1"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/workspacefile"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler/clusteraccess"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler/kcp"
 	"github.com/spf13/cobra"
+
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -18,12 +22,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	gatewayv1alpha1 "github.com/platform-mesh/kubernetes-graphql-gateway/common/apis/v1alpha1"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/workspacefile"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler/clusteraccess"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler/kcp"
+	kcpapis "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
+	kcpcore "github.com/kcp-dev/kcp/sdk/apis/core/v1alpha1"
+	kcptenancy "github.com/kcp-dev/kcp/sdk/apis/tenancy/v1alpha1"
 )
 
 var listenCmd = &cobra.Command{

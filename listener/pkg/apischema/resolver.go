@@ -1,10 +1,10 @@
 package apischema
 
 import (
+	"github.com/platform-mesh/golang-commons/logger"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/discovery"
-
-	"github.com/platform-mesh/golang-commons/logger"
 )
 
 type Resolver interface {
