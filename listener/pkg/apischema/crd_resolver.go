@@ -1,17 +1,12 @@
 package apischema
 
 import (
-	"encoding/json"
 	"errors"
-	"slices"
-	"strings"
 
 	"github.com/platform-mesh/golang-commons/logger"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/discovery"
-	"k8s.io/client-go/openapi"
-	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 var (
@@ -39,29 +34,6 @@ func NewCRDResolver(discovery discovery.DiscoveryInterface, restMapper meta.REST
 
 func (cr *CRDResolver) Resolve(dc discovery.DiscoveryInterface, rm meta.RESTMapper) ([]byte, error) {
 	return cr.resolveSchema(dc, rm)
-}
-
-func getSchemaForPath(preferredApiGroups []string, path string, gv openapi.GroupVersion) (map[string]*spec.Schema, error) {
-	if !strings.Contains(path, separator) {
-		return nil, ErrInvalidPath
-	}
-	pathApiGroupArray := strings.Split(path, separator)
-	pathApiGroup := strings.Join(pathApiGroupArray[1:], separator)
-	// filer out apiGroups that aren't in the preferred list
-	if !slices.Contains(preferredApiGroups, pathApiGroup) {
-		return nil, ErrNotPreferred
-	}
-
-	b, err := gv.Schema(discovery.AcceptV1)
-	if err != nil {
-		return nil, errors.Join(ErrGetSchemaForPath, err)
-	}
-
-	resp := &schemaResponse{}
-	if err := json.Unmarshal(b, resp); err != nil {
-		return nil, errors.Join(ErrUnmarshalSchemaForPath, err)
-	}
-	return resp.Components.Schemas, nil
 }
 
 func (cr *CRDResolver) resolveSchema(dc discovery.DiscoveryInterface, rm meta.RESTMapper) ([]byte, error) {

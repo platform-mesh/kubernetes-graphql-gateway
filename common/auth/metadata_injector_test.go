@@ -1,18 +1,17 @@
 package auth
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/platform-mesh/golang-commons/logger/testlogger"
+	gatewayv1alpha1 "github.com/platform-mesh/kubernetes-graphql-gateway/common/apis/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"encoding/base64"
-
-	"github.com/platform-mesh/golang-commons/logger/testlogger"
-	gatewayv1alpha1 "github.com/platform-mesh/kubernetes-graphql-gateway/common/apis/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -51,8 +50,8 @@ users:
 
 	// Set environment variable
 	originalKubeconfig := os.Getenv("KUBECONFIG")
-	defer os.Setenv("KUBECONFIG", originalKubeconfig)
-	os.Setenv("KUBECONFIG", kubeconfigPath)
+	defer os.Setenv("KUBECONFIG", originalKubeconfig) //nolint:errcheck
+	os.Setenv("KUBECONFIG", kubeconfigPath)           //nolint:errcheck
 
 	tests := []struct {
 		name         string
@@ -112,7 +111,7 @@ users:
 		assert.NotNil(t, result)
 
 		// Parse the result to verify metadata injection
-		var resultData map[string]interface{}
+		var resultData map[string]any
 		err = json.Unmarshal(result, &resultData)
 		require.NoError(t, err)
 
@@ -120,7 +119,7 @@ users:
 		metadata, exists := resultData["x-cluster-metadata"]
 		require.True(t, exists, "x-cluster-metadata should be present")
 
-		metadataMap, ok := metadata.(map[string]interface{})
+		metadataMap, ok := metadata.(map[string]any)
 		require.True(t, ok, "x-cluster-metadata should be a map")
 
 		// Verify override host is used
@@ -142,7 +141,7 @@ users:
 			assert.NotNil(t, result)
 
 			// Parse the result to verify metadata injection
-			var resultData map[string]interface{}
+			var resultData map[string]any
 			err = json.Unmarshal(result, &resultData)
 			require.NoError(t, err)
 
@@ -150,7 +149,7 @@ users:
 			metadata, exists := resultData["x-cluster-metadata"]
 			require.True(t, exists, "x-cluster-metadata should be present")
 
-			metadataMap, ok := metadata.(map[string]interface{})
+			metadataMap, ok := metadata.(map[string]any)
 			require.True(t, ok, "x-cluster-metadata should be a map")
 
 			// Verify host
@@ -167,7 +166,7 @@ users:
 			auth, exists := metadataMap["auth"]
 			require.True(t, exists, "auth should be present")
 
-			authMap, ok := auth.(map[string]interface{})
+			authMap, ok := auth.(map[string]any)
 			require.True(t, ok, "auth should be a map")
 
 			authType, exists := authMap["type"]
@@ -180,7 +179,7 @@ users:
 
 			// Verify CA data (if present)
 			if ca, exists := metadataMap["ca"]; exists {
-				caMap, ok := ca.(map[string]interface{})
+				caMap, ok := ca.(map[string]any)
 				require.True(t, ok, "ca should be a map")
 
 				caData, exists := caMap["data"]
@@ -288,7 +287,7 @@ func TestInjectClusterMetadata(t *testing.T) {
 			assert.NotNil(t, result)
 
 			// Parse the result to verify metadata injection
-			var resultData map[string]interface{}
+			var resultData map[string]any
 			err = json.Unmarshal(result, &resultData)
 			require.NoError(t, err)
 
@@ -296,7 +295,7 @@ func TestInjectClusterMetadata(t *testing.T) {
 			metadata, exists := resultData["x-cluster-metadata"]
 			require.True(t, exists, "x-cluster-metadata should be present")
 
-			metadataMap, ok := metadata.(map[string]interface{})
+			metadataMap, ok := metadata.(map[string]any)
 			require.True(t, ok, "x-cluster-metadata should be a map")
 
 			// Verify host
@@ -346,10 +345,10 @@ clusters:
 				require.NoError(t, err)
 
 				original := os.Getenv("KUBECONFIG")
-				os.Setenv("KUBECONFIG", kubeconfigPath)
+				os.Setenv("KUBECONFIG", kubeconfigPath) //nolint:errcheck
 
 				return func() {
-					os.Setenv("KUBECONFIG", original)
+					os.Setenv("KUBECONFIG", original) //nolint:errcheck
 				}
 			},
 			expectedHost: "https://test.example.com:6443",
@@ -359,10 +358,10 @@ clusters:
 			name: "file_not_found",
 			setupEnv: func() func() {
 				original := os.Getenv("KUBECONFIG")
-				os.Setenv("KUBECONFIG", "/non/existent/path")
+				os.Setenv("KUBECONFIG", "/non/existent/path") //nolint:errcheck
 
 				return func() {
-					os.Setenv("KUBECONFIG", original)
+					os.Setenv("KUBECONFIG", original) //nolint:errcheck
 				}
 			},
 			expectError:   true,

@@ -9,14 +9,14 @@ import (
 	"os"
 	"strings"
 
+	"github.com/platform-mesh/golang-commons/logger"
+	gatewayv1alpha1 "github.com/platform-mesh/kubernetes-graphql-gateway/common/apis/v1alpha1"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/platform-mesh/golang-commons/logger"
-	gatewayv1alpha1 "github.com/platform-mesh/kubernetes-graphql-gateway/common/apis/v1alpha1"
 )
 
 // MetadataInjectionConfig contains configuration for metadata injection
@@ -46,7 +46,7 @@ func NewMetadataInjector(log *logger.Logger, client client.Client) *MetadataInje
 // This unified function handles both KCP and ClusterAccess use cases
 func (m *MetadataInjector) InjectClusterMetadata(ctx context.Context, schemaJSON []byte, config MetadataInjectionConfig) ([]byte, error) {
 	// Parse the existing schema JSON
-	var schemaData map[string]interface{}
+	var schemaData map[string]any
 	if err := json.Unmarshal(schemaJSON, &schemaData); err != nil {
 		return nil, fmt.Errorf("failed to parse schema JSON: %w", err)
 	}
@@ -55,7 +55,7 @@ func (m *MetadataInjector) InjectClusterMetadata(ctx context.Context, schemaJSON
 	host := m.determineHost(config.Host, config.HostOverride)
 
 	// Create cluster metadata
-	metadata := map[string]interface{}{
+	metadata := map[string]any{
 		"host": host,
 		"path": config.Path,
 	}
@@ -76,7 +76,7 @@ func (m *MetadataInjector) InjectClusterMetadata(ctx context.Context, schemaJSON
 		if err != nil {
 			m.log.Warn().Err(err).Msg("failed to extract CA data for metadata")
 		} else if caData != nil {
-			metadata["ca"] = map[string]interface{}{
+			metadata["ca"] = map[string]any{
 				"data": base64.StdEncoding.EncodeToString(caData),
 			}
 		}
@@ -103,7 +103,7 @@ func (m *MetadataInjector) InjectKCPMetadataFromEnv(schemaJSON []byte, clusterPa
 	}
 
 	// Parse the existing schema JSON
-	var schemaData map[string]interface{}
+	var schemaData map[string]any
 	if err := json.Unmarshal(schemaJSON, &schemaData); err != nil {
 		return nil, fmt.Errorf("failed to parse schema JSON: %w", err)
 	}
@@ -112,10 +112,10 @@ func (m *MetadataInjector) InjectKCPMetadataFromEnv(schemaJSON []byte, clusterPa
 	host := m.determineKCPHost(kubeconfigHost, override, clusterPath)
 
 	// Create cluster metadata with environment kubeconfig
-	metadata := map[string]interface{}{
+	metadata := map[string]any{
 		"host": host,
 		"path": clusterPath,
-		"auth": map[string]interface{}{
+		"auth": map[string]any{
 			"type":       "kubeconfig",
 			"kubeconfig": base64.StdEncoding.EncodeToString(kubeconfigData),
 		},
@@ -124,7 +124,7 @@ func (m *MetadataInjector) InjectKCPMetadataFromEnv(schemaJSON []byte, clusterPa
 	// Extract CA data from kubeconfig if available
 	caData := m.extractCAFromKubeconfigData(kubeconfigData)
 	if caData != nil {
-		metadata["ca"] = map[string]interface{}{
+		metadata["ca"] = map[string]any{
 			"data": base64.StdEncoding.EncodeToString(caData),
 		}
 	}
@@ -133,7 +133,7 @@ func (m *MetadataInjector) InjectKCPMetadataFromEnv(schemaJSON []byte, clusterPa
 }
 
 // extractAuthDataForMetadata extracts auth data from AuthConfig for metadata injection
-func (m *MetadataInjector) extractAuthDataForMetadata(ctx context.Context, auth *gatewayv1alpha1.AuthConfig) (map[string]interface{}, error) {
+func (m *MetadataInjector) extractAuthDataForMetadata(ctx context.Context, auth *gatewayv1alpha1.AuthConfig) (map[string]any, error) {
 	if auth == nil {
 		return nil, nil
 	}
@@ -154,7 +154,7 @@ func (m *MetadataInjector) extractAuthDataForMetadata(ctx context.Context, auth 
 }
 
 // extractTokenAuth handles token-based authentication from SecretRef
-func (m *MetadataInjector) extractTokenAuth(ctx context.Context, secretRef *gatewayv1alpha1.SecretRef) (map[string]interface{}, error) {
+func (m *MetadataInjector) extractTokenAuth(ctx context.Context, secretRef *gatewayv1alpha1.SecretRef) (map[string]any, error) {
 	secret, err := m.getSecret(ctx, secretRef.Name, secretRef.Namespace)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get auth secret: %w", err)
@@ -165,14 +165,14 @@ func (m *MetadataInjector) extractTokenAuth(ctx context.Context, secretRef *gate
 		return nil, fmt.Errorf("auth key not found in secret")
 	}
 
-	return map[string]interface{}{
+	return map[string]any{
 		"type":  "token",
 		"token": base64.StdEncoding.EncodeToString(tokenData),
 	}, nil
 }
 
 // extractKubeconfigAuth handles kubeconfig-based authentication from KubeconfigSecretRef
-func (m *MetadataInjector) extractKubeconfigAuth(ctx context.Context, kubeconfigRef *gatewayv1alpha1.KubeconfigSecretRef) (map[string]interface{}, error) {
+func (m *MetadataInjector) extractKubeconfigAuth(ctx context.Context, kubeconfigRef *gatewayv1alpha1.KubeconfigSecretRef) (map[string]any, error) {
 	secret, err := m.getSecret(ctx, kubeconfigRef.Name, kubeconfigRef.Namespace)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get kubeconfig secret: %w", err)
@@ -183,14 +183,14 @@ func (m *MetadataInjector) extractKubeconfigAuth(ctx context.Context, kubeconfig
 		return nil, fmt.Errorf("kubeconfig key not found in secret")
 	}
 
-	return map[string]interface{}{
+	return map[string]any{
 		"type":       "kubeconfig",
 		"kubeconfig": base64.StdEncoding.EncodeToString(kubeconfigData),
 	}, nil
 }
 
 // extractClientCertAuth handles client certificate authentication from ClientCertificateRef
-func (m *MetadataInjector) extractClientCertAuth(ctx context.Context, certRef *gatewayv1alpha1.ClientCertificateRef) (map[string]interface{}, error) {
+func (m *MetadataInjector) extractClientCertAuth(ctx context.Context, certRef *gatewayv1alpha1.ClientCertificateRef) (map[string]any, error) {
 	secret, err := m.getSecret(ctx, certRef.Name, certRef.Namespace)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get client certificate secret: %w", err)
@@ -203,7 +203,7 @@ func (m *MetadataInjector) extractClientCertAuth(ctx context.Context, certRef *g
 		return nil, fmt.Errorf("client certificate or key not found in secret")
 	}
 
-	return map[string]interface{}{
+	return map[string]any{
 		"type":     "clientCert",
 		"certData": base64.StdEncoding.EncodeToString(certData),
 		"keyData":  base64.StdEncoding.EncodeToString(keyData),
@@ -359,7 +359,7 @@ func (m *MetadataInjector) extractCAFromKubeconfigB64(kubeconfigB64 string) []by
 }
 
 // tryExtractKubeconfigCA attempts to extract CA data from kubeconfig auth and adds it to metadata
-func (m *MetadataInjector) tryExtractKubeconfigCA(ctx context.Context, auth *gatewayv1alpha1.AuthConfig, metadata map[string]interface{}) {
+func (m *MetadataInjector) tryExtractKubeconfigCA(ctx context.Context, auth *gatewayv1alpha1.AuthConfig, metadata map[string]any) {
 	authMetadata, err := m.extractAuthDataForMetadata(ctx, auth)
 	if err != nil {
 		m.log.Warn().Err(err).Msg("failed to extract auth data for CA extraction")
@@ -385,7 +385,7 @@ func (m *MetadataInjector) tryExtractKubeconfigCA(ctx context.Context, auth *gat
 		return
 	}
 
-	metadata["ca"] = map[string]interface{}{
+	metadata["ca"] = map[string]any{
 		"data": base64.StdEncoding.EncodeToString(kubeconfigCAData),
 	}
 	m.log.Info().Msg("extracted CA data from kubeconfig")
@@ -436,7 +436,7 @@ func (m *MetadataInjector) determineKCPHost(kubeconfigHost, override, clusterPat
 }
 
 // finalizeSchemaInjection finalizes the schema injection process
-func (m *MetadataInjector) finalizeSchemaInjection(schemaData map[string]interface{}, metadata map[string]interface{}, host, path string, hasCA bool) ([]byte, error) {
+func (m *MetadataInjector) finalizeSchemaInjection(schemaData map[string]any, metadata map[string]any, host, path string, hasCA bool) ([]byte, error) {
 	// Inject the metadata into the schema
 	schemaData["x-cluster-metadata"] = metadata
 
@@ -479,7 +479,7 @@ func extractKubeconfigFromEnv(log *logger.Logger) ([]byte, string, error) {
 }
 
 // extractAuthDataForMetadata is exported for testing
-func extractAuthDataForMetadata(ctx context.Context, auth *gatewayv1alpha1.AuthConfig, k8sClient client.Client) (map[string]interface{}, error) {
+func extractAuthDataForMetadata(ctx context.Context, auth *gatewayv1alpha1.AuthConfig, k8sClient client.Client) (map[string]any, error) {
 	injector := NewMetadataInjector(nil, k8sClient)
 	return injector.extractAuthDataForMetadata(ctx, auth)
 }

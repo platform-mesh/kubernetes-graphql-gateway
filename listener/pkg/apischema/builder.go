@@ -8,17 +8,19 @@ import (
 	"strings"
 
 	"github.com/hashicorp/go-multierror"
-	"golang.org/x/exp/maps"
+	"github.com/platform-mesh/golang-commons/logger"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/common"
+
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeSchema "k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/openapi"
+	"k8s.io/kube-openapi/pkg/schemamutation"
+	"k8s.io/kube-openapi/pkg/spec3"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
-
-	"github.com/platform-mesh/golang-commons/logger"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/common"
 )
 
 var (
@@ -63,13 +65,49 @@ func NewSchemaBuilder(oc openapi.Client, preferredApiGroups []string, log *logge
 		return b
 	}
 
-	for path, gv := range apiv3Paths {
-		schema, err := getSchemaForPath(preferredApiGroups, path, gv)
+	walker := schemamutation.Walker{
+		RefCallback: schemamutation.RefCallbackNoop,
+		SchemaCallback: func(schema *spec.Schema) *spec.Schema {
+			refPtr := schema.Ref.GetPointer()
+			if refPtr == nil {
+				return schema
+			}
+
+			tokens := refPtr.DecodedTokens()
+			if len(tokens) == 0 {
+				return schema
+			}
+
+			resolvedRef := tokens[len(tokens)-1]
+
+			return &spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Ref: spec.MustCreateRef(resolvedRef),
+				},
+			}
+		},
+	}
+
+	for _, path := range apiv3Paths {
+
+		schemaBytes, err := path.Schema(discovery.AcceptV2)
 		if err != nil {
-			b.log.Debug().Err(err).Str("path", path).Msg("skipping schema path")
 			continue
 		}
-		maps.Copy(b.schemas, schema)
+
+		var openAPISpec spec3.OpenAPI
+		if err := json.Unmarshal(schemaBytes, &openAPISpec); err != nil {
+			continue
+		}
+
+		if openAPISpec.Components == nil {
+			continue
+		}
+
+		for k, v := range openAPISpec.Components.Schemas {
+			out := walker.WalkSchema(v)
+			b.schemas[k] = out
+		}
 	}
 
 	return b
@@ -85,12 +123,12 @@ func (b *SchemaBuilder) WithScope(rm meta.RESTMapper) *SchemaBuilder {
 	for _, schema := range b.schemas {
 		//skip resources that do not have the GVK extension:
 		//assumption: sub-resources do not have GVKs
-		if schema.VendorExtensible.Extensions == nil {
+		if schema.Extensions == nil {
 			continue
 		}
 		var gvksVal any
 		var ok bool
-		if gvksVal, ok = schema.VendorExtensible.Extensions[common.GVKExtensionKey]; !ok {
+		if gvksVal, ok = schema.Extensions[common.GVKExtensionKey]; !ok {
 			continue
 		}
 		jsonBytes, err := json.Marshal(gvksVal)
@@ -125,9 +163,9 @@ func (b *SchemaBuilder) WithScope(rm meta.RESTMapper) *SchemaBuilder {
 		}
 
 		if namespaced {
-			schema.VendorExtensible.AddExtension(common.ScopeExtensionKey, apiextensionsv1.NamespaceScoped)
+			schema.AddExtension(common.ScopeExtensionKey, apiextensionsv1.NamespaceScoped)
 		} else {
-			schema.VendorExtensible.AddExtension(common.ScopeExtensionKey, apiextensionsv1.ClusterScoped)
+			schema.AddExtension(common.ScopeExtensionKey, apiextensionsv1.ClusterScoped)
 		}
 	}
 	return b
@@ -154,7 +192,7 @@ func (b *SchemaBuilder) WithApiResourceCategories(list []*metav1.APIResourceList
 			if !ok {
 				continue
 			}
-			resourceSchema.VendorExtensible.AddExtension(common.CategoriesExtensionKey, apiResource.Categories)
+			resourceSchema.AddExtension(common.CategoriesExtensionKey, apiResource.Categories)
 			b.schemas[resourceKey] = resourceSchema
 		}
 	}
@@ -241,11 +279,11 @@ func (b *SchemaBuilder) expandWithSimpleDepthControl() {
 func (b *SchemaBuilder) buildKindRegistry() {
 	for schemaKey, schema := range b.schemas {
 		// Extract GVK from schema
-		if schema.VendorExtensible.Extensions == nil {
+		if schema.Extensions == nil {
 			continue
 		}
 
-		gvksVal, ok := schema.VendorExtensible.Extensions[common.GVKExtensionKey]
+		gvksVal, ok := schema.Extensions[common.GVKExtensionKey]
 		if !ok {
 			continue
 		}
@@ -506,8 +544,8 @@ func isRefProperty(name string) bool {
 }
 
 func (b *SchemaBuilder) Complete() ([]byte, error) {
-	v3JSON, err := json.Marshal(&schemaResponse{
-		Components: schemasComponentsWrapper{
+	v3JSON, err := json.Marshal(&spec3.OpenAPI{
+		Components: &spec3.Components{
 			Schemas: b.schemas,
 		},
 	})
@@ -515,12 +553,7 @@ func (b *SchemaBuilder) Complete() ([]byte, error) {
 		return nil, errors.Join(ErrMarshalOpenAPISchema, err)
 	}
 
-	v2JSON, err := ConvertJSON(v3JSON)
-	if err != nil {
-		return nil, errors.Join(ErrConvertOpenAPISchema, err)
-	}
-
-	return v2JSON, nil
+	return v3JSON, nil
 }
 
 // getOpenAPISchemaKey creates the key that kubernetes uses in its OpenAPI Definitions

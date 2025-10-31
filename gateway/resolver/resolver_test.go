@@ -5,31 +5,31 @@ import (
 	"testing"
 
 	"github.com/graphql-go/graphql"
+	"github.com/platform-mesh/golang-commons/logger/testlogger"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/common/mocks"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/resolver"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/platform-mesh/golang-commons/logger/testlogger"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/common/mocks"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/resolver"
 )
 
 func TestListItems(t *testing.T) {
 	tests := []struct {
 		name          string
-		args          map[string]interface{}
+		args          map[string]any
 		mockSetup     func(runtimeClientMock *mocks.MockWithWatch)
 		expectedItems []map[string]any
 		expectError   bool
 	}{
 		{
 			name: "listItems_OK",
-			args: map[string]interface{}{
+			args: map[string]any{
 				resolver.NamespaceArg:     "test-namespace",
 				resolver.LabelSelectorArg: "key=value",
 				resolver.SortByArg:        "metadata.name",
@@ -44,13 +44,13 @@ func TestListItems(t *testing.T) {
 					).
 					Run(func(_ context.Context, l client.ObjectList, _ ...client.ListOption) {
 						l.(*unstructured.UnstructuredList).Items = []unstructured.Unstructured{
-							{Object: map[string]interface{}{"metadata": map[string]interface{}{"name": "ns-object"}}},
+							{Object: map[string]any{"metadata": map[string]any{"name": "ns-object"}}},
 						}
 					}).
 					Return(nil)
 			},
 			expectedItems: []map[string]any{
-				{"metadata": map[string]interface{}{"name": "ns-object"}},
+				{"metadata": map[string]any{"name": "ns-object"}},
 			},
 		},
 		{
@@ -64,7 +64,7 @@ func TestListItems(t *testing.T) {
 		},
 		{
 			name: "invalidLabelSelector_ERROR",
-			args: map[string]interface{}{
+			args: map[string]any{
 				resolver.LabelSelectorArg: ",,",
 			},
 			expectedItems: nil,
@@ -102,14 +102,14 @@ func TestListItems(t *testing.T) {
 func TestGetItem(t *testing.T) {
 	tests := []struct {
 		name        string
-		args        map[string]interface{}
+		args        map[string]any
 		mockSetup   func(runtimeClientMock *mocks.MockWithWatch)
-		expectedObj map[string]interface{}
+		expectedObj map[string]any
 		expectError bool
 	}{
 		{
 			name: "getItem_OK",
-			args: map[string]interface{}{
+			args: map[string]any{
 				resolver.NameArg:      "test-object",
 				resolver.NamespaceArg: "test-namespace",
 			},
@@ -122,19 +122,19 @@ func TestGetItem(t *testing.T) {
 					).
 					Run(func(_ context.Context, _ client.ObjectKey, obj client.Object, _ ...client.GetOption) {
 						unstructuredObj := obj.(*unstructured.Unstructured)
-						unstructuredObj.Object = map[string]interface{}{
-							"metadata": map[string]interface{}{"name": "test-object"},
+						unstructuredObj.Object = map[string]any{
+							"metadata": map[string]any{"name": "test-object"},
 						}
 					}).
 					Return(nil)
 			},
-			expectedObj: map[string]interface{}{
-				"metadata": map[string]interface{}{"name": "test-object"},
+			expectedObj: map[string]any{
+				"metadata": map[string]any{"name": "test-object"},
 			},
 		},
 		{
 			name: "getItem_ERROR",
-			args: map[string]interface{}{
+			args: map[string]any{
 				resolver.NameArg:      "test-object",
 				resolver.NamespaceArg: "test-namespace",
 			},
@@ -147,14 +147,14 @@ func TestGetItem(t *testing.T) {
 		},
 		{
 			name: "missingNameArg_ERROR",
-			args: map[string]interface{}{
+			args: map[string]any{
 				resolver.NamespaceArg: "test-namespace",
 			},
 			expectError: true,
 		},
 		{
 			name: "missingNamespaceArg_ERROR",
-			args: map[string]interface{}{
+			args: map[string]any{
 				resolver.NameArg: "test-object",
 			},
 			expectError: true,
@@ -192,14 +192,14 @@ func TestGetItem(t *testing.T) {
 func TestGetItemAsYAML(t *testing.T) {
 	tests := []struct {
 		name         string
-		args         map[string]interface{}
+		args         map[string]any
 		mockSetup    func(runtimeClientMock *mocks.MockWithWatch)
 		expectedYAML string
 		expectError  bool
 	}{
 		{
 			name: "getItemAsYAML_OK",
-			args: map[string]interface{}{
+			args: map[string]any{
 				resolver.NameArg:      "test-object",
 				resolver.NamespaceArg: "test-namespace",
 			},
@@ -212,8 +212,8 @@ func TestGetItemAsYAML(t *testing.T) {
 					).
 					Run(func(_ context.Context, _ client.ObjectKey, obj client.Object, _ ...client.GetOption) {
 						unstructuredObj := obj.(*unstructured.Unstructured)
-						unstructuredObj.Object = map[string]interface{}{
-							"metadata": map[string]interface{}{"name": "test-object"},
+						unstructuredObj.Object = map[string]any{
+							"metadata": map[string]any{"name": "test-object"},
 						}
 					}).
 					Return(nil)
@@ -262,18 +262,18 @@ func TestGetItemAsYAML(t *testing.T) {
 func TestCreateItem(t *testing.T) {
 	tests := []struct {
 		name        string
-		args        map[string]interface{}
+		args        map[string]any
 		mockSetup   func(runtimeClientMock *mocks.MockWithWatch)
-		expectedObj map[string]interface{}
+		expectedObj map[string]any
 		expectError bool
 	}{
 		{
 			name: "create_item_OK",
-			args: map[string]interface{}{
+			args: map[string]any{
 				resolver.NameArg:      "test-object",
 				resolver.NamespaceArg: "test-namespace",
-				"object": map[string]interface{}{
-					"metadata": map[string]interface{}{
+				"object": map[string]any{
+					"metadata": map[string]any{
 						"name": "test-object",
 					},
 				},
@@ -289,10 +289,10 @@ func TestCreateItem(t *testing.T) {
 					).
 					Return(nil)
 			},
-			expectedObj: map[string]interface{}{
+			expectedObj: map[string]any{
 				"apiVersion": "group/version",
 				"kind":       "kind",
-				"metadata": map[string]interface{}{
+				"metadata": map[string]any{
 					"name":      "test-object",
 					"namespace": "test-namespace",
 				},
@@ -300,11 +300,11 @@ func TestCreateItem(t *testing.T) {
 		},
 		{
 			name: "create_item_ERROR",
-			args: map[string]interface{}{
+			args: map[string]any{
 				resolver.NameArg:      "test-object",
 				resolver.NamespaceArg: "test-namespace",
-				"object": map[string]interface{}{
-					"metadata": map[string]interface{}{
+				"object": map[string]any{
+					"metadata": map[string]any{
 						"name": "test-object",
 					},
 				},
@@ -324,20 +324,20 @@ func TestCreateItem(t *testing.T) {
 		},
 		{
 			name: "missing_metadata_name_ERROR",
-			args: map[string]interface{}{
+			args: map[string]any{
 				resolver.NamespaceArg: "test-namespace",
-				"object":              map[string]interface{}{},
+				"object":              map[string]any{},
 			},
 			expectError: true,
 		},
 		{
 			name: "create_item_with_dry_run_OK",
-			args: map[string]interface{}{
+			args: map[string]any{
 				resolver.NameArg:      "test-object",
 				resolver.NamespaceArg: "test-namespace",
 				resolver.DryRunArg:    true,
-				"object": map[string]interface{}{
-					"metadata": map[string]interface{}{
+				"object": map[string]any{
+					"metadata": map[string]any{
 						"name": "test-object",
 					},
 				},
@@ -353,10 +353,10 @@ func TestCreateItem(t *testing.T) {
 					).
 					Return(nil)
 			},
-			expectedObj: map[string]interface{}{
+			expectedObj: map[string]any{
 				"apiVersion": "group/version",
 				"kind":       "kind",
-				"metadata": map[string]interface{}{
+				"metadata": map[string]any{
 					"name":      "test-object",
 					"namespace": "test-namespace",
 				},
@@ -395,18 +395,18 @@ func TestCreateItem(t *testing.T) {
 func TestUpdateItem(t *testing.T) {
 	tests := []struct {
 		name        string
-		args        map[string]interface{}
+		args        map[string]any
 		mockSetup   func(runtimeClientMock *mocks.MockWithWatch)
-		expectedObj map[string]interface{}
+		expectedObj map[string]any
 		expectError bool
 	}{
 		{
 			name: "update_item_OK",
-			args: map[string]interface{}{
+			args: map[string]any{
 				resolver.NameArg:      "test-object",
 				resolver.NamespaceArg: "test-namespace",
-				"object": map[string]interface{}{
-					"metadata": map[string]interface{}{
+				"object": map[string]any{
+					"metadata": map[string]any{
 						"name": "test-object",
 					},
 				},
@@ -420,8 +420,8 @@ func TestUpdateItem(t *testing.T) {
 					).
 					Run(func(_ context.Context, _ client.ObjectKey, obj client.Object, _ ...client.GetOption) {
 						unstructuredObj := obj.(*unstructured.Unstructured)
-						unstructuredObj.Object = map[string]interface{}{
-							"metadata": map[string]interface{}{
+						unstructuredObj.Object = map[string]any{
+							"metadata": map[string]any{
 								"name": "test-object",
 							},
 						}
@@ -438,27 +438,27 @@ func TestUpdateItem(t *testing.T) {
 					).
 					Return(nil)
 			},
-			expectedObj: map[string]interface{}{
-				"metadata": map[string]interface{}{
+			expectedObj: map[string]any{
+				"metadata": map[string]any{
 					"name": "test-object",
 				},
 			},
 		},
 		{
 			name: "missing_metadata_name_ERROR",
-			args: map[string]interface{}{
+			args: map[string]any{
 				resolver.NamespaceArg: "test-namespace",
-				"object":              map[string]interface{}{},
+				"object":              map[string]any{},
 			},
 			expectError: true,
 		},
 		{
 			name: "get_existing_object_ERROR",
-			args: map[string]interface{}{
+			args: map[string]any{
 				resolver.NameArg:      "test-object",
 				resolver.NamespaceArg: "test-namespace",
-				"object": map[string]interface{}{
-					"metadata": map[string]interface{}{
+				"object": map[string]any{
+					"metadata": map[string]any{
 						"name": "test-object",
 					},
 				},
@@ -472,11 +472,11 @@ func TestUpdateItem(t *testing.T) {
 		},
 		{
 			name: "patch_object_ERROR",
-			args: map[string]interface{}{
+			args: map[string]any{
 				resolver.NameArg:      "test-object",
 				resolver.NamespaceArg: "test-namespace",
-				"object": map[string]interface{}{
-					"metadata": map[string]interface{}{
+				"object": map[string]any{
+					"metadata": map[string]any{
 						"name": "test-object",
 					},
 				},
@@ -500,12 +500,12 @@ func TestUpdateItem(t *testing.T) {
 		},
 		{
 			name: "update_item_with_dry_run_OK",
-			args: map[string]interface{}{
+			args: map[string]any{
 				resolver.NameArg:      "test-object",
 				resolver.NamespaceArg: "test-namespace",
 				resolver.DryRunArg:    true,
-				"object": map[string]interface{}{
-					"metadata": map[string]interface{}{
+				"object": map[string]any{
+					"metadata": map[string]any{
 						"name": "test-object",
 					},
 				},
@@ -519,8 +519,8 @@ func TestUpdateItem(t *testing.T) {
 					).
 					Run(func(_ context.Context, _ client.ObjectKey, obj client.Object, _ ...client.GetOption) {
 						unstructuredObj := obj.(*unstructured.Unstructured)
-						unstructuredObj.Object = map[string]interface{}{
-							"metadata": map[string]interface{}{
+						unstructuredObj.Object = map[string]any{
+							"metadata": map[string]any{
 								"name": "test-object",
 							},
 						}
@@ -538,8 +538,8 @@ func TestUpdateItem(t *testing.T) {
 					).
 					Return(nil)
 			},
-			expectedObj: map[string]interface{}{
-				"metadata": map[string]interface{}{
+			expectedObj: map[string]any{
+				"metadata": map[string]any{
 					"name": "test-object",
 				},
 			},
@@ -577,13 +577,13 @@ func TestUpdateItem(t *testing.T) {
 func TestDeleteItem(t *testing.T) {
 	tests := []struct {
 		name        string
-		args        map[string]interface{}
+		args        map[string]any
 		mockSetup   func(runtimeClientMock *mocks.MockWithWatch)
 		expectError bool
 	}{
 		{
 			name: "delete_item_OK",
-			args: map[string]interface{}{
+			args: map[string]any{
 				resolver.NameArg:      "test-object",
 				resolver.NamespaceArg: "test-namespace",
 			},
@@ -599,21 +599,21 @@ func TestDeleteItem(t *testing.T) {
 		},
 		{
 			name: "missing_name_argument_ERROR",
-			args: map[string]interface{}{
+			args: map[string]any{
 				resolver.NamespaceArg: "test-namespace",
 			},
 			expectError: true,
 		},
 		{
 			name: "missing_namespace_argument_ERROR",
-			args: map[string]interface{}{
+			args: map[string]any{
 				resolver.NameArg: "test-object",
 			},
 			expectError: true,
 		},
 		{
 			name: "delete_object_ERROR",
-			args: map[string]interface{}{
+			args: map[string]any{
 				resolver.NameArg:      "test-object",
 				resolver.NamespaceArg: "test-namespace",
 			},
@@ -712,98 +712,98 @@ func TestGetOriginalGroupName(t *testing.T) {
 func TestCompareUnstructured(t *testing.T) {
 	tests := []struct {
 		name     string
-		a        map[string]interface{}
-		b        map[string]interface{}
+		a        map[string]any
+		b        map[string]any
 		expected int
 	}{
 		{
 			name:     "equal_strings",
-			a:        map[string]interface{}{"key": "abc"},
-			b:        map[string]interface{}{"key": "abc"},
+			a:        map[string]any{"key": "abc"},
+			b:        map[string]any{"key": "abc"},
 			expected: 0,
 		},
 		{
 			name:     "different_strings",
-			a:        map[string]interface{}{"key": "abc"},
-			b:        map[string]interface{}{"key": "xyz"},
+			a:        map[string]any{"key": "abc"},
+			b:        map[string]any{"key": "xyz"},
 			expected: -1,
 		},
 		{
 			name:     "equal_int64",
-			a:        map[string]interface{}{"key": int64(42)},
-			b:        map[string]interface{}{"key": int64(42)},
+			a:        map[string]any{"key": int64(42)},
+			b:        map[string]any{"key": int64(42)},
 			expected: 0,
 		},
 		{
 			name:     "different_int64",
-			a:        map[string]interface{}{"key": int64(10)},
-			b:        map[string]interface{}{"key": int64(20)},
+			a:        map[string]any{"key": int64(10)},
+			b:        map[string]any{"key": int64(20)},
 			expected: -1,
 		},
 		{
 			name:     "equal_int32",
-			a:        map[string]interface{}{"key": int32(42)},
-			b:        map[string]interface{}{"key": int32(42)},
+			a:        map[string]any{"key": int32(42)},
+			b:        map[string]any{"key": int32(42)},
 			expected: 0,
 		},
 		{
 			name:     "different_int32",
-			a:        map[string]interface{}{"key": int32(10)},
-			b:        map[string]interface{}{"key": int32(20)},
+			a:        map[string]any{"key": int32(10)},
+			b:        map[string]any{"key": int32(20)},
 			expected: -1,
 		},
 		{
 			name:     "int32_vs_int64",
-			a:        map[string]interface{}{"key": int32(10)},
-			b:        map[string]interface{}{"key": int64(20)},
+			a:        map[string]any{"key": int32(10)},
+			b:        map[string]any{"key": int64(20)},
 			expected: -1,
 		},
 		{
 			name:     "equal_float64",
-			a:        map[string]interface{}{"key": float64(3.14)},
-			b:        map[string]interface{}{"key": float64(3.14)},
+			a:        map[string]any{"key": float64(3.14)},
+			b:        map[string]any{"key": float64(3.14)},
 			expected: 0,
 		},
 		{
 			name:     "different_float64",
-			a:        map[string]interface{}{"key": float64(1.5)},
-			b:        map[string]interface{}{"key": float64(2.5)},
+			a:        map[string]any{"key": float64(1.5)},
+			b:        map[string]any{"key": float64(2.5)},
 			expected: -1,
 		},
 		{
 			name:     "equal_float32",
-			a:        map[string]interface{}{"key": float32(3.14)},
-			b:        map[string]interface{}{"key": float32(3.14)},
+			a:        map[string]any{"key": float32(3.14)},
+			b:        map[string]any{"key": float32(3.14)},
 			expected: 0,
 		},
 		{
 			name:     "different_float32",
-			a:        map[string]interface{}{"key": float32(1.5)},
-			b:        map[string]interface{}{"key": float32(2.5)},
+			a:        map[string]any{"key": float32(1.5)},
+			b:        map[string]any{"key": float32(2.5)},
 			expected: -1,
 		},
 		{
 			name:     "float32_vs_float64",
-			a:        map[string]interface{}{"key": float32(1.5)},
-			b:        map[string]interface{}{"key": float64(2.5)},
+			a:        map[string]any{"key": float32(1.5)},
+			b:        map[string]any{"key": float64(2.5)},
 			expected: -1,
 		},
 		{
 			name:     "equal_bool",
-			a:        map[string]interface{}{"key": true},
-			b:        map[string]interface{}{"key": true},
+			a:        map[string]any{"key": true},
+			b:        map[string]any{"key": true},
 			expected: 0,
 		},
 		{
 			name:     "different_bool",
-			a:        map[string]interface{}{"key": true},
-			b:        map[string]interface{}{"key": false},
+			a:        map[string]any{"key": true},
+			b:        map[string]any{"key": false},
 			expected: -1,
 		},
 		{
 			name:     "missing_field",
-			a:        map[string]interface{}{},
-			b:        map[string]interface{}{"key": "abc"},
+			a:        map[string]any{},
+			b:        map[string]any{"key": "abc"},
 			expected: 0,
 		},
 	}
