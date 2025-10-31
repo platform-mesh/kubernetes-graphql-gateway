@@ -78,6 +78,7 @@ func TestIntegrationSuite(t *testing.T) {
 
 func TestMain(m *testing.M) {
 	commonsLogger = testlogger.New()
+	testLog = commonsLogger.ComponentLogger("test-main").Logr()
 	logf.SetLogger(commonsLogger.Logr())
 
 	testLog.Info("Starting integration test suite")
