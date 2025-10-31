@@ -194,6 +194,11 @@ func (tc *TargetCluster) GetConfig() *rest.Config {
 	return tc.restCfg
 }
 
+// GetHandler returns the cluster's GraphQL handler (useful for testing)
+func (tc *TargetCluster) GetHandler() *GraphQLHandler {
+	return tc.handler
+}
+
 // GetEndpoint returns the HTTP endpoint for this cluster's GraphQL API
 func (tc *TargetCluster) GetEndpoint(appCfg appConfig.Config) string {
 	// Build the path with virtual workspace suffix if needed

@@ -68,3 +68,8 @@ func (g *Service) Close() error {
 	g.log.Info().Msg("The Gateway has been closed")
 	return nil
 }
+
+// GetClusterRegistry returns the cluster registry (useful for testing)
+func (g *Service) GetClusterRegistry() ClusterManager {
+	return g.clusterRegistry
+}
