@@ -197,6 +197,11 @@ spec:
                   - type
                   type: object
                 type: array
+              observedPath:
+                description: |-
+                  ObservedPath stores the actual path currently used to store the schema for this resource
+                  This is maintained by the controller and used for cleanup when .spec.path changes
+                type: string
             type: object
         type: object
     served: true

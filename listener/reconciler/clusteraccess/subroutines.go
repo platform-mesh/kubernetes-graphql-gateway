@@ -19,8 +19,7 @@ import (
 
 // generateSchemaSubroutine processes ClusterAccess resources and generates schemas
 const (
-	finalizerName            = "gateway.openmfp.org/clusteraccess-finalizer"
-	lastSchemaPathAnnotation = "gateway.openmfp.org/last-schema-path"
+	finalizerName = "gateway.openmfp.org/clusteraccess-finalizer"
 )
 
 // generateSchemaSubroutine processes ClusterAccess resources and generates schemas
@@ -78,11 +77,8 @@ func (s *generateSchemaSubroutine) Process(ctx context.Context, instance runtime
 		return ctrl.Result{}, commonserrors.NewOperatorError(err, false, false)
 	}
 
-	// If path changed, delete the old schema file referenced in the annotation
-	prevPath := ""
-	if ann := clusterAccess.GetAnnotations(); ann != nil {
-		prevPath = ann[lastSchemaPathAnnotation]
-	}
+	// If path changed, delete the old schema file referenced in the status
+	prevPath := clusterAccess.Status.ObservedPath
 	if prevPath != "" && prevPath != clusterName {
 		if err := s.reconciler.ioHandler.Delete(prevPath); err != nil {
 			// Log and continue; do not fail reconciliation on cleanup issues
@@ -96,20 +92,15 @@ func (s *generateSchemaSubroutine) Process(ctx context.Context, instance runtime
 		return ctrl.Result{}, commonserrors.NewOperatorError(err, false, false)
 	}
 
-	// Ensure annotation reflects the current path for future cleanups
-	needUpdate := prevPath != clusterName
-	if needUpdate {
+	// Update status.ObservedPath to reflect the current observed path
+	if prevPath != clusterName {
 		obj := clusterAccess.DeepCopy()
-		if obj.Annotations == nil {
-			obj.Annotations = map[string]string{}
-		}
-		obj.Annotations[lastSchemaPathAnnotation] = clusterName
-		if err := s.reconciler.opts.Client.Update(ctx, obj); err != nil {
+		obj.Status.ObservedPath = clusterName
+		if err := s.reconciler.opts.Client.Status().Update(ctx, obj); err != nil {
 			// Log but do not fail reconciliation; file has been written already
-			s.reconciler.log.Warn().Err(err).Str("clusterAccess", clusterAccessName).Msg("failed to update last schema path annotation")
+			s.reconciler.log.Warn().Err(err).Str("clusterAccess", clusterAccessName).Msg("failed to update observed path in status")
 		} else {
-			// Reflect update locally too to avoid future confusion in this reconcile loop
-			clusterAccess.Annotations = obj.Annotations
+			clusterAccess.Status.ObservedPath = obj.Status.ObservedPath
 		}
 	}
 
@@ -143,10 +134,7 @@ func (s *generateSchemaSubroutine) Finalize(ctx context.Context, instance runtim
 	if currentPath == "" {
 		currentPath = clusterAccess.GetName()
 	}
-	prevPath := ""
-	if ann := clusterAccess.GetAnnotations(); ann != nil {
-		prevPath = ann[lastSchemaPathAnnotation]
-	}
+	prevPath := clusterAccess.Status.ObservedPath
 
 	// Try deleting current path file
 	if currentPath != "" {

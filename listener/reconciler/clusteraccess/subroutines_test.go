@@ -90,12 +90,12 @@ func TestGenerateSchemaSubroutine_Finalize_DeletesCurrentAndPreviousPaths(t *tes
 	ca := &gatewayv1alpha1.ClusterAccess{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "my-resource",
-			Annotations: map[string]string{
-				lastSchemaPathAnnotation: "previous-path",
-			},
 		},
 		Spec: gatewayv1alpha1.ClusterAccessSpec{
 			Path: "current-path",
+		},
+		Status: gatewayv1alpha1.ClusterAccessStatus{
+			ObservedPath: "previous-path",
 		},
 	}
 
