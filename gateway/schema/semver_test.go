@@ -439,6 +439,47 @@ func TestHasAnotherVersion(t *testing.T) {
 			expectedOtherCount: 1,
 			expectedOtherKeys:  []string{"io.example.v2.MyResource"},
 		},
+		{
+			name:        "handle missing definition gracefully",
+			currentKind: "io.example.v1.MyResource",
+			allKinds: map[string]*spec.Schema{
+				"io.example.v1.MyResource":  {},
+				"io.example.v2.MissingDef":  {},
+				"io.example.v2.MyResource2": {},
+			},
+			definitions: map[string]*spec.Schema{
+				"io.example.v1.MyResource": {
+					VendorExtensible: spec.VendorExtensible{
+						Extensions: map[string]any{
+							common.GVKExtensionKey: []any{
+								map[string]any{
+									"group":   "io.example",
+									"version": "v1",
+									"kind":    "MyResource",
+								},
+							},
+						},
+					},
+				},
+				// v2.MissingDef intentionally not in definitions
+				"io.example.v2.MyResource2": {
+					VendorExtensible: spec.VendorExtensible{
+						Extensions: map[string]any{
+							common.GVKExtensionKey: []any{
+								map[string]any{
+									"group":   "io.example",
+									"version": "v2",
+									"kind":    "MyResource2", // Different kind, shouldn't match
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedHasOther:   false,
+			expectedOtherCount: 0,
+			expectedOtherKeys:  []string{},
+		},
 	}
 
 	for _, tt := range tests {
