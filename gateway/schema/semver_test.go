@@ -3,10 +3,10 @@ package schema
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"k8s.io/kube-openapi/pkg/validation/spec"
-
 	"github.com/platform-mesh/kubernetes-graphql-gateway/common"
+	"github.com/stretchr/testify/assert"
+
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 func TestHighestSemverVersion(t *testing.T) {

@@ -629,41 +629,16 @@ func getGroupVersionKindFromDefinitions(resourceKey string, definitions map[stri
 }
 
 // getGroupVersionKind retrieves the GroupVersionKind for a given resourceKey and its OpenAPI schema.
-// It first checks for the 'x-kubernetes-group-version-kind' extension and uses it if available.
-// If not, it falls back to parsing the resourceKey.
+// It uses the standalone helper but applies group name sanitization for GraphQL compatibility.
 func (g *Gateway) getGroupVersionKind(resourceKey string) (*schema.GroupVersionKind, error) {
-	// First, check if 'x-kubernetes-group-version-kind' extension is present
-	resourceSpec, ok := g.definitions[resourceKey]
-	if !ok || resourceSpec.Extensions == nil {
-		return nil, errors.New("no resource extensions")
-	}
-	xkGvk, ok := resourceSpec.Extensions[common.GVKExtensionKey]
-	if !ok {
-		return nil, errors.New("x-kubernetes-group-version-kind extension not found")
-	}
-	// xkGvk should be an array of maps
-	if gvkList, ok := xkGvk.([]any); ok && len(gvkList) > 0 {
-		// Use the first item in the list
-		if gvkMap, ok := gvkList[0].(map[string]any); ok {
-			group, _ := gvkMap["group"].(string)
-			version, _ := gvkMap["version"].(string)
-			kind, _ := gvkMap["kind"].(string)
-
-			// Validate that kind is not empty - empty kinds cannot be used for GraphQL type names
-			if kind == "" {
-				return nil, fmt.Errorf("kind cannot be empty for resource %s", resourceKey)
-			}
-
-			// Sanitize the group and kind names
-			return &schema.GroupVersionKind{
-				Group:   g.resolver.SanitizeGroupName(group),
-				Version: version,
-				Kind:    kind,
-			}, nil
-		}
+	gvk, err := getGroupVersionKindFromDefinitions(resourceKey, g.definitions)
+	if err != nil {
+		return nil, err
 	}
 
-	return nil, errors.New("failed to parse x-kubernetes-group-version-kind extension")
+	// Sanitize the group name for GraphQL compatibility
+	gvk.Group = g.resolver.SanitizeGroupName(gvk.Group)
+	return gvk, nil
 }
 
 func (g *Gateway) storeCategory(
