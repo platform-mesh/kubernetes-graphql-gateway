@@ -43,3 +43,8 @@ go.work
 # binary files
 main
 kubernetes-graphql-gateway
+
+# Claude Code files
+.claude/
+CLAUDE.md
+CLAUDE.local.md
