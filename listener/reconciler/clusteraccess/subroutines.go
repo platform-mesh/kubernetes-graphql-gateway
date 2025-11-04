@@ -19,7 +19,7 @@ import (
 
 // generateSchemaSubroutine processes ClusterAccess resources and generates schemas
 const (
-	finalizerName = "gateway.openmfp.org/clusteraccess-finalizer"
+	finalizerName = "gateway.platform-mesh.io/clusteraccess-finalizer"
 )
 
 // generateSchemaSubroutine processes ClusterAccess resources and generates schemas
