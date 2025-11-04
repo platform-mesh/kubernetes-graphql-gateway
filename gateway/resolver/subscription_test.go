@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -19,58 +20,58 @@ func TestDetermineFieldChanged(t *testing.T) {
 		{
 			name:           "oldObj_is_nil",
 			oldObj:         nil,
-			newObj:         &unstructured.Unstructured{Object: map[string]interface{}{"status": map[string]interface{}{"ready": true}}},
+			newObj:         &unstructured.Unstructured{Object: map[string]any{"status": map[string]any{"ready": true}}},
 			fields:         []string{"status.ready"},
 			isFieldChanged: true,
 			expectError:    false,
 		},
 		{
 			name:           "both_objects_are_empty",
-			oldObj:         &unstructured.Unstructured{Object: map[string]interface{}{}},
-			newObj:         &unstructured.Unstructured{Object: map[string]interface{}{}},
+			oldObj:         &unstructured.Unstructured{Object: map[string]any{}},
+			newObj:         &unstructured.Unstructured{Object: map[string]any{}},
 			fields:         []string{"status.ready"},
 			isFieldChanged: false,
 			expectError:    false,
 		},
 		{
 			name:           "field_missing_in_both",
-			oldObj:         &unstructured.Unstructured{Object: map[string]interface{}{"status": map[string]interface{}{"ready": true}}},
-			newObj:         &unstructured.Unstructured{Object: map[string]interface{}{"status": map[string]interface{}{"ready": true}}},
+			oldObj:         &unstructured.Unstructured{Object: map[string]any{"status": map[string]any{"ready": true}}},
+			newObj:         &unstructured.Unstructured{Object: map[string]any{"status": map[string]any{"ready": true}}},
 			fields:         []string{"status.missing"},
 			isFieldChanged: false,
 			expectError:    false,
 		},
 		{
 			name:           "field_present_in_oldObj_but_missing_in_newObj",
-			oldObj:         &unstructured.Unstructured{Object: map[string]interface{}{"status": map[string]interface{}{"ready": true}}},
-			newObj:         &unstructured.Unstructured{Object: map[string]interface{}{"status": map[string]interface{}{}}},
+			oldObj:         &unstructured.Unstructured{Object: map[string]any{"status": map[string]any{"ready": true}}},
+			newObj:         &unstructured.Unstructured{Object: map[string]any{"status": map[string]any{}}},
 			fields:         []string{"status.ready"},
 			isFieldChanged: true,
 			expectError:    false,
 		},
 		{
 			name:           "field_present_in_newObj_but_missing_in_oldObj",
-			oldObj:         &unstructured.Unstructured{Object: map[string]interface{}{"status": map[string]interface{}{}}},
-			newObj:         &unstructured.Unstructured{Object: map[string]interface{}{"status": map[string]interface{}{"ready": true}}},
+			oldObj:         &unstructured.Unstructured{Object: map[string]any{"status": map[string]any{}}},
+			newObj:         &unstructured.Unstructured{Object: map[string]any{"status": map[string]any{"ready": true}}},
 			fields:         []string{"status.ready"},
 			isFieldChanged: true,
 			expectError:    false,
 		},
 		{
 			name:           "field_value_changed",
-			oldObj:         &unstructured.Unstructured{Object: map[string]interface{}{"status": map[string]interface{}{"ready": false}}},
-			newObj:         &unstructured.Unstructured{Object: map[string]interface{}{"status": map[string]interface{}{"ready": true}}},
+			oldObj:         &unstructured.Unstructured{Object: map[string]any{"status": map[string]any{"ready": false}}},
+			newObj:         &unstructured.Unstructured{Object: map[string]any{"status": map[string]any{"ready": true}}},
 			fields:         []string{"status.ready"},
 			isFieldChanged: true,
 			expectError:    false,
 		},
 		{
 			name: "field_value_changed",
-			oldObj: &unstructured.Unstructured{Object: map[string]interface{}{
-				"status": map[string]interface{}{"ready": true, "healthy": true},
+			oldObj: &unstructured.Unstructured{Object: map[string]any{
+				"status": map[string]any{"ready": true, "healthy": true},
 			}},
-			newObj: &unstructured.Unstructured{Object: map[string]interface{}{
-				"status": map[string]interface{}{"ready": true, "healthy": false},
+			newObj: &unstructured.Unstructured{Object: map[string]any{
+				"status": map[string]any{"ready": true, "healthy": false},
 			}},
 			fields:         []string{"status.ready", "status.healthy"},
 			isFieldChanged: true,
@@ -78,8 +79,8 @@ func TestDetermineFieldChanged(t *testing.T) {
 		},
 		{
 			name:           "field_value_unchanged",
-			oldObj:         &unstructured.Unstructured{Object: map[string]interface{}{"status": map[string]interface{}{"ready": true}}},
-			newObj:         &unstructured.Unstructured{Object: map[string]interface{}{"status": map[string]interface{}{"ready": true}}},
+			oldObj:         &unstructured.Unstructured{Object: map[string]any{"status": map[string]any{"ready": true}}},
+			newObj:         &unstructured.Unstructured{Object: map[string]any{"status": map[string]any{"ready": true}}},
 			fields:         []string{"status.ready"},
 			isFieldChanged: false,
 			expectError:    false,
@@ -87,13 +88,13 @@ func TestDetermineFieldChanged(t *testing.T) {
 		{
 			name: "nested_field_changed",
 			oldObj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
-					"conditions": []interface{}{map[string]interface{}{"type": "Ready", "status": "True"}},
+				Object: map[string]any{
+					"conditions": []any{map[string]any{"type": "Ready", "status": "True"}},
 				},
 			},
 			newObj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
-					"conditions": []interface{}{map[string]interface{}{"type": "Ready", "status": "False"}},
+				Object: map[string]any{
+					"conditions": []any{map[string]any{"type": "Ready", "status": "False"}},
 				},
 			},
 			fields:         []string{"conditions.0.status", "conditions.0.type"},
@@ -102,24 +103,24 @@ func TestDetermineFieldChanged(t *testing.T) {
 		},
 		{
 			name:           "nested_field_unchanged",
-			oldObj:         &unstructured.Unstructured{Object: map[string]interface{}{"status": map[string]interface{}{"conditions": []interface{}{map[string]interface{}{"type": "Ready", "status": "True"}}}}},
-			newObj:         &unstructured.Unstructured{Object: map[string]interface{}{"status": map[string]interface{}{"conditions": []interface{}{map[string]interface{}{"type": "Ready", "status": "True"}}}}},
+			oldObj:         &unstructured.Unstructured{Object: map[string]any{"status": map[string]any{"conditions": []any{map[string]any{"type": "Ready", "status": "True"}}}}},
+			newObj:         &unstructured.Unstructured{Object: map[string]any{"status": map[string]any{"conditions": []any{map[string]any{"type": "Ready", "status": "True"}}}}},
 			fields:         []string{"status.conditions.0.status"},
 			isFieldChanged: false,
 			expectError:    false,
 		},
 		{
 			name:           "invalid_field_path",
-			oldObj:         &unstructured.Unstructured{Object: map[string]interface{}{"status": map[string]interface{}{"ready": true}}},
-			newObj:         &unstructured.Unstructured{Object: map[string]interface{}{"status": map[string]interface{}{"ready": true}}},
+			oldObj:         &unstructured.Unstructured{Object: map[string]any{"status": map[string]any{"ready": true}}},
+			newObj:         &unstructured.Unstructured{Object: map[string]any{"status": map[string]any{"ready": true}}},
 			fields:         []string{"invalid.path"},
 			isFieldChanged: false,
 			expectError:    false,
 		},
 		{
 			name:           "unexpected_type_in_field_path",
-			oldObj:         &unstructured.Unstructured{Object: map[string]interface{}{"status": map[string]interface{}{"ready": true}}},
-			newObj:         &unstructured.Unstructured{Object: map[string]interface{}{"status": map[string]interface{}{"ready": true}}},
+			oldObj:         &unstructured.Unstructured{Object: map[string]any{"status": map[string]any{"ready": true}}},
+			newObj:         &unstructured.Unstructured{Object: map[string]any{"status": map[string]any{"ready": true}}},
 			fields:         []string{"status.ready.invalid"},
 			isFieldChanged: false,
 			expectError:    true,

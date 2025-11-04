@@ -7,13 +7,13 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/client-go/discovery"
-
 	"github.com/platform-mesh/golang-commons/logger/testlogger"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/client-go/discovery"
 )
 
 // Mock implementations for testing
@@ -181,7 +181,7 @@ func TestCreateVirtualConfig(t *testing.T) {
 				assert.NotNil(t, config)
 				assert.Equal(t, tt.workspace.URL+"/clusters/root", config.Host)
 				if tt.workspace.Kubeconfig == "" {
-					assert.True(t, config.TLSClientConfig.Insecure)
+					assert.True(t, config.Insecure)
 					assert.Equal(t, "kubernetes-graphql-gateway-listener", config.UserAgent)
 				}
 			}
@@ -193,7 +193,7 @@ func TestCreateVirtualConfig_WithValidKubeconfig(t *testing.T) {
 	// Create a valid kubeconfig file for testing
 	tempDir, err := os.MkdirTemp("", "kubeconfig_test")
 	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
+	defer os.RemoveAll(tempDir) //nolint:errcheck
 
 	kubeconfigPath := filepath.Join(tempDir, "kubeconfig")
 	kubeconfigContent := `
@@ -259,7 +259,7 @@ func TestVirtualWorkspaceManager_CreateDiscoveryClient(t *testing.T) {
 			// Create a temporary kubeconfig file to avoid reading user's kubeconfig
 			tempDir, err := os.MkdirTemp("", "test_kubeconfig")
 			require.NoError(t, err)
-			defer os.RemoveAll(tempDir)
+			defer os.RemoveAll(tempDir) //nolint:errcheck
 
 			// Create .kube directory in temp home
 			kubeDir := filepath.Join(tempDir, ".kube")
@@ -293,11 +293,11 @@ users:
 			oldKubeconfig := os.Getenv("KUBECONFIG")
 			oldHome := os.Getenv("HOME")
 			defer func() {
-				os.Setenv("KUBECONFIG", oldKubeconfig)
-				os.Setenv("HOME", oldHome)
+				os.Setenv("KUBECONFIG", oldKubeconfig) //nolint:errcheck
+				os.Setenv("HOME", oldHome)             //nolint:errcheck
 			}()
-			os.Setenv("KUBECONFIG", tempKubeconfig)
-			os.Setenv("HOME", tempDir)
+			os.Setenv("KUBECONFIG", tempKubeconfig) //nolint:errcheck
+			os.Setenv("HOME", tempDir)              //nolint:errcheck
 
 			appCfg := config.Config{}
 			manager := NewVirtualWorkspaceManager(appCfg)
@@ -344,7 +344,7 @@ func TestVirtualWorkspaceManager_CreateRESTConfig(t *testing.T) {
 			// Create a temporary kubeconfig file to avoid reading user's kubeconfig
 			tempDir, err := os.MkdirTemp("", "test_kubeconfig")
 			require.NoError(t, err)
-			defer os.RemoveAll(tempDir)
+			defer os.RemoveAll(tempDir) //nolint:errcheck
 
 			// Create .kube directory in temp home
 			kubeDir := filepath.Join(tempDir, ".kube")
@@ -378,11 +378,11 @@ users:
 			oldKubeconfig := os.Getenv("KUBECONFIG")
 			oldHome := os.Getenv("HOME")
 			defer func() {
-				os.Setenv("KUBECONFIG", oldKubeconfig)
-				os.Setenv("HOME", oldHome)
+				os.Setenv("KUBECONFIG", oldKubeconfig) //nolint:errcheck
+				os.Setenv("HOME", oldHome)             //nolint:errcheck
 			}()
-			os.Setenv("KUBECONFIG", tempKubeconfig)
-			os.Setenv("HOME", tempDir)
+			os.Setenv("KUBECONFIG", tempKubeconfig) //nolint:errcheck
+			os.Setenv("HOME", tempDir)              //nolint:errcheck
 
 			appCfg := config.Config{}
 			manager := NewVirtualWorkspaceManager(appCfg)
@@ -471,7 +471,7 @@ virtualWorkspaces:
 			// Create a temporary kubeconfig file to avoid reading user's kubeconfig
 			tempDir, err := os.MkdirTemp("", "test_kubeconfig")
 			require.NoError(t, err)
-			defer os.RemoveAll(tempDir)
+			defer os.RemoveAll(tempDir) //nolint:errcheck
 
 			// Create .kube directory in temp home
 			kubeDir := filepath.Join(tempDir, ".kube")
@@ -505,11 +505,11 @@ users:
 			oldKubeconfig := os.Getenv("KUBECONFIG")
 			oldHome := os.Getenv("HOME")
 			defer func() {
-				os.Setenv("KUBECONFIG", oldKubeconfig)
-				os.Setenv("HOME", oldHome)
+				os.Setenv("KUBECONFIG", oldKubeconfig) //nolint:errcheck
+				os.Setenv("HOME", oldHome)             //nolint:errcheck
 			}()
-			os.Setenv("KUBECONFIG", tempKubeconfig)
-			os.Setenv("HOME", tempDir)
+			os.Setenv("KUBECONFIG", tempKubeconfig) //nolint:errcheck
+			os.Setenv("HOME", tempDir)              //nolint:errcheck
 
 			appCfg := config.Config{}
 			manager := NewVirtualWorkspaceManager(appCfg)
@@ -519,7 +519,7 @@ users:
 			if tt.configContent != "" {
 				tempDir, err := os.MkdirTemp("", "virtual_workspace_test")
 				require.NoError(t, err)
-				defer os.RemoveAll(tempDir)
+				defer os.RemoveAll(tempDir) //nolint:errcheck
 
 				tempFile = filepath.Join(tempDir, "config.yaml")
 				err = os.WriteFile(tempFile, []byte(tt.configContent), 0644)
@@ -607,8 +607,8 @@ func TestVirtualWorkspaceReconciler_ReconcileConfig_Simple(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set up test environment where KUBECONFIG is not available
 			oldKubeconfig := os.Getenv("KUBECONFIG")
-			defer os.Setenv("KUBECONFIG", oldKubeconfig)
-			os.Unsetenv("KUBECONFIG")
+			defer os.Setenv("KUBECONFIG", oldKubeconfig) //nolint:errcheck
+			os.Unsetenv("KUBECONFIG")                    //nolint:errcheck
 
 			appCfg := config.Config{}
 			appCfg.Url.VirtualWorkspacePrefix = "virtual-workspace"
@@ -697,11 +697,11 @@ func TestVirtualWorkspaceReconciler_ProcessVirtualWorkspace(t *testing.T) {
 			oldKubeconfig := os.Getenv("KUBECONFIG")
 			oldHome := os.Getenv("HOME")
 			defer func() {
-				os.Setenv("KUBECONFIG", oldKubeconfig)
-				os.Setenv("HOME", oldHome)
+				os.Setenv("KUBECONFIG", oldKubeconfig) //nolint:errcheck
+				os.Setenv("HOME", oldHome)             //nolint:errcheck
 			}()
-			os.Unsetenv("KUBECONFIG")
-			os.Setenv("HOME", "/nonexistent") // Force metadata injection to fail consistently
+			os.Unsetenv("KUBECONFIG")         //nolint:errcheck
+			os.Setenv("HOME", "/nonexistent") //nolint:errcheck // Force metadata injection to fail consistently
 
 			appCfg := config.Config{}
 			appCfg.Url.VirtualWorkspacePrefix = "virtual-workspace"
@@ -768,8 +768,8 @@ func TestVirtualWorkspaceReconciler_RemoveVirtualWorkspace(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set up test environment where KUBECONFIG is not available
 			oldKubeconfig := os.Getenv("KUBECONFIG")
-			defer os.Setenv("KUBECONFIG", oldKubeconfig)
-			os.Unsetenv("KUBECONFIG")
+			defer os.Setenv("KUBECONFIG", oldKubeconfig) //nolint:errcheck
+			os.Unsetenv("KUBECONFIG")                    //nolint:errcheck
 
 			appCfg := config.Config{}
 			appCfg.Url.VirtualWorkspacePrefix = "virtual-workspace"

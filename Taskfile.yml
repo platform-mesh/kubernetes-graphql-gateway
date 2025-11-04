@@ -7,6 +7,7 @@ vars:
   ENVTEST_VERSION: "release-0.20" # https://github.com/kubernetes-sigs/controller-runtime/releases
   MOCKERY_VERSION: v2.52.3 # https://github.com/vektra/mockery/releases
   CONTROLLER_GEN_VERSION: v0.18.0 # https://github.com/kubernetes-sigs/controller-tools/releases
+  GOLANGCI_LINT_VERSION: v2.6.0
 tasks:
   ## Setup
   setup:mockery:
@@ -21,39 +22,21 @@ tasks:
     internal: true
     cmds:
       - test -s {{.LOCAL_BIN}}/controller-gen || GOBIN=$(pwd)/{{.LOCAL_BIN}} go install sigs.k8s.io/controller-tools/cmd/controller-gen@{{.CONTROLLER_GEN_VERSION}}
-  update:crd:
-    desc: "Download the latest CRDs"
-    cmds:
-      - mkdir -p tests/gateway_test/testdata/crd
-      - curl -sSLo tests/gateway_test/testdata/crd/core.platform-mesh.io_accounts.yaml https://raw.githubusercontent.com/platform-mesh/account-operator/main/config/crd/core.platform-mesh.io_accounts.yaml
-      - echo "CRD updated successfully."
   setup:golangci-lint:
     internal: true
     cmds:
-      - test -s {{.LOCAL_BIN}}/golangci-lint || GOBIN=$(pwd)/{{.LOCAL_BIN}} go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+      - test -s {{.LOCAL_BIN}}/golangci-lint || GOBIN=$(pwd)/{{.LOCAL_BIN}} go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{{.GOLANGCI_LINT_VERSION}}
   setup:go-test-coverage:
     internal: true
     cmds:
       - test -s {{.LOCAL_BIN}}/go-test-coverage || GOBIN=$(pwd)/{{.LOCAL_BIN}} go install github.com/vladopajic/go-test-coverage/v2@latest
 
   ## Code Generation
-  generate:crd:
-    desc: "Generate CRD manifests from Go types"
-    deps: [setup:controller-gen]
-    cmds:
-      - "{{.LOCAL_BIN}}/controller-gen crd:crdVersions=v1 paths=./common/apis/v1alpha1 output:crd:artifacts:config=config/crd"
-      - echo "CRD manifests generated successfully in config/crd/"
-  generate:deepcopy:
-    desc: "Generate deepcopy methods for API types"
-    deps: [setup:controller-gen]
-    cmds:
-      - "{{.LOCAL_BIN}}/controller-gen object paths=./common/apis/v1alpha1"
-      - echo "Deepcopy methods generated successfully"
   generate:
     desc: "Generate all CRD-related files (manifests + deepcopy methods)"
-    deps: [generate:crd, generate:deepcopy]
+    deps: [setup:controller-gen]
     cmds:
-      - echo "All CRD generation completed successfully!"
+      - "{{.LOCAL_BIN}}/controller-gen object crd:crdVersions=v1 paths=./common/apis/v1alpha1 output:crd:artifacts:config=config/crd"
 
   ## Development
   mockery:
@@ -66,14 +49,14 @@ tasks:
   ## Testing
   fmt:
     cmds:
-      - go fmt ./...
+      - "{{.LOCAL_BIN}}/golangci-lint fmt ./..."
   lint:
     deps: [setup:golangci-lint]
     cmds:
       - task: fmt
       - "{{.LOCAL_BIN}}/golangci-lint run --timeout 10m ./..."
   envtest:
-    deps: [mockery]
+    deps: [setup:envtest]
     env:
       KUBEBUILDER_ASSETS:
         sh: $(pwd)/{{.LOCAL_BIN}}/setup-envtest use {{.ENVTEST_K8S_VERSION}} --bin-dir $(pwd)/{{.LOCAL_BIN}} -p path
@@ -86,7 +69,7 @@ tasks:
         vars:
           ADDITIONAL_COMMAND_ARGS: -coverprofile=./cover.out -covermode=atomic -coverpkg=./...
   cover:
-    deps: [ setup:envtest, update:crd, setup:go-test-coverage ]
+    deps: [setup:envtest, setup:go-test-coverage ]
     cmds:
       - task: envtest
         vars:

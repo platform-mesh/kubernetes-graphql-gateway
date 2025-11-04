@@ -6,16 +6,15 @@ import (
 	"errors"
 	"fmt"
 
+	gatewayv1alpha1 "github.com/platform-mesh/kubernetes-graphql-gateway/common/apis/v1alpha1"
+
 	authv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
-
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	gatewayv1alpha1 "github.com/platform-mesh/kubernetes-graphql-gateway/common/apis/v1alpha1"
 )
 
 // BuildConfig creates a rest.Config from cluster connection parameters
@@ -39,8 +38,8 @@ func BuildConfig(ctx context.Context, host string, auth *gatewayv1alpha1.AuthCon
 			return nil, errors.Join(errors.New("failed to extract CA data"), err)
 		}
 		if caData != nil {
-			config.TLSClientConfig.CAData = caData
-			config.TLSClientConfig.Insecure = false // Use proper TLS verification when CA is provided
+			config.CAData = caData
+			config.Insecure = false // Use proper TLS verification when CA is provided
 		}
 	}
 
@@ -74,8 +73,8 @@ func BuildConfigFromMetadata(host string, authType, token, kubeconfig, certData,
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode CA data: %w", err)
 		}
-		config.TLSClientConfig.CAData = decodedCA
-		config.TLSClientConfig.Insecure = false
+		config.CAData = decodedCA
+		config.Insecure = false
 	}
 
 	// Handle authentication based on type
@@ -109,8 +108,8 @@ func BuildConfigFromMetadata(host string, authType, token, kubeconfig, certData,
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode key data: %w", err)
 			}
-			config.TLSClientConfig.CertData = decodedCert
-			config.TLSClientConfig.KeyData = decodedKey
+			config.CertData = decodedCert
+			config.KeyData = decodedKey
 		}
 	}
 
@@ -247,8 +246,8 @@ func ConfigureAuthentication(ctx context.Context, config *rest.Config, auth *gat
 			return errors.New("client certificate or key not found in secret")
 		}
 
-		config.TLSClientConfig.CertData = certData
-		config.TLSClientConfig.KeyData = keyData
+		config.CertData = certData
+		config.KeyData = keyData
 		return nil
 	}
 
@@ -256,7 +255,7 @@ func ConfigureAuthentication(ctx context.Context, config *rest.Config, auth *gat
 		var expirationSeconds int64
 		if auth.ServiceAccount.TokenExpiration != nil {
 			// If TokenExpiration is provided, use its value
-			expirationSeconds = int64(auth.ServiceAccount.TokenExpiration.Duration.Seconds())
+			expirationSeconds = int64(auth.ServiceAccount.TokenExpiration.Seconds())
 		} else {
 			// If TokenExpiration is nil, use the desired default (3600 seconds = 1 hour)
 			expirationSeconds = 3600
@@ -346,14 +345,14 @@ func ExtractAuthFromKubeconfig(config *rest.Config, authInfo *api.AuthInfo) erro
 	}
 
 	if len(authInfo.ClientCertificateData) > 0 && len(authInfo.ClientKeyData) > 0 {
-		config.TLSClientConfig.CertData = authInfo.ClientCertificateData
-		config.TLSClientConfig.KeyData = authInfo.ClientKeyData
+		config.CertData = authInfo.ClientCertificateData
+		config.KeyData = authInfo.ClientKeyData
 		return nil
 	}
 
 	if authInfo.ClientCertificate != "" && authInfo.ClientKey != "" {
-		config.TLSClientConfig.CertFile = authInfo.ClientCertificate
-		config.TLSClientConfig.KeyFile = authInfo.ClientKey
+		config.CertFile = authInfo.ClientCertificate
+		config.KeyFile = authInfo.ClientKey
 		return nil
 	}
 
