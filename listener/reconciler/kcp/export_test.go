@@ -11,7 +11,7 @@ import (
 // Cluster path exports
 var ConfigForKCPClusterExported = ConfigForKCPCluster
 
-func NewClusterPathResolverExported(cfg *rest.Config, scheme interface{}) (*ClusterPathResolverProvider, error) {
+func NewClusterPathResolverExported(cfg *rest.Config, scheme any) (*ClusterPathResolverProvider, error) {
 	return NewClusterPathResolver(cfg, scheme.(*runtime.Scheme))
 }
 

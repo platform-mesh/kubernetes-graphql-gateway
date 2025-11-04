@@ -5,16 +5,17 @@ import (
 	"errors"
 	"testing"
 
-	kcpcore "github.com/kcp-dev/kcp/sdk/apis/core/v1alpha1"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/common/mocks"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler/kcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/platform-mesh/kubernetes-graphql-gateway/common/mocks"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler/kcp"
+	kcpcore "github.com/kcp-dev/kcp/sdk/apis/core/v1alpha1"
 )
 
 func TestConfigForKCPCluster(t *testing.T) {

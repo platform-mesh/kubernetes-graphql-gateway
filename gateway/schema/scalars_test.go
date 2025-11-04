@@ -5,20 +5,19 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/schema"
-
 	"github.com/graphql-go/graphql/language/ast"
 	"github.com/graphql-go/graphql/language/kinds"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/schema"
 )
 
 func TestStringMapScalar_ParseValue(t *testing.T) {
 	tests := []struct {
-		input    interface{}
-		expected interface{}
+		input    any
+		expected any
 	}{
 		{
-			input:    map[string]interface{}{"key": "val"},
-			expected: map[string]interface{}{"key": "val"},
+			input:    map[string]any{"key": "val"},
+			expected: map[string]any{"key": "val"},
 		},
 		{
 			input:    map[string]string{"a": "b"},
@@ -42,7 +41,7 @@ func TestStringMapScalar_ParseLiteral(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    ast.Value
-		expected interface{}
+		expected any
 	}{
 		{
 			name: "valid_object_value",
@@ -156,7 +155,7 @@ func TestGenerateTypeName(t *testing.T) {
 }
 
 func TestJSONStringScalar_ProperSerialization(t *testing.T) {
-	testObject := map[string]interface{}{
+	testObject := map[string]any{
 		"name":      "example-config",
 		"namespace": "default",
 		"labels": map[string]string{
@@ -180,7 +179,7 @@ func TestJSONStringScalar_ProperSerialization(t *testing.T) {
 	}
 
 	// Verify it's valid JSON
-	var parsed map[string]interface{}
+	var parsed map[string]any
 	err := json.Unmarshal([]byte(resultStr), &parsed)
 	if err != nil {
 		t.Fatalf("Result is not valid JSON: %s\nResult: %s", err, resultStr)

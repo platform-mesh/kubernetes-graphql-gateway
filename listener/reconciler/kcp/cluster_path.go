@@ -6,10 +6,11 @@ import (
 	"fmt"
 	"net/url"
 
-	kcpcore "github.com/kcp-dev/kcp/sdk/apis/core/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	kcpcore "github.com/kcp-dev/kcp/sdk/apis/core/v1alpha1"
 )
 
 var (

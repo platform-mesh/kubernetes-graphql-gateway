@@ -1,17 +1,16 @@
 package cmd
 
 import (
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
-
-	openmfpconfig "github.com/platform-mesh/golang-commons/config"
+	pmconfig "github.com/platform-mesh/golang-commons/config"
 	"github.com/platform-mesh/golang-commons/logger"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var (
 	appCfg     config.Config
-	defaultCfg *openmfpconfig.CommonServiceConfig
+	defaultCfg *pmconfig.CommonServiceConfig
 	v          *viper.Viper
 	log        *logger.Logger
 )
@@ -25,7 +24,7 @@ func init() {
 	rootCmd.AddCommand(listenCmd)
 
 	var err error
-	v, defaultCfg, err = openmfpconfig.NewDefaultConfig(rootCmd)
+	v, defaultCfg, err = pmconfig.NewDefaultConfig(rootCmd)
 	if err != nil {
 		panic(err)
 	}
@@ -40,12 +39,12 @@ func init() {
 		}
 	})
 
-	err = openmfpconfig.BindConfigToFlags(v, gatewayCmd, &appCfg)
+	err = pmconfig.BindConfigToFlags(v, gatewayCmd, &appCfg)
 	if err != nil {
 		panic(err)
 	}
 
-	err = openmfpconfig.BindConfigToFlags(v, listenCmd, &appCfg)
+	err = pmconfig.BindConfigToFlags(v, listenCmd, &appCfg)
 	if err != nil {
 		panic(err)
 	}

@@ -8,17 +8,16 @@ import (
 	"os"
 	"sync"
 
+	"github.com/platform-mesh/golang-commons/logger"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/workspacefile"
 	"gopkg.in/yaml.v3"
+
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
-
-	"github.com/platform-mesh/golang-commons/logger"
-
-	"github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/workspacefile"
 )
 
 var (

@@ -10,7 +10,7 @@ import (
 var jsonStringScalar = graphql.NewScalar(graphql.ScalarConfig{
 	Name:        "JSONString",
 	Description: "A JSON-serialized string representation of any object.",
-	Serialize: func(value interface{}) interface{} {
+	Serialize: func(value any) any {
 		// Convert the value to JSON string
 		jsonBytes, err := json.Marshal(value)
 		if err != nil {
@@ -19,9 +19,9 @@ var jsonStringScalar = graphql.NewScalar(graphql.ScalarConfig{
 		}
 		return string(jsonBytes)
 	},
-	ParseValue: func(value interface{}) interface{} {
+	ParseValue: func(value any) any {
 		if str, ok := value.(string); ok {
-			var result interface{}
+			var result any
 			err := json.Unmarshal([]byte(str), &result)
 			if err != nil {
 				return nil // Invalid JSON
@@ -30,9 +30,9 @@ var jsonStringScalar = graphql.NewScalar(graphql.ScalarConfig{
 		}
 		return nil
 	},
-	ParseLiteral: func(valueAST ast.Value) interface{} {
+	ParseLiteral: func(valueAST ast.Value) any {
 		if value, ok := valueAST.(*ast.StringValue); ok {
-			var result interface{}
+			var result any
 			err := json.Unmarshal([]byte(value.Value), &result)
 			if err != nil {
 				return nil // Invalid JSON
@@ -46,19 +46,19 @@ var jsonStringScalar = graphql.NewScalar(graphql.ScalarConfig{
 var stringMapScalar = graphql.NewScalar(graphql.ScalarConfig{
 	Name:        "StringMapInput",
 	Description: "Input type for a map from strings to strings.",
-	Serialize: func(value interface{}) interface{} {
+	Serialize: func(value any) any {
 		return value
 	},
-	ParseValue: func(value interface{}) interface{} {
+	ParseValue: func(value any) any {
 		switch val := value.(type) {
-		case map[string]interface{}, map[string]string:
+		case map[string]any, map[string]string:
 			return val
 		default:
 			// Added this to handle GraphQL variables
-			if arr, ok := value.([]interface{}); ok {
+			if arr, ok := value.([]any); ok {
 				result := make(map[string]string)
 				for _, item := range arr {
-					if obj, ok := item.(map[string]interface{}); ok {
+					if obj, ok := item.(map[string]any); ok {
 						if key, keyOk := obj["key"].(string); keyOk {
 							if val, valOk := obj["value"].(string); valOk {
 								result[key] = val

@@ -5,11 +5,11 @@ import (
 	"maps"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-
 	"github.com/graphql-go/graphql"
 	"github.com/rs/zerolog/log"
+
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 const (
@@ -98,7 +98,7 @@ func (b *FieldConfigArgumentsBuilder) Complete() graphql.FieldConfigArgument {
 	return maps.Clone(b.arguments)
 }
 
-func getStringArg(args map[string]interface{}, key string, required bool) (string, error) {
+func getStringArg(args map[string]any, key string, required bool) (string, error) {
 	val, exists := args[key]
 	if !exists {
 		if required {
@@ -126,7 +126,7 @@ func getStringArg(args map[string]interface{}, key string, required bool) (strin
 	return str, nil
 }
 
-func getBoolArg(args map[string]interface{}, key string, required bool) (bool, error) {
+func getBoolArg(args map[string]any, key string, required bool) (bool, error) {
 	val, exists := args[key]
 	if !exists {
 		if required {
