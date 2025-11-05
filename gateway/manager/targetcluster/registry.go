@@ -13,6 +13,7 @@ import (
 	"github.com/platform-mesh/golang-commons/logger"
 	appConfig "github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/roundtripper"
+
 	"k8s.io/client-go/rest"
 )
 
@@ -288,7 +289,7 @@ func (cr *ClusterRegistry) validateToken(ctx context.Context, token string, clus
 		cr.log.Error().Err(err).Str("cluster", cluster.name).Msg("Token validation request failed")
 		return false, fmt.Errorf("failed to make validation request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	cr.log.Debug().Str("cluster", cluster.name).Int("status", resp.StatusCode).Msg("Token validation response received")
 

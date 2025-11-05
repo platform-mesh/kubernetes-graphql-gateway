@@ -7,6 +7,7 @@ import (
 	apischema "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
 	apimocks "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema/mocks"
 	"github.com/stretchr/testify/assert"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/openapi"
 	"k8s.io/kube-openapi/pkg/validation/spec"
@@ -15,7 +16,7 @@ import (
 // helper constructs a schema with x-kubernetes-group-version-kind
 func schemaWithGVK(group, version, kind string) *spec.Schema {
 	return &spec.Schema{
-		VendorExtensible: spec.VendorExtensible{Extensions: map[string]interface{}{
+		VendorExtensible: spec.VendorExtensible{Extensions: map[string]any{
 			"x-kubernetes-group-version-kind": []map[string]string{{
 				"group":   group,
 				"version": version,

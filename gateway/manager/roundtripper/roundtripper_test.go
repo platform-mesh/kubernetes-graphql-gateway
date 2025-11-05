@@ -8,13 +8,12 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/platform-mesh/golang-commons/logger/testlogger"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-
 	appConfig "github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/mocks"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/roundtripper"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRoundTripper_RoundTrip(t *testing.T) {
@@ -478,7 +477,7 @@ func createTestToken(t *testing.T, claims jwt.MapClaims) string {
 	return signedToken
 }
 
-func createTestTokenWithClaim(t *testing.T, claimKey string, claimValue interface{}) string {
+func createTestTokenWithClaim(t *testing.T, claimKey string, claimValue any) string {
 	claims := jwt.MapClaims{claimKey: claimValue}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	signedToken, err := token.SignedString([]byte("test-secret"))

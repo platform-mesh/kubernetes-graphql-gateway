@@ -3,19 +3,20 @@ package kcp_test
 import (
 	"testing"
 
-	kcpapis "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
-	kcpcore "github.com/kcp-dev/kcp/sdk/apis/core/v1alpha1"
+	"github.com/platform-mesh/golang-commons/logger"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler/kcp"
 	"github.com/stretchr/testify/assert"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	"github.com/platform-mesh/golang-commons/logger"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler/kcp"
+	kcpapis "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
+	kcpcore "github.com/kcp-dev/kcp/sdk/apis/core/v1alpha1"
 )
 
 func TestNewKCPReconciler(t *testing.T) {

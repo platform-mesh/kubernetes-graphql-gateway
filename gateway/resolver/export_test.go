@@ -14,11 +14,11 @@ func (r *Service) SetGroupNames(names map[string]string) {
 	r.groupNames = names
 }
 
-func GetStringArg(args map[string]interface{}, key string, required bool) (string, error) {
+func GetStringArg(args map[string]any, key string, required bool) (string, error) {
 	return getStringArg(args, key, required)
 }
 
-func GetBoolArg(args map[string]interface{}, key string, required bool) (bool, error) {
+func GetBoolArg(args map[string]any, key string, required bool) (bool, error) {
 	return getBoolArg(args, key, required)
 }
 

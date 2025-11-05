@@ -7,6 +7,7 @@ import (
 	"github.com/graphql-go/graphql"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -24,7 +25,7 @@ type referenceInfo struct {
 // RelationResolver creates a GraphQL resolver for relation fields
 // Relationships are only enabled for GetItem queries to prevent N+1 problems in ListItems and Subscriptions
 func (r *Service) RelationResolver(fieldName string, gvk schema.GroupVersionKind) graphql.FieldResolveFn {
-	return func(p graphql.ResolveParams) (interface{}, error) {
+	return func(p graphql.ResolveParams) (any, error) {
 		// Determine operation type from GraphQL path analysis
 		operation := r.detectOperationFromGraphQLInfo(p)
 
@@ -82,7 +83,7 @@ func (r *Service) extractReferenceInfo(parentObj map[string]any, fieldName strin
 }
 
 // resolveReference fetches a referenced Kubernetes resource using strict conflict resolution
-func (r *Service) resolveReference(ctx context.Context, ref referenceInfo, targetGVK schema.GroupVersionKind) (interface{}, error) {
+func (r *Service) resolveReference(ctx context.Context, ref referenceInfo, targetGVK schema.GroupVersionKind) (any, error) {
 	// Use provided reference info to override GVK if specified
 	finalGVK := targetGVK
 	if ref.apiGroup != "" {

@@ -4,14 +4,14 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"github.com/platform-mesh/golang-commons/logger"
 	gatewayv1alpha1 "github.com/platform-mesh/kubernetes-graphql-gateway/common/apis/v1alpha1"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/common/mocks"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler/clusteraccess"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestInjectClusterMetadata(t *testing.T) {
@@ -22,7 +22,7 @@ func TestInjectClusterMetadata(t *testing.T) {
 		schemaJSON    []byte
 		clusterAccess gatewayv1alpha1.ClusterAccess
 		mockSetup     func(*mocks.MockClient)
-		wantMetadata  map[string]interface{}
+		wantMetadata  map[string]any
 		wantErr       bool
 		errContains   string
 	}{
@@ -36,7 +36,7 @@ func TestInjectClusterMetadata(t *testing.T) {
 				},
 			},
 			mockSetup: func(m *mocks.MockClient) {},
-			wantMetadata: map[string]interface{}{
+			wantMetadata: map[string]any{
 				"host": "https://test-cluster.example.com",
 				"path": "test-cluster",
 			},
@@ -53,7 +53,7 @@ func TestInjectClusterMetadata(t *testing.T) {
 				},
 			},
 			mockSetup: func(m *mocks.MockClient) {},
-			wantMetadata: map[string]interface{}{
+			wantMetadata: map[string]any{
 				"host": "https://test-cluster.example.com",
 				"path": "custom-path",
 			},
@@ -81,7 +81,7 @@ func TestInjectClusterMetadata(t *testing.T) {
 				},
 			},
 			mockSetup: func(m *mocks.MockClient) {},
-			wantMetadata: map[string]interface{}{
+			wantMetadata: map[string]any{
 				"host": "https://example.com",
 				"path": "",
 			},
@@ -98,7 +98,7 @@ func TestInjectClusterMetadata(t *testing.T) {
 				},
 			},
 			mockSetup: func(m *mocks.MockClient) {},
-			wantMetadata: map[string]interface{}{
+			wantMetadata: map[string]any{
 				"host": "https://example.com",
 				"path": "",
 			},
@@ -114,7 +114,7 @@ func TestInjectClusterMetadata(t *testing.T) {
 				},
 			},
 			mockSetup: func(m *mocks.MockClient) {},
-			wantMetadata: map[string]interface{}{
+			wantMetadata: map[string]any{
 				"host": "",
 				"path": "no-host-cluster",
 			},
@@ -131,7 +131,7 @@ func TestInjectClusterMetadata(t *testing.T) {
 				},
 			},
 			mockSetup: func(m *mocks.MockClient) {},
-			wantMetadata: map[string]interface{}{
+			wantMetadata: map[string]any{
 				"host": "https://special.example.com",
 				"path": "special/chars_path.test",
 			},
@@ -147,7 +147,7 @@ func TestInjectClusterMetadata(t *testing.T) {
 				},
 			},
 			mockSetup: func(m *mocks.MockClient) {},
-			wantMetadata: map[string]interface{}{
+			wantMetadata: map[string]any{
 				"host": "https://minimal.example.com",
 				"path": "minimal",
 			},
@@ -164,7 +164,7 @@ func TestInjectClusterMetadata(t *testing.T) {
 				},
 			},
 			mockSetup: func(m *mocks.MockClient) {},
-			wantMetadata: map[string]interface{}{
+			wantMetadata: map[string]any{
 				"host": "https://example.com",
 				"path": "very/long/path/with/multiple/segments",
 			},
@@ -180,7 +180,7 @@ func TestInjectClusterMetadata(t *testing.T) {
 				},
 			},
 			mockSetup: func(m *mocks.MockClient) {},
-			wantMetadata: map[string]interface{}{
+			wantMetadata: map[string]any{
 				"host": "https://unicode.example.com",
 				"path": "üñíçødé-cluster",
 			},
@@ -231,7 +231,7 @@ func TestInjectClusterMetadata(t *testing.T) {
 			assert.NotNil(t, result)
 
 			// Parse the result to verify metadata injection
-			var resultData map[string]interface{}
+			var resultData map[string]any
 			err = json.Unmarshal(result, &resultData)
 			require.NoError(t, err)
 
@@ -239,7 +239,7 @@ func TestInjectClusterMetadata(t *testing.T) {
 			metadata, exists := resultData["x-cluster-metadata"]
 			require.True(t, exists, "x-cluster-metadata should be present")
 
-			metadataMap, ok := metadata.(map[string]interface{})
+			metadataMap, ok := metadata.(map[string]any)
 			require.True(t, ok, "x-cluster-metadata should be a map")
 
 			// Verify expected metadata
@@ -270,11 +270,11 @@ func TestInjectClusterMetadata_PathLogic(t *testing.T) {
 		result, err := clusteraccess.InjectClusterMetadata(t.Context(), schemaJSON, clusterAccess, mockClient, mockLogger)
 		require.NoError(t, err)
 
-		var resultData map[string]interface{}
+		var resultData map[string]any
 		err = json.Unmarshal(result, &resultData)
 		require.NoError(t, err)
 
-		metadata := resultData["x-cluster-metadata"].(map[string]interface{})
+		metadata := resultData["x-cluster-metadata"].(map[string]any)
 		assert.Equal(t, "custom-path", metadata["path"])
 	})
 
@@ -290,11 +290,11 @@ func TestInjectClusterMetadata_PathLogic(t *testing.T) {
 		result, err := clusteraccess.InjectClusterMetadata(t.Context(), schemaJSON, clusterAccess, mockClient, mockLogger)
 		require.NoError(t, err)
 
-		var resultData map[string]interface{}
+		var resultData map[string]any
 		err = json.Unmarshal(result, &resultData)
 		require.NoError(t, err)
 
-		metadata := resultData["x-cluster-metadata"].(map[string]interface{})
+		metadata := resultData["x-cluster-metadata"].(map[string]any)
 		assert.Equal(t, "fallback-name", metadata["path"])
 	})
 }

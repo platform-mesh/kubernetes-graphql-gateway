@@ -6,15 +6,15 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/go-openapi/spec"
 	"github.com/gobuffalo/flect"
 	"github.com/graphql-go/graphql"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-
 	"github.com/platform-mesh/golang-commons/logger"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/common"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/resolver"
+
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 type Provider interface {
@@ -25,7 +25,7 @@ type Gateway struct {
 	log                *logger.Logger
 	resolver           resolver.Provider
 	graphqlSchema      graphql.Schema
-	definitions        spec.Definitions
+	definitions        map[string]*spec.Schema
 	typesCache         map[string]*graphql.Object
 	inputTypesCache    map[string]*graphql.InputObject
 	enhancedTypesCache map[string]*graphql.Object // Cache for enhanced *Ref types
@@ -36,7 +36,7 @@ type Gateway struct {
 	typeByCategory map[string][]resolver.TypeByCategory
 }
 
-func New(log *logger.Logger, definitions spec.Definitions, resolverProvider resolver.Provider) (*Gateway, error) {
+func New(log *logger.Logger, definitions map[string]*spec.Schema, resolverProvider resolver.Provider) (*Gateway, error) {
 	g := &Gateway{
 		log:                log,
 		resolver:           resolverProvider,
@@ -101,7 +101,7 @@ func (g *Gateway) generateGraphqlSchema() error {
 
 func (g *Gateway) processGroupedResources(
 	group string,
-	groupedResources spec.Definitions,
+	groupedResources map[string]*spec.Schema,
 	rootQueryFields,
 	rootMutationFields,
 	rootSubscriptionFields graphql.Fields,
@@ -143,7 +143,7 @@ func (g *Gateway) processGroupedResources(
 
 func (g *Gateway) processSingleResource(
 	resourceKey string,
-	resourceScheme spec.Schema,
+	resourceScheme *spec.Schema,
 	queryGroupType, mutationGroupType *graphql.Object,
 	rootSubscriptionFields graphql.Fields,
 ) {
@@ -172,7 +172,7 @@ func (g *Gateway) processSingleResource(
 	singular, plural := g.getNames(gvk)
 
 	// Generate both fields and inputFields
-	fields, inputFields, err := g.generateGraphQLFields(&resourceScheme, singular, []string{}, make(map[string]bool))
+	fields, inputFields, err := g.generateGraphQLFields(resourceScheme, singular, []string{}, make(map[string]bool))
 	if err != nil {
 		g.log.Error().Err(err).Str("resource", singular).Msg("Error generating fields")
 		return
@@ -293,8 +293,8 @@ func (g *Gateway) getNames(gvk *schema.GroupVersionKind) (singular string, plura
 	return singular, plural
 }
 
-func (g *Gateway) getDefinitionsByGroup(filteredDefinitions spec.Definitions) map[string]spec.Definitions {
-	groups := map[string]spec.Definitions{}
+func (g *Gateway) getDefinitionsByGroup(filteredDefinitions map[string]*spec.Schema) map[string]map[string]*spec.Schema {
+	groups := map[string]map[string]*spec.Schema{}
 	for key, definition := range filteredDefinitions {
 		gvk, err := g.getGroupVersionKind(key)
 		if err != nil {
@@ -303,7 +303,7 @@ func (g *Gateway) getDefinitionsByGroup(filteredDefinitions spec.Definitions) ma
 		}
 
 		if _, ok := groups[gvk.Group]; !ok {
-			groups[gvk.Group] = spec.Definitions{}
+			groups[gvk.Group] = map[string]*spec.Schema{}
 		}
 
 		groups[gvk.Group][key] = definition
@@ -343,48 +343,48 @@ func (g *Gateway) generateGraphQLFields(resourceScheme *spec.Schema, typePrefix 
 func (g *Gateway) convertSwaggerTypeToGraphQL(schema spec.Schema, typePrefix string, fieldPath []string, processingTypes map[string]bool) (graphql.Output, graphql.Input, error) {
 	if len(schema.Type) == 0 {
 		// Handle $ref types
-		if schema.Ref.GetURL() != nil {
-			refKey := schema.Ref.String()
-
-			// Remove the leading '#/definitions/' from the ref string
-			refKey = strings.TrimPrefix(refKey, "#/definitions/")
-
-			// Check if type is already being processed
-			if processingTypes[refKey] {
-				// Return existing type to prevent infinite recursion
-				if existingType, exists := g.typesCache[refKey]; exists && existingType != nil {
-					existingInputType := g.inputTypesCache[refKey]
-					return existingType, existingInputType, nil
-				}
-				// Return placeholder types to prevent recursion
-				return graphql.String, graphql.String, nil
-			}
-
-			if refDef, ok := g.definitions[refKey]; ok {
-				// Mark as processing
-				processingTypes[refKey] = true
-				defer delete(processingTypes, refKey)
-
-				fieldType, inputFieldType, err := g.convertSwaggerTypeToGraphQL(refDef, refKey, fieldPath, processingTypes)
-				if err != nil {
-					return nil, nil, err
-				}
-
-				// Store the types
-				if objType, ok := fieldType.(*graphql.Object); ok {
-					g.typesCache[refKey] = objType
-				}
-				if inputObjType, ok := inputFieldType.(*graphql.InputObject); ok {
-					g.inputTypesCache[refKey] = inputObjType
-				}
-
-				return fieldType, inputFieldType, nil
-			} else {
-				// Definition not found, return string
-				return graphql.String, graphql.String, nil
-			}
+		if len(schema.AllOf) == 0 {
+			return graphql.String, graphql.String, nil
 		}
-		return graphql.String, graphql.String, nil
+
+		refKey := schema.AllOf[0].Ref.String()
+
+		// Check if type is already being processed
+		if processingTypes[refKey] {
+			// Return existing type to prevent infinite recursion
+			if existingType, exists := g.typesCache[refKey]; exists && existingType != nil {
+				existingInputType := g.inputTypesCache[refKey]
+				return existingType, existingInputType, nil
+			}
+
+			// Return placeholder types to prevent recursion
+			return graphql.String, graphql.String, nil
+		}
+
+		if refDef, ok := g.definitions[refKey]; ok {
+			// Mark as processing
+			processingTypes[refKey] = true
+			defer delete(processingTypes, refKey)
+
+			fieldType, inputFieldType, err := g.convertSwaggerTypeToGraphQL(*refDef, refKey, fieldPath, processingTypes)
+			if err != nil {
+				return nil, nil, err
+			}
+
+			// Store the types
+			if objType, ok := fieldType.(*graphql.Object); ok {
+				g.typesCache[refKey] = objType
+			}
+			if inputObjType, ok := inputFieldType.(*graphql.InputObject); ok {
+				g.inputTypesCache[refKey] = inputObjType
+			}
+
+			return fieldType, inputFieldType, nil
+		} else {
+			// Definition not found, return string
+			return graphql.String, graphql.String, nil
+		}
+
 	}
 
 	switch schema.Type[0] {
@@ -484,9 +484,9 @@ func (g *Gateway) getGroupVersionKind(resourceKey string) (*schema.GroupVersionK
 		return nil, errors.New("x-kubernetes-group-version-kind extension not found")
 	}
 	// xkGvk should be an array of maps
-	if gvkList, ok := xkGvk.([]interface{}); ok && len(gvkList) > 0 {
+	if gvkList, ok := xkGvk.([]any); ok && len(gvkList) > 0 {
 		// Use the first item in the list
-		if gvkMap, ok := gvkList[0].(map[string]interface{}); ok {
+		if gvkMap, ok := gvkList[0].(map[string]any); ok {
 			group, _ := gvkMap["group"].(string)
 			version, _ := gvkMap["version"].(string)
 			kind, _ := gvkMap["kind"].(string)
@@ -522,7 +522,7 @@ func (g *Gateway) storeCategory(
 		return fmt.Errorf("%s extension not found", common.CategoriesExtensionKey)
 	}
 
-	categoriesRawArray, ok := categoriesRaw.([]interface{})
+	categoriesRawArray, ok := categoriesRaw.([]any)
 	if !ok {
 		return fmt.Errorf("%s extension is not an array", common.CategoriesExtensionKey)
 	}

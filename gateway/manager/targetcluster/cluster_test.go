@@ -4,11 +4,11 @@ import (
 	"encoding/base64"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"k8s.io/client-go/rest"
-
 	"github.com/platform-mesh/golang-commons/logger/testlogger"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/targetcluster"
+	"github.com/stretchr/testify/assert"
+
+	"k8s.io/client-go/rest"
 )
 
 func TestBuildConfigFromMetadata(t *testing.T) {
@@ -54,9 +54,9 @@ users:
 			expectError: false,
 			validateConfig: func(t *testing.T, config *rest.Config) {
 				assert.Equal(t, "https://k8s.example.com", config.Host)
-				assert.True(t, config.TLSClientConfig.Insecure)
+				assert.True(t, config.Insecure)
 				assert.Empty(t, config.BearerToken)
-				assert.Nil(t, config.TLSClientConfig.CAData)
+				assert.Nil(t, config.CAData)
 			},
 		},
 		{
@@ -70,9 +70,9 @@ users:
 			expectError: false,
 			validateConfig: func(t *testing.T, config *rest.Config) {
 				assert.Equal(t, "https://k8s.example.com", config.Host)
-				assert.False(t, config.TLSClientConfig.Insecure)
-				assert.NotNil(t, config.TLSClientConfig.CAData)
-				assert.Contains(t, string(config.TLSClientConfig.CAData), "BEGIN CERTIFICATE")
+				assert.False(t, config.Insecure)
+				assert.NotNil(t, config.CAData)
+				assert.Contains(t, string(config.CAData), "BEGIN CERTIFICATE")
 			},
 		},
 		{
@@ -97,8 +97,8 @@ users:
 			expectError: false,
 			validateConfig: func(t *testing.T, config *rest.Config) {
 				assert.Equal(t, "https://k8s.example.com", config.Host)
-				assert.True(t, config.TLSClientConfig.Insecure)
-				assert.Nil(t, config.TLSClientConfig.CAData)
+				assert.True(t, config.Insecure)
+				assert.Nil(t, config.CAData)
 			},
 		},
 		{
@@ -210,10 +210,10 @@ users:
 			expectError: false,
 			validateConfig: func(t *testing.T, config *rest.Config) {
 				assert.Equal(t, "https://k8s.example.com", config.Host)
-				assert.NotNil(t, config.TLSClientConfig.CertData)
-				assert.NotNil(t, config.TLSClientConfig.KeyData)
-				assert.Contains(t, string(config.TLSClientConfig.CertData), "BEGIN CERTIFICATE")
-				assert.Contains(t, string(config.TLSClientConfig.KeyData), "BEGIN PRIVATE KEY")
+				assert.NotNil(t, config.CertData)
+				assert.NotNil(t, config.KeyData)
+				assert.Contains(t, string(config.CertData), "BEGIN CERTIFICATE")
+				assert.Contains(t, string(config.KeyData), "BEGIN PRIVATE KEY")
 			},
 		},
 		{
@@ -255,8 +255,8 @@ users:
 			expectError: false,
 			validateConfig: func(t *testing.T, config *rest.Config) {
 				assert.Equal(t, "https://k8s.example.com", config.Host)
-				assert.Nil(t, config.TLSClientConfig.CertData)
-				assert.Nil(t, config.TLSClientConfig.KeyData)
+				assert.Nil(t, config.CertData)
+				assert.Nil(t, config.KeyData)
 			},
 		},
 		{
@@ -272,8 +272,8 @@ users:
 			expectError: false,
 			validateConfig: func(t *testing.T, config *rest.Config) {
 				assert.Equal(t, "https://k8s.example.com", config.Host)
-				assert.Nil(t, config.TLSClientConfig.CertData)
-				assert.Nil(t, config.TLSClientConfig.KeyData)
+				assert.Nil(t, config.CertData)
+				assert.Nil(t, config.KeyData)
 			},
 		},
 		{
@@ -306,8 +306,8 @@ users:
 			expectError: false,
 			validateConfig: func(t *testing.T, config *rest.Config) {
 				assert.Equal(t, "https://k8s.example.com", config.Host)
-				assert.False(t, config.TLSClientConfig.Insecure)
-				assert.NotNil(t, config.TLSClientConfig.CAData)
+				assert.False(t, config.Insecure)
+				assert.NotNil(t, config.CAData)
 				assert.Equal(t, "test-token-123", config.BearerToken)
 			},
 		},
@@ -327,10 +327,10 @@ users:
 			expectError: false,
 			validateConfig: func(t *testing.T, config *rest.Config) {
 				assert.Equal(t, "https://k8s.example.com", config.Host)
-				assert.False(t, config.TLSClientConfig.Insecure)
-				assert.NotNil(t, config.TLSClientConfig.CAData)
-				assert.NotNil(t, config.TLSClientConfig.CertData)
-				assert.NotNil(t, config.TLSClientConfig.KeyData)
+				assert.False(t, config.Insecure)
+				assert.NotNil(t, config.CAData)
+				assert.NotNil(t, config.CertData)
+				assert.NotNil(t, config.KeyData)
 			},
 		},
 	}

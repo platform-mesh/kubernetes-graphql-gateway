@@ -6,6 +6,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/graphql-go/graphql"
+	"github.com/graphql-go/graphql/language/ast"
 	"github.com/pkg/errors"
 	"github.com/platform-mesh/golang-commons/sentry"
 	"go.opentelemetry.io/otel"
@@ -13,14 +15,10 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-
-	"github.com/graphql-go/graphql/language/ast"
-	"k8s.io/apimachinery/pkg/watch"
-
-	"github.com/graphql-go/graphql"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/watch"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -29,10 +27,10 @@ var (
 )
 
 func (r *Service) SubscribeItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
-	return func(p graphql.ResolveParams) (interface{}, error) {
+	return func(p graphql.ResolveParams) (any, error) {
 		_, span := otel.Tracer("").Start(p.Context, "SubscribeItem", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
-		resultChannel := make(chan interface{})
+		resultChannel := make(chan any)
 		go r.runWatch(p, gvk, resultChannel, true, scope)
 
 		return resultChannel, nil
@@ -40,10 +38,10 @@ func (r *Service) SubscribeItem(gvk schema.GroupVersionKind, scope v1.ResourceSc
 }
 
 func (r *Service) SubscribeItems(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
-	return func(p graphql.ResolveParams) (interface{}, error) {
+	return func(p graphql.ResolveParams) (any, error) {
 		_, span := otel.Tracer("").Start(p.Context, "SubscribeItems", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
-		resultChannel := make(chan interface{})
+		resultChannel := make(chan any)
 		go r.runWatch(p, gvk, resultChannel, false, scope)
 
 		return resultChannel, nil
@@ -53,7 +51,7 @@ func (r *Service) SubscribeItems(gvk schema.GroupVersionKind, scope v1.ResourceS
 func (r *Service) runWatch(
 	p graphql.ResolveParams,
 	gvk schema.GroupVersionKind,
-	resultChannel chan interface{},
+	resultChannel chan any,
 	singleItem bool,
 	scope v1.ResourceScope,
 ) {
@@ -132,7 +130,7 @@ func (r *Service) runWatch(
 		select {
 		case <-ctx.Done():
 			return
-		case resultChannel <- []map[string]interface{}{}:
+		case resultChannel <- []map[string]any{}:
 		}
 	}
 
@@ -201,7 +199,7 @@ func (r *Service) runWatch(
 						singleObj = previousObjects[namespace+"/"+name]
 					}
 
-					var data interface{}
+					var data any
 					if singleObj != nil { // object can be nil in case it is deleted
 						data = singleObj.Object
 					}
@@ -319,13 +317,13 @@ func determineFieldChanged(oldObj, newObj *unstructured.Unstructured, fields []s
 }
 
 // Helper function to get the value of a field from an unstructured object
-func getFieldValue(obj *unstructured.Unstructured, fieldPath string) (interface{}, bool, error) {
+func getFieldValue(obj *unstructured.Unstructured, fieldPath string) (any, bool, error) {
 	fields := strings.Split(fieldPath, ".")
-	var current interface{} = obj.Object
+	var current any = obj.Object
 
 	for i, field := range fields {
 		switch v := current.(type) {
-		case map[string]interface{}:
+		case map[string]any:
 			value, found, err := unstructured.NestedFieldNoCopy(v, field)
 			if err != nil {
 				return nil, false, fmt.Errorf("error accessing field %s: %v", strings.Join(fields[:i+1], "."), err)
@@ -334,7 +332,7 @@ func getFieldValue(obj *unstructured.Unstructured, fieldPath string) (interface{
 				return nil, false, nil
 			}
 			current = value
-		case []interface{}:
+		case []any:
 			// in case of slice, we return it, and that slice will be compared later using deep equal
 			return current, true, nil
 		default:
@@ -346,7 +344,7 @@ func getFieldValue(obj *unstructured.Unstructured, fieldPath string) (interface{
 }
 
 func CreateSubscriptionResolver(isSingle bool) graphql.FieldResolveFn {
-	return func(p graphql.ResolveParams) (interface{}, error) {
+	return func(p graphql.ResolveParams) (any, error) {
 		source := p.Source
 
 		if err, ok := source.(error); ok {

@@ -10,14 +10,15 @@ import (
 	"time"
 
 	"github.com/graphql-go/graphql"
-	"github.com/kcp-dev/logicalcluster/v3"
-	"sigs.k8s.io/controller-runtime/pkg/kontext"
-
 	"github.com/platform-mesh/golang-commons/logger/testlogger"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/common"
 	appConfig "github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/roundtripper"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/targetcluster"
+
+	"sigs.k8s.io/controller-runtime/pkg/kontext"
+
+	"github.com/kcp-dev/logicalcluster/v3"
 )
 
 func TestGetToken(t *testing.T) {
@@ -134,7 +135,7 @@ func TestCreateHandler(t *testing.T) {
 			Fields: graphql.Fields{
 				"hello": &graphql.Field{
 					Type: graphql.String,
-					Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					Resolve: func(p graphql.ResolveParams) (any, error) {
 						return "world", nil
 					},
 				},
@@ -217,7 +218,7 @@ func TestHandleSubscription_ErrorCases(t *testing.T) {
 			Fields: graphql.Fields{
 				"hello": &graphql.Field{
 					Type: graphql.String,
-					Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					Resolve: func(p graphql.ResolveParams) (any, error) {
 						return "world", nil
 					},
 				},
@@ -272,7 +273,7 @@ func TestHandleSubscription_Headers(t *testing.T) {
 			Fields: graphql.Fields{
 				"hello": &graphql.Field{
 					Type: graphql.String,
-					Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					Resolve: func(p graphql.ResolveParams) (any, error) {
 						return "world", nil
 					},
 				},
@@ -283,7 +284,7 @@ func TestHandleSubscription_Headers(t *testing.T) {
 			Fields: graphql.Fields{
 				"hello": &graphql.Field{
 					Type: graphql.String,
-					Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					Resolve: func(p graphql.ResolveParams) (any, error) {
 						return "world", nil
 					},
 				},
@@ -332,7 +333,7 @@ func TestHandleSubscription_SubscriptionLoop(t *testing.T) {
 			Fields: graphql.Fields{
 				"hello": &graphql.Field{
 					Type: graphql.String,
-					Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					Resolve: func(p graphql.ResolveParams) (any, error) {
 						return "world", nil
 					},
 				},
@@ -343,7 +344,7 @@ func TestHandleSubscription_SubscriptionLoop(t *testing.T) {
 			Fields: graphql.Fields{
 				"counter": &graphql.Field{
 					Type: graphql.Int,
-					Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					Resolve: func(p graphql.ResolveParams) (any, error) {
 						return 42, nil
 					},
 				},

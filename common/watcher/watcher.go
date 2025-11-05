@@ -50,7 +50,7 @@ func (w *FileWatcher) WatchSingleFile(ctx context.Context, filePath string, debo
 	if err := w.watcher.Add(fileDir); err != nil {
 		return fmt.Errorf("failed to watch directory %s: %w", fileDir, err)
 	}
-	defer w.watcher.Close()
+	defer w.watcher.Close() //nolint:errcheck
 
 	w.log.Info().Str("filePath", filePath).Msg("started watching file")
 
@@ -75,7 +75,7 @@ func (w *FileWatcher) WatchDirectory(ctx context.Context, dirPath string) error 
 	if err := w.addWatchRecursively(dirPath); err != nil {
 		return fmt.Errorf("failed to add watch paths: %w", err)
 	}
-	defer w.watcher.Close()
+	defer w.watcher.Close() //nolint:errcheck
 
 	w.log.Info().Str("dirPath", dirPath).Msg("started watching directory")
 

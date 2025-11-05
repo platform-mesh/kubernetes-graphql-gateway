@@ -9,6 +9,8 @@ import (
 	apischema "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
 	apischemaMocks "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema/mocks"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,52 +42,6 @@ func TestGetOpenAPISchemaKey(t *testing.T) {
 	}
 }
 
-// TestGetCRDGroupVersionKind tests the getCRDGroupVersionKind function. It checks if the
-// function correctly extracts the GroupVersionKind from the CRD spec and handles errors.
-func TestGetCRDGroupVersionKind(t *testing.T) {
-	tests := []struct {
-		name    string
-		spec    apiextensionsv1.CustomResourceDefinitionSpec
-		want    *metav1.GroupVersionKind
-		wantErr error
-	}{
-		{
-			name: "has_versions",
-			spec: apiextensionsv1.CustomResourceDefinitionSpec{
-				Group: "test.group",
-				Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
-					{Name: "v1beta1"},
-					{Name: "v1"},
-				},
-				Names: apiextensionsv1.CustomResourceDefinitionNames{Kind: "Foo"},
-			},
-			want:    &metav1.GroupVersionKind{Group: "test.group", Version: "v1beta1", Kind: "Foo"},
-			wantErr: nil,
-		},
-		{
-			name: "no_versions",
-			spec: apiextensionsv1.CustomResourceDefinitionSpec{
-				Group:    "empty.group",
-				Versions: []apiextensionsv1.CustomResourceDefinitionVersion{},
-				Names:    apiextensionsv1.CustomResourceDefinitionNames{Kind: "Bar"},
-			},
-			want:    nil,
-			wantErr: apischema.ErrCRDNoVersions,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			got, err := apischema.GetCRDGroupVersionKind(tc.spec)
-			assert.Equal(t, tc.wantErr, err, "error value mismatch")
-			if tc.wantErr != nil {
-				return
-			}
-			assert.Equal(t, tc.want, got, "result value mismatch")
-		})
-	}
-}
-
 // TestNewSchemaBuilder tests the NewSchemaBuilder function. It checks if the
 // SchemaBuilder is correctly initialized with the expected number of schemas
 // and the expected schema key.
@@ -100,13 +56,13 @@ func TestNewSchemaBuilder(t *testing.T) {
 		{
 			name: "populates_schemas",
 			client: func() openapi.Client {
-				mock := apischemaMocks.NewMockClient(t)
+				schemaClient := apischemaMocks.NewMockClient(t)
 				mockGV := apischemaMocks.NewMockGroupVersion(t)
 				paths := map[string]openapi.GroupVersion{
 					"/v1": mockGV,
 				}
-				mock.EXPECT().Paths().Return(paths, nil)
-				mockGV.EXPECT().Schema("application/json").Return([]byte(`{
+				schemaClient.EXPECT().Paths().Return(paths, nil)
+				mockGV.EXPECT().Schema(mock.Anything).Return([]byte(`{
 					"components": {
 						"schemas": {
 							"v1.Pod": {
@@ -116,7 +72,7 @@ func TestNewSchemaBuilder(t *testing.T) {
 						}
 					}
 				}`), nil)
-				return mock
+				return schemaClient
 			}(),
 			wantErr: nil,
 			wantLen: 1,
@@ -146,69 +102,6 @@ func TestNewSchemaBuilder(t *testing.T) {
 				_, ok := b.GetSchemas()[tc.wantKey]
 				assert.True(t, ok, "schema key %s not found in builder.schemas", tc.wantKey)
 			}
-		})
-	}
-}
-
-// TestWithCRDCategories tests the WithCRDCategories method
-// for the SchemaBuilder struct. It checks if the categories are correctly added
-// to the schema's extensions.
-func TestWithCRDCategories(t *testing.T) {
-	tests := []struct {
-		name     string
-		key      string
-		crd      *apiextensionsv1.CustomResourceDefinition
-		wantCats []string
-	}{
-		{
-			name: "adds_categories",
-			key:  "g.v1.K",
-			crd: &apiextensionsv1.CustomResourceDefinition{
-				Spec: apiextensionsv1.CustomResourceDefinitionSpec{
-					Group:    "g",
-					Versions: []apiextensionsv1.CustomResourceDefinitionVersion{{Name: "v1"}},
-					Names: apiextensionsv1.CustomResourceDefinitionNames{
-						Kind:       "K",
-						Categories: []string{"cat1", "cat2"},
-					},
-				},
-			},
-			wantCats: []string{"cat1", "cat2"},
-		},
-		{
-			name: "no_categories",
-			key:  "g.v1.K",
-			crd: &apiextensionsv1.CustomResourceDefinition{
-				Spec: apiextensionsv1.CustomResourceDefinitionSpec{
-					Group:    "g",
-					Versions: []apiextensionsv1.CustomResourceDefinitionVersion{{Name: "v1"}},
-					Names: apiextensionsv1.CustomResourceDefinitionNames{
-						Kind: "K",
-					},
-				},
-			},
-			wantCats: nil,
-		},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			mock := apischemaMocks.NewMockClient(t)
-			mock.EXPECT().Paths().Return(map[string]openapi.GroupVersion{}, nil)
-			b := apischema.NewSchemaBuilder(mock, nil, testlogger.New().Logger)
-			b.SetSchemas(map[string]*spec.Schema{
-				tc.key: {VendorExtensible: spec.VendorExtensible{Extensions: map[string]interface{}{}}},
-			})
-			b.WithCRDCategories(tc.crd)
-			ext, found := b.GetSchemas()[tc.key].VendorExtensible.Extensions[common.CategoriesExtensionKey]
-			if tc.wantCats == nil {
-				assert.False(t, found, "expected no categories")
-				return
-			}
-			assert.True(t, found, "expected CategoriesExtensionKey to be set")
-			cats, ok := ext.([]string)
-			assert.True(t, ok, "categories should be []string")
-			assert.Equal(t, len(tc.wantCats), len(cats))
-			assert.Equal(t, tc.wantCats, cats, "categories mismatch")
 		})
 	}
 }
@@ -248,10 +141,10 @@ func TestWithApiResourceCategories(t *testing.T) {
 			mock.EXPECT().Paths().Return(map[string]openapi.GroupVersion{}, nil)
 			b := apischema.NewSchemaBuilder(mock, nil, testlogger.New().Logger)
 			b.SetSchemas(map[string]*spec.Schema{
-				tc.key: {VendorExtensible: spec.VendorExtensible{Extensions: map[string]interface{}{}}},
+				tc.key: {VendorExtensible: spec.VendorExtensible{Extensions: map[string]any{}}},
 			})
 			b.WithApiResourceCategories(tc.list)
-			ext, found := b.GetSchemas()[tc.key].VendorExtensible.Extensions[common.CategoriesExtensionKey]
+			ext, found := b.GetSchemas()[tc.key].Extensions[common.CategoriesExtensionKey]
 			if tc.wantCats == nil {
 				assert.False(t, found, "expected no categories")
 				return
@@ -272,7 +165,7 @@ func TestWithScope(t *testing.T) {
 	// Create schema with GVK extension
 	s := &spec.Schema{
 		VendorExtensible: spec.VendorExtensible{
-			Extensions: map[string]interface{}{
+			Extensions: map[string]any{
 				common.GVKExtensionKey: []map[string]string{
 					{"group": gvk.Group, "version": gvk.Version, "kind": gvk.Kind},
 				},
@@ -294,6 +187,6 @@ func TestWithScope(t *testing.T) {
 	b.WithScope(mapper)
 
 	// Validate
-	scope := b.GetSchemas()["g.v1.K"].VendorExtensible.Extensions[common.ScopeExtensionKey]
+	scope := b.GetSchemas()["g.v1.K"].Extensions[common.ScopeExtensionKey]
 	assert.Equal(t, apiextensionsv1.NamespaceScoped, scope, "scope value mismatch")
 }

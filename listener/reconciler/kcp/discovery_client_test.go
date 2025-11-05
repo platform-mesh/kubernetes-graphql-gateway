@@ -4,13 +4,13 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler/kcp"
+	kcpmocks "github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler/kcp/mocks"
 	"github.com/stretchr/testify/assert"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
-
-	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler/kcp"
-	kcpmocks "github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler/kcp/mocks"
 )
 
 func TestNewDiscoveryFactory(t *testing.T) {

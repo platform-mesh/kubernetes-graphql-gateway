@@ -11,18 +11,18 @@ import (
 
 	"github.com/graphql-go/graphql"
 	pkgErrors "github.com/pkg/errors"
+	"github.com/platform-mesh/golang-commons/logger"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"gopkg.in/yaml.v3"
+
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/platform-mesh/golang-commons/logger"
 )
 
 const (
@@ -76,7 +76,7 @@ func New(log *logger.Logger, runtimeClient client.WithWatch) *Service {
 
 // ListItems returns a GraphQL CommonResolver function that lists Kubernetes resources of the given GroupVersionKind.
 func (r *Service) ListItems(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
-	return func(p graphql.ResolveParams) (interface{}, error) {
+	return func(p graphql.ResolveParams) (any, error) {
 		ctx, span := otel.Tracer("").Start(p.Context, LIST_ITEMS, trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
 
@@ -151,7 +151,7 @@ func (r *Service) ListItems(gvk schema.GroupVersionKind, scope v1.ResourceScope)
 
 // GetItem returns a GraphQL CommonResolver function that retrieves a single Kubernetes resource of the given GroupVersionKind.
 func (r *Service) GetItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
-	return func(p graphql.ResolveParams) (interface{}, error) {
+	return func(p graphql.ResolveParams) (any, error) {
 		ctx, span := otel.Tracer("").Start(p.Context, "GetItem", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
 
@@ -203,7 +203,7 @@ func (r *Service) GetItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) g
 }
 
 func (r *Service) GetItemAsYAML(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
-	return func(p graphql.ResolveParams) (interface{}, error) {
+	return func(p graphql.ResolveParams) (any, error) {
 		var span trace.Span
 		p.Context, span = otel.Tracer("").Start(p.Context, "GetItemAsYAML", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
@@ -223,7 +223,7 @@ func (r *Service) GetItemAsYAML(gvk schema.GroupVersionKind, scope v1.ResourceSc
 }
 
 func (r *Service) CreateItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
-	return func(p graphql.ResolveParams) (interface{}, error) {
+	return func(p graphql.ResolveParams) (any, error) {
 		ctx, span := otel.Tracer("").Start(p.Context, "CreateItem", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
 
@@ -231,7 +231,7 @@ func (r *Service) CreateItem(gvk schema.GroupVersionKind, scope v1.ResourceScope
 
 		log := r.log.With().Str("operation", "create").Str("kind", gvk.Kind).Logger()
 
-		objectInput := p.Args["object"].(map[string]interface{})
+		objectInput := p.Args["object"].(map[string]any)
 
 		obj := &unstructured.Unstructured{
 			Object: objectInput,
@@ -269,7 +269,7 @@ func (r *Service) CreateItem(gvk schema.GroupVersionKind, scope v1.ResourceScope
 }
 
 func (r *Service) UpdateItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
-	return func(p graphql.ResolveParams) (interface{}, error) {
+	return func(p graphql.ResolveParams) (any, error) {
 		ctx, span := otel.Tracer("").Start(p.Context, "UpdateItem", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
 
@@ -282,7 +282,7 @@ func (r *Service) UpdateItem(gvk schema.GroupVersionKind, scope v1.ResourceScope
 			return nil, err
 		}
 
-		objectInput := p.Args["object"].(map[string]interface{})
+		objectInput := p.Args["object"].(map[string]any)
 		// Marshal the input object to JSON to create the patch data
 		patchData, err := json.Marshal(objectInput)
 		if err != nil {
@@ -331,7 +331,7 @@ func (r *Service) UpdateItem(gvk schema.GroupVersionKind, scope v1.ResourceScope
 
 // DeleteItem returns a CommonResolver function for deleting a resource.
 func (r *Service) DeleteItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
-	return func(p graphql.ResolveParams) (interface{}, error) {
+	return func(p graphql.ResolveParams) (any, error) {
 		ctx, span := otel.Tracer("").Start(p.Context, "DeleteItem", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
 
@@ -375,7 +375,7 @@ func (r *Service) DeleteItem(gvk schema.GroupVersionKind, scope v1.ResourceScope
 }
 
 func (r *Service) CommonResolver() graphql.FieldResolveFn {
-	return func(p graphql.ResolveParams) (interface{}, error) {
+	return func(p graphql.ResolveParams) (any, error) {
 		return p.Source, nil
 	}
 }
