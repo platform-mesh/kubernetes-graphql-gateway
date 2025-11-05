@@ -83,6 +83,11 @@ type ClusterAccessStatus struct {
 	// Conditions represent the latest available observations of the cluster access state
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
+
+	// ObservedPath stores the actual path currently used to store the schema for this resource
+	// This is maintained by the controller and used for cleanup when .spec.path changes
+	// +optional
+	ObservedPath string `json:"observedPath,omitempty"`
 }
 
 type ServiceAccountRef struct {
