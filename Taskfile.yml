@@ -63,7 +63,7 @@ tasks:
     cmds:
       - go test ./... {{.ADDITIONAL_COMMAND_ARGS}}
   test:
-    deps: [setup:envtest, update:crd]
+    deps: [setup:envtest]
     cmds:
       - task: envtest
         vars:
