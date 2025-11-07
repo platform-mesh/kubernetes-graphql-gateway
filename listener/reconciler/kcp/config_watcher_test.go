@@ -1,4 +1,4 @@
-package kcp_test
+package kcp
 
 import (
 	"context"
@@ -7,12 +7,21 @@ import (
 
 	"github.com/platform-mesh/golang-commons/logger/testlogger"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/common"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler/kcp"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler/kcp/mocks"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
+
+// MockVirtualWorkspaceConfigManager for testing
+type MockVirtualWorkspaceConfigManager struct {
+	LoadConfigFunc func(configPath string) (*VirtualWorkspacesConfig, error)
+}
+
+func (m *MockVirtualWorkspaceConfigManager) LoadConfig(configPath string) (*VirtualWorkspacesConfig, error) {
+	if m.LoadConfigFunc != nil {
+		return m.LoadConfigFunc(configPath)
+	}
+	return &VirtualWorkspacesConfig{}, nil
+}
 
 func TestNewConfigWatcher(t *testing.T) {
 	tests := []struct {
@@ -27,10 +36,9 @@ func TestNewConfigWatcher(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			virtualWSManager := mocks.NewMockVirtualWorkspaceConfigManager(t)
-			reconciler := mocks.NewMockVirtualWorkspaceConfigReconciler(t)
+			virtualWSManager := &MockVirtualWorkspaceConfigManager{}
 
-			watcher, err := kcp.NewConfigWatcher(virtualWSManager, reconciler, testlogger.New().Logger)
+			watcher, err := NewConfigWatcher(virtualWSManager, testlogger.New().Logger)
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -38,6 +46,9 @@ func TestNewConfigWatcher(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				assert.NotNil(t, watcher)
+				assert.Equal(t, virtualWSManager, watcher.virtualWSManager)
+				assert.Equal(t, testlogger.New().Logger, watcher.log)
+				assert.NotNil(t, watcher.fileWatcher)
 			}
 		})
 	}
@@ -45,68 +56,183 @@ func TestNewConfigWatcher(t *testing.T) {
 
 func TestConfigWatcher_OnFileChanged(t *testing.T) {
 	tests := []struct {
-		name       string
-		filepath   string
-		setupMocks func(*mocks.MockVirtualWorkspaceConfigManager, *mocks.MockVirtualWorkspaceConfigReconciler)
+		name              string
+		filepath          string
+		loadConfigFunc    func(configPath string) (*VirtualWorkspacesConfig, error)
+		expectHandlerCall bool
 	}{
 		{
 			name:     "successful_file_change",
 			filepath: "/test/config.yaml",
-			setupMocks: func(manager *mocks.MockVirtualWorkspaceConfigManager, reconciler *mocks.MockVirtualWorkspaceConfigReconciler) {
-				config := &kcp.VirtualWorkspacesConfig{
-					VirtualWorkspaces: []kcp.VirtualWorkspace{
+			loadConfigFunc: func(configPath string) (*VirtualWorkspacesConfig, error) {
+				return &VirtualWorkspacesConfig{
+					VirtualWorkspaces: []VirtualWorkspace{
 						{Name: "test-ws", URL: "https://example.com"},
 					},
-				}
-				manager.EXPECT().LoadConfig("/test/config.yaml").Return(config, nil)
-				reconciler.EXPECT().ReconcileConfig(mock.Anything, config).Return(nil)
+				}, nil
 			},
+			expectHandlerCall: true,
 		},
 		{
 			name:     "failed_config_load",
 			filepath: "/test/config.yaml",
-			setupMocks: func(manager *mocks.MockVirtualWorkspaceConfigManager, reconciler *mocks.MockVirtualWorkspaceConfigReconciler) {
-				manager.EXPECT().LoadConfig("/test/config.yaml").Return((*kcp.VirtualWorkspacesConfig)(nil), errors.New("failed to load config"))
+			loadConfigFunc: func(configPath string) (*VirtualWorkspacesConfig, error) {
+				return nil, errors.New("failed to load config")
 			},
+			expectHandlerCall: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			virtualWSManager := mocks.NewMockVirtualWorkspaceConfigManager(t)
-			reconciler := mocks.NewMockVirtualWorkspaceConfigReconciler(t)
+			virtualWSManager := &MockVirtualWorkspaceConfigManager{
+				LoadConfigFunc: tt.loadConfigFunc,
+			}
 
-			tt.setupMocks(virtualWSManager, reconciler)
-
-			watcher, err := kcp.NewConfigWatcher(virtualWSManager, reconciler, testlogger.New().Logger)
+			watcher, err := NewConfigWatcher(virtualWSManager, testlogger.New().Logger)
 			require.NoError(t, err)
 
+			// Track change handler calls
+			var handlerCalled bool
+			var receivedConfig *VirtualWorkspacesConfig
+			changeHandler := func(config *VirtualWorkspacesConfig) error {
+				handlerCalled = true
+				receivedConfig = config
+				return nil
+			}
+			watcher.changeHandler = changeHandler
+
 			watcher.OnFileChanged(tt.filepath)
+
+			if tt.expectHandlerCall {
+				assert.True(t, handlerCalled)
+				assert.NotNil(t, receivedConfig)
+				assert.Equal(t, 1, len(receivedConfig.VirtualWorkspaces))
+				assert.Equal(t, "test-ws", receivedConfig.VirtualWorkspaces[0].Name)
+			} else {
+				assert.False(t, handlerCalled)
+			}
 		})
 	}
 }
 
 func TestConfigWatcher_OnFileDeleted(t *testing.T) {
-	virtualWSManager := mocks.NewMockVirtualWorkspaceConfigManager(t)
-	reconciler := mocks.NewMockVirtualWorkspaceConfigReconciler(t)
+	virtualWSManager := &MockVirtualWorkspaceConfigManager{}
 
-	watcher, err := kcp.NewConfigWatcher(virtualWSManager, reconciler, testlogger.New().Logger)
+	watcher, err := NewConfigWatcher(virtualWSManager, testlogger.New().Logger)
 	require.NoError(t, err)
 
+	// Should not panic or error
 	watcher.OnFileDeleted("/test/config.yaml")
 }
 
-func TestConfigWatcher_Watch_EmptyPath(t *testing.T) {
-	virtualWSManager := mocks.NewMockVirtualWorkspaceConfigManager(t)
-	reconciler := mocks.NewMockVirtualWorkspaceConfigReconciler(t)
+func TestConfigWatcher_LoadAndNotify(t *testing.T) {
+	tests := []struct {
+		name           string
+		configPath     string
+		loadConfigFunc func(configPath string) (*VirtualWorkspacesConfig, error)
+		expectError    bool
+		expectCall     bool
+	}{
+		{
+			name:       "successful_load_and_notify",
+			configPath: "/test/config.yaml",
+			loadConfigFunc: func(configPath string) (*VirtualWorkspacesConfig, error) {
+				return &VirtualWorkspacesConfig{
+					VirtualWorkspaces: []VirtualWorkspace{
+						{Name: "ws1", URL: "https://example.com"},
+						{Name: "ws2", URL: "https://example.org"},
+					},
+				}, nil
+			},
+			expectError: false,
+			expectCall:  true,
+		},
+		{
+			name:       "failed_config_load",
+			configPath: "/test/config.yaml",
+			loadConfigFunc: func(configPath string) (*VirtualWorkspacesConfig, error) {
+				return nil, errors.New("config load error")
+			},
+			expectError: true,
+			expectCall:  false,
+		},
+		{
+			name:       "no_change_handler",
+			configPath: "/test/config.yaml",
+			loadConfigFunc: func(configPath string) (*VirtualWorkspacesConfig, error) {
+				return &VirtualWorkspacesConfig{}, nil
+			},
+			expectError: false,
+			expectCall:  false,
+		},
+	}
 
-	watcher, err := kcp.NewConfigWatcher(virtualWSManager, reconciler, testlogger.New().Logger)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			virtualWSManager := &MockVirtualWorkspaceConfigManager{
+				LoadConfigFunc: tt.loadConfigFunc,
+			}
+
+			watcher, err := NewConfigWatcher(virtualWSManager, testlogger.New().Logger)
+			require.NoError(t, err)
+
+			// Track change handler calls
+			var handlerCalled bool
+			var receivedConfig *VirtualWorkspacesConfig
+			if tt.name != "no_change_handler" {
+				changeHandler := func(config *VirtualWorkspacesConfig) error {
+					handlerCalled = true
+					receivedConfig = config
+					return nil
+				}
+				watcher.changeHandler = changeHandler
+			}
+
+			err = watcher.loadAndNotify(tt.configPath)
+
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+
+			if tt.expectCall {
+				assert.True(t, handlerCalled)
+				assert.NotNil(t, receivedConfig)
+				if tt.name == "successful_load_and_notify" {
+					assert.Equal(t, 2, len(receivedConfig.VirtualWorkspaces))
+				}
+			} else {
+				assert.False(t, handlerCalled)
+			}
+		})
+	}
+}
+
+func TestConfigWatcher_Watch_EmptyPath(t *testing.T) {
+	virtualWSManager := &MockVirtualWorkspaceConfigManager{
+		LoadConfigFunc: func(configPath string) (*VirtualWorkspacesConfig, error) {
+			return &VirtualWorkspacesConfig{}, nil
+		},
+	}
+
+	watcher, err := NewConfigWatcher(virtualWSManager, testlogger.New().Logger)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithTimeout(t.Context(), common.ShortTimeout)
 	defer cancel()
 
-	err = watcher.Watch(ctx, "")
+	var handlerCalled bool
+	changeHandler := func(config *VirtualWorkspacesConfig) error {
+		handlerCalled = true
+		return nil
+	}
 
+	// Test with empty config path - should not try to load initial config
+	err = watcher.Watch(ctx, "", changeHandler)
+
+	// Should complete gracefully without error since graceful termination is not an error
 	assert.NoError(t, err)
+	assert.False(t, handlerCalled) // Should not call handler for empty path initial load
 }
