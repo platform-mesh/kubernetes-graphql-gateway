@@ -1,7 +1,6 @@
 # Custom Queries
 
 This page contains custom queries that **differ** from standard `kubectl` commands.  
-For instructions on how to execute them, please refer to our [Quick Start Guide](./quickstart.md).
 
 ## typeByCategory
 

@@ -5,15 +5,17 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"time"
 
 	gatewayv1alpha1 "github.com/platform-mesh/kubernetes-graphql-gateway/common/apis/v1alpha1"
 
 	authv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -252,36 +254,28 @@ func ConfigureAuthentication(ctx context.Context, config *rest.Config, auth *gat
 	}
 
 	if auth.ServiceAccount != nil {
-		var expirationSeconds int64
+		expiration := 1 * time.Hour
 		if auth.ServiceAccount.TokenExpiration != nil {
-			// If TokenExpiration is provided, use its value
-			expirationSeconds = int64(auth.ServiceAccount.TokenExpiration.Seconds())
-		} else {
-			// If TokenExpiration is nil, use the desired default (3600 seconds = 1 hour)
-			expirationSeconds = 3600
-			fmt.Println("Warning: auth.ServiceAccount.TokenExpiration is nil, defaulting to 3600 seconds.")
+			expiration = auth.ServiceAccount.TokenExpiration.Duration
 		}
 
 		// Build the TokenRequest object
 		tokenRequest := &authv1.TokenRequest{
 			Spec: authv1.TokenRequestSpec{
-				Audiences: auth.ServiceAccount.Audience,
-				// Optionally set ExpirationSeconds, BoundObjectRef, etc.
-				ExpirationSeconds: &expirationSeconds,
+				Audiences:         auth.ServiceAccount.Audience,
+				ExpirationSeconds: ptr.To(int64(expiration.Seconds())),
 			},
 		}
 
 		// Get the service account token using the Kubernetes API
-		sa := &corev1.ServiceAccount{}
-		err := k8sClient.Get(ctx, types.NamespacedName{
-			Name:      auth.ServiceAccount.Name,
-			Namespace: auth.ServiceAccount.Namespace,
-		}, sa)
-		if err != nil {
-			return errors.Join(errors.New("failed to get service account"), err)
+		sa := &corev1.ServiceAccount{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      auth.ServiceAccount.Name,
+				Namespace: auth.ServiceAccount.Namespace,
+			},
 		}
 
-		err = k8sClient.SubResource("token").Create(ctx, sa, tokenRequest)
+		err := k8sClient.SubResource("token").Create(ctx, sa, tokenRequest)
 		if err != nil {
 			return errors.Join(errors.New("failed to create token request for service account"), err)
 		}
@@ -306,62 +300,12 @@ func ConfigureFromKubeconfig(config *rest.Config, kubeconfigData []byte) error {
 		return errors.Join(errors.New("failed to parse kubeconfig"), err)
 	}
 
-	rawConfig, err := clientConfig.RawConfig()
+	extracted, err := clientConfig.ClientConfig()
 	if err != nil {
 		return errors.Join(errors.New("failed to get raw kubeconfig"), err)
 	}
 
-	// Get the current context
-	currentContext := rawConfig.CurrentContext
-	if currentContext == "" {
-		return errors.New("no current context in kubeconfig")
-	}
+	*config = *extracted
 
-	context, exists := rawConfig.Contexts[currentContext]
-	if !exists {
-		return errors.New("current context not found in kubeconfig")
-	}
-
-	// Get auth info for current context
-	authInfo, exists := rawConfig.AuthInfos[context.AuthInfo]
-	if !exists {
-		return errors.New("auth info not found in kubeconfig")
-	}
-
-	// Extract authentication information
-	return ExtractAuthFromKubeconfig(config, authInfo)
-}
-
-// ExtractAuthFromKubeconfig extracts authentication info from kubeconfig AuthInfo
-func ExtractAuthFromKubeconfig(config *rest.Config, authInfo *api.AuthInfo) error {
-	if authInfo.Token != "" {
-		config.BearerToken = authInfo.Token
-		return nil
-	}
-
-	if authInfo.TokenFile != "" {
-		// TODO: Read token from file if needed
-		return errors.New("token file authentication not yet implemented")
-	}
-
-	if len(authInfo.ClientCertificateData) > 0 && len(authInfo.ClientKeyData) > 0 {
-		config.CertData = authInfo.ClientCertificateData
-		config.KeyData = authInfo.ClientKeyData
-		return nil
-	}
-
-	if authInfo.ClientCertificate != "" && authInfo.ClientKey != "" {
-		config.CertFile = authInfo.ClientCertificate
-		config.KeyFile = authInfo.ClientKey
-		return nil
-	}
-
-	if authInfo.Username != "" && authInfo.Password != "" {
-		config.Username = authInfo.Username
-		config.Password = authInfo.Password
-		return nil
-	}
-
-	// No recognizable authentication found
-	return errors.New("no valid authentication method found in kubeconfig")
+	return nil
 }

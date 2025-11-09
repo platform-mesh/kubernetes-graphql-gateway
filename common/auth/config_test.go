@@ -13,7 +13,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd/api"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -257,115 +256,6 @@ clusters:
 			}
 
 			err := ConfigureAuthentication(t.Context(), config, tt.auth, mockClient)
-
-			if tt.wantErr {
-				assert.Error(t, err)
-				if tt.errContains != "" {
-					assert.Contains(t, err.Error(), tt.errContains)
-				}
-			} else {
-				assert.NoError(t, err)
-				expected := tt.wantConfig(config)
-				assert.Equal(t, expected, config)
-			}
-		})
-	}
-}
-
-func TestExtractAuthFromKubeconfig(t *testing.T) {
-	tests := []struct {
-		name        string
-		authInfo    *api.AuthInfo
-		wantConfig  func(*rest.Config) *rest.Config
-		wantErr     bool
-		errContains string
-	}{
-		{
-			name: "token_auth",
-			authInfo: &api.AuthInfo{
-				Token: "test-token",
-			},
-			wantConfig: func(config *rest.Config) *rest.Config {
-				expected := *config
-				expected.BearerToken = "test-token"
-				return &expected
-			},
-			wantErr: false,
-		},
-		{
-			name: "client_certificate_data",
-			authInfo: &api.AuthInfo{
-				ClientCertificateData: []byte("cert-data"),
-				ClientKeyData:         []byte("key-data"),
-			},
-			wantConfig: func(config *rest.Config) *rest.Config {
-				expected := *config
-				expected.CertData = []byte("cert-data")
-				expected.KeyData = []byte("key-data")
-				return &expected
-			},
-			wantErr: false,
-		},
-		{
-			name: "client_certificate_files",
-			authInfo: &api.AuthInfo{
-				ClientCertificate: "/path/to/cert.pem",
-				ClientKey:         "/path/to/key.pem",
-			},
-			wantConfig: func(config *rest.Config) *rest.Config {
-				expected := *config
-				expected.CertFile = "/path/to/cert.pem"
-				expected.KeyFile = "/path/to/key.pem"
-				return &expected
-			},
-			wantErr: false,
-		},
-		{
-			name: "basic_auth",
-			authInfo: &api.AuthInfo{
-				Username: "test-user",
-				Password: "test-password",
-			},
-			wantConfig: func(config *rest.Config) *rest.Config {
-				expected := *config
-				expected.Username = "test-user"
-				expected.Password = "test-password"
-				return &expected
-			},
-			wantErr: false,
-		},
-		{
-			name: "token_file_not_implemented",
-			authInfo: &api.AuthInfo{
-				TokenFile: "/path/to/token",
-			},
-			wantConfig: func(config *rest.Config) *rest.Config {
-				return config
-			},
-			wantErr:     true,
-			errContains: "token file authentication not yet implemented",
-		},
-		{
-			name:     "no_auth_info",
-			authInfo: &api.AuthInfo{},
-			wantConfig: func(config *rest.Config) *rest.Config {
-				return config
-			},
-			wantErr:     true,
-			errContains: "no valid authentication method found in kubeconfig",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			config := &rest.Config{
-				Host: "https://test.example.com",
-				TLSClientConfig: rest.TLSClientConfig{
-					Insecure: true,
-				},
-			}
-
-			err := ExtractAuthFromKubeconfig(config, tt.authInfo)
 
 			if tt.wantErr {
 				assert.Error(t, err)

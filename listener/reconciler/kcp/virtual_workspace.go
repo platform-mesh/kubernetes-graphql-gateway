@@ -67,18 +67,13 @@ func createVirtualConfig(workspace VirtualWorkspace) (*rest.Config, error) {
 	var virtualConfig *rest.Config
 
 	if workspace.Kubeconfig != "" {
-		// Load authentication from the specified kubeconfig
-		cfg, err := clientcmd.LoadFromFile(workspace.Kubeconfig)
+		restConfig, err := clientcmd.BuildConfigFromFlags("", workspace.Kubeconfig)
 		if err != nil {
-			return nil, fmt.Errorf("failed to load kubeconfig %s: %w", workspace.Kubeconfig, err)
+			return nil, fmt.Errorf("failed to build rest config from kubeconfig %s: %w", workspace.Kubeconfig, err)
 		}
 
-		restConfig, err := clientcmd.NewDefaultClientConfig(*cfg, &clientcmd.ConfigOverrides{}).ClientConfig()
-		if err != nil {
-			return nil, fmt.Errorf("failed to create client config from kubeconfig %s: %w", workspace.Kubeconfig, err)
-		}
+		virtualConfig = rest.CopyConfig(restConfig)
 
-		virtualConfig = restConfig
 		virtualConfig.Host = workspace.URL + "/clusters/root"
 	} else {
 		// Use minimal configuration for virtual workspaces without authentication
