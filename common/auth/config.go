@@ -58,7 +58,6 @@ func BuildConfigFromMetadata(host string, authType, token, kubeconfig, certData,
 	}
 
 	config := &rest.Config{
-		Host: host,
 		TLSClientConfig: rest.TLSClientConfig{
 			Insecure: true, // Start with insecure, will be overridden if CA is provided
 		},
@@ -109,6 +108,8 @@ func BuildConfigFromMetadata(host string, authType, token, kubeconfig, certData,
 			config.KeyData = decodedKey
 		}
 	}
+
+	config.Host = host
 
 	return config, nil
 }
