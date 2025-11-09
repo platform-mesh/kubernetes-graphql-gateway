@@ -21,13 +21,8 @@ import (
 
 // BuildConfig creates a rest.Config from cluster connection parameters
 // This function unifies the authentication logic used by both listener and gateway
-func BuildConfig(ctx context.Context, host string, auth *gatewayv1alpha1.AuthConfig, ca *gatewayv1alpha1.CAConfig, k8sClient client.Client) (*rest.Config, error) {
-	if host == "" {
-		return nil, errors.New("host is required")
-	}
-
+func BuildConfig(ctx context.Context, auth *gatewayv1alpha1.AuthConfig, ca *gatewayv1alpha1.CAConfig, k8sClient client.Client) (*rest.Config, error) {
 	config := &rest.Config{
-		Host: host,
 		TLSClientConfig: rest.TLSClientConfig{
 			Insecure: true, // Start with insecure, will be overridden if CA is provided
 		},
