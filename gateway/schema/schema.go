@@ -9,11 +9,13 @@ import (
 	"github.com/gobuffalo/flect"
 	"github.com/graphql-go/graphql"
 	"github.com/platform-mesh/golang-commons/logger"
+
 	"github.com/platform-mesh/kubernetes-graphql-gateway/common"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/resolver"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
@@ -63,9 +65,10 @@ func (g *Gateway) generateGraphqlSchema() error {
 	rootSubscriptionFields := graphql.Fields{}
 
 	for group, groupedResources := range g.getDefinitionsByGroup(g.definitions) {
+		filteredResources := g.filterOutNotActiveVersions(groupedResources)
 		g.processGroupedResources(
 			group,
-			groupedResources,
+			filteredResources,
 			rootQueryFields,
 			rootMutationFields,
 			rootSubscriptionFields,
@@ -97,6 +100,120 @@ func (g *Gateway) generateGraphqlSchema() error {
 	g.graphqlSchema = newSchema
 
 	return nil
+}
+
+func (g *Gateway) filterOutNotActiveVersions(allKinds map[string]*spec.Schema) map[string]*spec.Schema {
+	filteredSchema := map[string]*spec.Schema{}
+	processedResources := make(map[string]bool)
+
+	for resourceKey, resourceScheme := range allKinds {
+		// Skip if we've already processed this resource as part of another version group
+		if processedResources[resourceKey] {
+			continue
+		}
+
+		hasOtherVersions, otherVersions := hasAnotherVersion(resourceKey, allKinds, g.definitions)
+		if hasOtherVersions {
+			// Filter out non-active versions
+			highestSemver := highestSemverVersion(resourceKey, otherVersions, g.definitions)
+			filteredSchema[highestSemver] = allKinds[highestSemver]
+
+			if resourceKey != highestSemver {
+				g.log.Debug().
+					Str("filtered", resourceKey).
+					Str("kept", highestSemver).
+					Msg("Filtered out non-active version")
+			}
+			for otherVersion := range otherVersions {
+				if otherVersion != highestSemver {
+					g.log.Debug().
+						Str("filtered", otherVersion).
+						Str("kept", highestSemver).
+						Msg("Filtered out non-active version")
+				}
+			}
+
+			// Mark the current resource and all other versions as processed
+			processedResources[resourceKey] = true
+			for otherVersion := range otherVersions {
+				processedResources[otherVersion] = true
+			}
+		} else {
+			// No other versions, keep this resource
+			filteredSchema[resourceKey] = resourceScheme
+			processedResources[resourceKey] = true
+		}
+	}
+	return filteredSchema
+}
+
+// highestSemverVersion finds the highest semantic version among a group of resources with the same Kind.
+// It extracts the version from each GroupVersionKind string and compares them using Kubernetes version priority.
+// Returns the full GroupVersionKind string of the resource with the highest version.
+func highestSemverVersion(currentKind string, otherVersions map[string]*spec.Schema, definitions map[string]*spec.Schema) string {
+	highestKey := currentKind
+	highestVersion := ""
+
+	// Extract version from current kind
+	if gvk, err := getGroupVersionKindFromDefinitions(currentKind, definitions); err == nil {
+		highestVersion = gvk.Version
+	}
+
+	// Compare with other versions
+	for versionKey := range otherVersions {
+		gvk, err := getGroupVersionKindFromDefinitions(versionKey, definitions)
+		if err != nil {
+			continue
+		}
+
+		// Compare versions using Kubernetes version comparison
+		// CompareKubeAwareVersionStrings returns positive if v1 > v2, 0 if equal, negative if v1 < v2
+		if version.CompareKubeAwareVersionStrings(gvk.Version, highestVersion) > 0 {
+			highestVersion = gvk.Version
+			highestKey = versionKey
+		}
+	}
+
+	return highestKey
+}
+
+// hasAnotherVersion checks if there are other versions of the same resource (same Group and Kind, different Version).
+// It returns true if other versions exist, and a map of all other versions found.
+func hasAnotherVersion(groupVersionKind string, allKinds map[string]*spec.Schema, definitions map[string]*spec.Schema) (bool, map[string]*spec.Schema) {
+	// Get the GVK for the current resource
+	currentGVK, err := getGroupVersionKindFromDefinitions(groupVersionKind, definitions)
+	if err != nil {
+		// If we can't parse the current GVK, we can't determine if there are other versions
+		return false, nil
+	}
+
+	otherVersions := map[string]*spec.Schema{}
+	hasOtherVersion := false
+
+	// Check all other resources to find ones with the same Group and Kind but different Version
+	for otherResourceKey, otherSchema := range allKinds {
+		// Skip the current resource
+		if otherResourceKey == groupVersionKind {
+			continue
+		}
+
+		// Get the GVK for the other resource
+		otherGVK, err := getGroupVersionKindFromDefinitions(otherResourceKey, definitions)
+		if err != nil {
+			// Skip resources we can't parse
+			continue
+		}
+
+		// Check if it's the same Group and Kind but different Version
+		if otherGVK.Group == currentGVK.Group &&
+			otherGVK.Kind == currentGVK.Kind &&
+			otherGVK.Version != currentGVK.Version {
+			hasOtherVersion = true
+			otherVersions[otherResourceKey] = otherSchema
+		}
+	}
+
+	return hasOtherVersion, otherVersions
 }
 
 func (g *Gateway) processGroupedResources(
@@ -468,44 +585,60 @@ func (g *Gateway) generateTypeName(typePrefix string, fieldPath []string) string
 	return name
 }
 
-// io.openmfp.core.v1alpha1.Account
-
-// getGroupVersionKind retrieves the GroupVersionKind for a given resourceKey and its OpenAPI schema.
-// It first checks for the 'x-kubernetes-group-version-kind' extension and uses it if available.
-// If not, it falls back to parsing the resourceKey.
-func (g *Gateway) getGroupVersionKind(resourceKey string) (*schema.GroupVersionKind, error) {
-	// First, check if 'x-kubernetes-group-version-kind' extension is present
-	resourceSpec, ok := g.definitions[resourceKey]
-	if !ok || resourceSpec.Extensions == nil {
-		return nil, errors.New("no resource extensions")
-	}
-	xkGvk, ok := resourceSpec.Extensions[common.GVKExtensionKey]
+// parseGVKExtension parses the x-kubernetes-group-version-kind extension from a resource schema.
+func parseGVKExtension(extensions map[string]any, resourceKey string) (*schema.GroupVersionKind, error) {
+	xkGvk, ok := extensions[common.GVKExtensionKey]
 	if !ok {
 		return nil, errors.New("x-kubernetes-group-version-kind extension not found")
 	}
-	// xkGvk should be an array of maps
-	if gvkList, ok := xkGvk.([]any); ok && len(gvkList) > 0 {
-		// Use the first item in the list
-		if gvkMap, ok := gvkList[0].(map[string]any); ok {
-			group, _ := gvkMap["group"].(string)
-			version, _ := gvkMap["version"].(string)
-			kind, _ := gvkMap["kind"].(string)
 
-			// Validate that kind is not empty - empty kinds cannot be used for GraphQL type names
-			if kind == "" {
-				return nil, fmt.Errorf("kind cannot be empty for resource %s", resourceKey)
-			}
-
-			// Sanitize the group and kind names
-			return &schema.GroupVersionKind{
-				Group:   g.resolver.SanitizeGroupName(group),
-				Version: version,
-				Kind:    kind,
-			}, nil
-		}
+	gvkList, ok := xkGvk.([]any)
+	if !ok || len(gvkList) == 0 {
+		return nil, errors.New("invalid GVK extension format")
 	}
 
-	return nil, errors.New("failed to parse x-kubernetes-group-version-kind extension")
+	gvkMap, ok := gvkList[0].(map[string]any)
+	if !ok {
+		return nil, errors.New("invalid GVK map format")
+	}
+
+	group, _ := gvkMap["group"].(string)
+	versionStr, _ := gvkMap["version"].(string)
+	kind, _ := gvkMap["kind"].(string)
+
+	if kind == "" {
+		return nil, fmt.Errorf("kind cannot be empty for resource %s", resourceKey)
+	}
+
+	return &schema.GroupVersionKind{
+		Group:   group,
+		Version: versionStr,
+		Kind:    kind,
+	}, nil
+}
+
+// getGroupVersionKindFromDefinitions retrieves the GroupVersionKind for a given resourceKey from a definitions map.
+// This is a standalone function that doesn't require a Gateway receiver.
+func getGroupVersionKindFromDefinitions(resourceKey string, definitions map[string]*spec.Schema) (*schema.GroupVersionKind, error) {
+	resourceSpec, ok := definitions[resourceKey]
+	if !ok || resourceSpec.Extensions == nil {
+		return nil, errors.New("no resource extensions")
+	}
+
+	return parseGVKExtension(resourceSpec.Extensions, resourceKey)
+}
+
+// getGroupVersionKind retrieves the GroupVersionKind for a given resourceKey and its OpenAPI schema.
+// It uses the standalone helper but applies group name sanitization for GraphQL compatibility.
+func (g *Gateway) getGroupVersionKind(resourceKey string) (*schema.GroupVersionKind, error) {
+	gvk, err := getGroupVersionKindFromDefinitions(resourceKey, g.definitions)
+	if err != nil {
+		return nil, err
+	}
+
+	// Sanitize the group name for GraphQL compatibility
+	gvk.Group = g.resolver.SanitizeGroupName(gvk.Group)
+	return gvk, nil
 }
 
 func (g *Gateway) storeCategory(
