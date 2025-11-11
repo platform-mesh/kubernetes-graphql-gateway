@@ -4,18 +4,18 @@ import (
 	"context"
 	"testing"
 
+	"github.com/platform-mesh/golang-commons/logger"
+	gatewayv1alpha1 "github.com/platform-mesh/kubernetes-graphql-gateway/common/apis/v1alpha1"
+	workspacefile_mocks "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/workspacefile/mocks"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-
-	"github.com/platform-mesh/golang-commons/logger"
-	gatewayv1alpha1 "github.com/platform-mesh/kubernetes-graphql-gateway/common/apis/v1alpha1"
-	workspacefile_mocks "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/workspacefile/mocks"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler"
 )
 
 func TestGenerateSchemaSubroutine_Process_InvalidResourceType(t *testing.T) {

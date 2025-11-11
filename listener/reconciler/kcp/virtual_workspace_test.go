@@ -587,7 +587,8 @@ func TestVirtualWorkspaceReconciler_ReconcileConfig_Simple(t *testing.T) {
 					{Name: "new-ws", URL: "https://example.com"},
 				},
 			},
-			expectCurrentCount: 1,
+			// With updated behavior, failed processing does not update current workspaces
+			expectCurrentCount: 0,
 		},
 		{
 			name: "keep_unchanged_workspace",

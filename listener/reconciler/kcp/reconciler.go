@@ -139,10 +139,12 @@ func (r *KCPReconciler) StartVirtualWorkspaceWatching(ctx context.Context, confi
 	r.log.Info().Str("configPath", configPath).Msg("starting virtual workspace configuration watching")
 
 	// Start config watcher with a wrapper function
-	changeHandler := func(config *VirtualWorkspacesConfig) {
+	changeHandler := func(config *VirtualWorkspacesConfig) error {
 		if err := r.virtualWorkspaceReconciler.ReconcileConfig(ctx, config); err != nil {
 			r.log.Error().Err(err).Msg("failed to reconcile virtual workspaces config")
+			return err
 		}
+		return nil
 	}
 	return r.configWatcher.Watch(ctx, configPath, changeHandler)
 }
