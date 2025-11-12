@@ -28,8 +28,7 @@ import (
 )
 
 var listenCmd = &cobra.Command{
-	Use:     "listener",
-	Example: "KUBECONFIG=<path to kubeconfig file> go run . listener",
+	Use: "listener",
 	Run: func(cmd *cobra.Command, args []string) {
 		log.Info().Str("LogLevel", log.GetLevel().String()).Msg("Starting the Listener...")
 

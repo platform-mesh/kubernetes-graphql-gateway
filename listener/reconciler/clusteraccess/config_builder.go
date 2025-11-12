@@ -28,10 +28,13 @@ func BuildTargetClusterConfigFromTyped(ctx context.Context, clusterAccess v1alph
 	}
 
 	// Use common auth package to build config
-	config, err := auth.BuildConfig(ctx, host, spec.Auth, spec.CA, k8sClient)
+	config, err := auth.BuildConfig(ctx, spec.Auth, spec.CA, k8sClient)
 	if err != nil {
 		return nil, "", err
 	}
+
+	// Set host
+	config.Host = host
 
 	return config, clusterName, nil
 }

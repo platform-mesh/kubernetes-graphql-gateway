@@ -49,6 +49,7 @@ tasks:
   ## Testing
   fmt:
     cmds:
+      - go fmt ./...
       - "{{.LOCAL_BIN}}/golangci-lint fmt ./..."
   lint:
     deps: [setup:golangci-lint]
