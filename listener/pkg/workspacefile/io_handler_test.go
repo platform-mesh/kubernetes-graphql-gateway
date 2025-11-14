@@ -45,9 +45,8 @@ func TestRead(t *testing.T) {
 	err := os.WriteFile(validFile, testJSON, 0644)
 	assert.NoError(t, err)
 
-	handler := &IOHandlerProvider{
-		schemasDir: tempDir,
-	}
+	handler, err := NewIOHandler(tempDir)
+	assert.NoError(t, err)
 
 	tests := map[string]struct {
 		clusterName string
@@ -71,9 +70,8 @@ func TestRead(t *testing.T) {
 
 func TestWrite(t *testing.T) {
 	tempDir := t.TempDir()
-	handler := &IOHandlerProvider{
-		schemasDir: tempDir,
-	}
+	handler, err := NewIOHandler(tempDir)
+	assert.NoError(t, err)
 
 	tests := map[string]struct {
 		clusterName string
