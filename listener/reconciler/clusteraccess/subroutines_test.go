@@ -6,6 +6,7 @@ import (
 
 	"github.com/platform-mesh/golang-commons/logger"
 	gatewayv1alpha1 "github.com/platform-mesh/kubernetes-graphql-gateway/common/apis/v1alpha1"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/workspacefile"
 	workspacefile_mocks "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/workspacefile/mocks"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler"
 	"github.com/stretchr/testify/assert"
@@ -23,7 +24,7 @@ func TestGenerateSchemaSubroutine_Process_InvalidResourceType(t *testing.T) {
 	log, _ := logger.New(logger.DefaultConfig())
 
 	r := &ClusterAccessReconciler{
-		ioHandler: mockIO,
+		ioHandler: workspacefile.HandlerFrom(mockIO),
 		log:       log,
 	}
 	s := &generateSchemaSubroutine{reconciler: r}
@@ -56,7 +57,7 @@ func TestGenerateSchemaSubroutine_Process_MissingHostReturnsError(t *testing.T) 
 	log, _ := logger.New(logger.DefaultConfig())
 
 	r := &ClusterAccessReconciler{
-		ioHandler: mockIO,
+		ioHandler: workspacefile.HandlerFrom(mockIO),
 		log:       log,
 		opts: reconciler.ReconcilerOpts{
 			Client:      fakeClient,
@@ -82,7 +83,7 @@ func TestGenerateSchemaSubroutine_Finalize_DeletesCurrentAndPreviousPaths(t *tes
 	mockIO.EXPECT().Delete("previous-path").Return(nil).Once()
 
 	r := &ClusterAccessReconciler{
-		ioHandler: mockIO,
+		ioHandler: workspacefile.HandlerFrom(mockIO),
 		log:       log,
 	}
 	s := &generateSchemaSubroutine{reconciler: r}
@@ -110,7 +111,7 @@ func TestGenerateSchemaSubroutine_restMapperFromConfig_SucceedsWithMinimalConfig
 	log, _ := logger.New(logger.DefaultConfig())
 
 	r := &ClusterAccessReconciler{
-		ioHandler: mockIO,
+		ioHandler: workspacefile.HandlerFrom(mockIO),
 		log:       log,
 	}
 	s := &generateSchemaSubroutine{reconciler: r}

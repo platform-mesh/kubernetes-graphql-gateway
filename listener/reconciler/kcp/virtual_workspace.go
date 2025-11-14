@@ -144,7 +144,7 @@ func (v *VirtualWorkspaceManager) LoadConfig(configPath string) (*VirtualWorkspa
 // VirtualWorkspaceReconciler handles reconciliation of virtual workspaces
 type VirtualWorkspaceReconciler struct {
 	virtualWSManager  *VirtualWorkspaceManager
-	ioHandler         workspacefile.IOHandler
+	ioHandler         *workspacefile.Handler
 	apiSchemaResolver apischema.Resolver
 	log               *logger.Logger
 	mu                sync.RWMutex
@@ -154,7 +154,7 @@ type VirtualWorkspaceReconciler struct {
 // NewVirtualWorkspaceReconciler creates a new virtual workspace reconciler
 func NewVirtualWorkspaceReconciler(
 	virtualWSManager *VirtualWorkspaceManager,
-	ioHandler workspacefile.IOHandler,
+	ioHandler *workspacefile.Handler,
 	apiSchemaResolver apischema.Resolver,
 	log *logger.Logger,
 ) *VirtualWorkspaceReconciler {

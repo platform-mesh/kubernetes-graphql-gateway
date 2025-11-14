@@ -12,6 +12,7 @@ import (
 	"github.com/platform-mesh/golang-commons/logger"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/common/mocks"
 	apschemamocks "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema/mocks"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/workspacefile"
 	workspacefilemocks "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/workspacefile/mocks"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler/kcp"
 	kcpmocks "github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler/kcp/mocks"
@@ -557,7 +558,7 @@ users:
 				Client:              mockClient,
 				Scheme:              runtime.NewScheme(),
 				RestConfig:          &rest.Config{Host: "https://test.example.com"},
-				IOHandler:           mockIOHandler,
+				IOHandler:           workspacefile.HandlerFrom(mockIOHandler),
 				DiscoveryFactory:    mockDiscoveryFactory,
 				APISchemaResolver:   mockAPISchemaResolver,
 				ClusterPathResolver: mockClusterPathResolver,
