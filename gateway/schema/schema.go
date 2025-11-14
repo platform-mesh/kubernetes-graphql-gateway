@@ -9,7 +9,6 @@ import (
 	"github.com/gobuffalo/flect"
 	"github.com/graphql-go/graphql"
 	"github.com/platform-mesh/golang-commons/logger"
-
 	"github.com/platform-mesh/kubernetes-graphql-gateway/common"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/resolver"
 

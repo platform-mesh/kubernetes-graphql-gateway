@@ -10,6 +10,7 @@ import (
 	"github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/common/mocks"
 	apischema_mocks "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema/mocks"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/workspacefile"
 	workspacefile_mocks "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/workspacefile/mocks"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler/clusteraccess"
@@ -152,7 +153,7 @@ func TestNewClusterAccessReconciler(t *testing.T) {
 				ctx,
 				appCfg,
 				opts,
-				mockIOHandler,
+				workspacefile.HandlerFrom(mockIOHandler),
 				mockSchemaResolver,
 				mockLogger,
 			)
@@ -211,7 +212,7 @@ func TestNewClusterAccessReconciler_NilDependencyValidation(t *testing.T) {
 			ctx,
 			appCfg,
 			opts,
-			mockIOHandler,
+			workspacefile.HandlerFrom(mockIOHandler),
 			nil, // nil schemaResolver
 			mockLogger,
 		)

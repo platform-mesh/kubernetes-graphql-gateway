@@ -36,7 +36,7 @@ func NewClusterAccessReconciler(
 	ctx context.Context,
 	appCfg config.Config,
 	opts reconciler.ReconcilerOpts,
-	ioHandler workspacefile.IOHandler,
+	ioHandler *workspacefile.Handler,
 	schemaResolver apischema.Resolver,
 	log *logger.Logger,
 ) (reconciler.CustomReconciler, error) {
@@ -83,7 +83,7 @@ func CheckClusterAccessCRDStatus(ctx context.Context, k8sClient client.Client, l
 // ClusterAccessReconciler handles reconciliation for ClusterAccess resources
 type ClusterAccessReconciler struct {
 	restCfg          *rest.Config
-	ioHandler        workspacefile.IOHandler
+	ioHandler        *workspacefile.Handler
 	schemaResolver   apischema.Resolver
 	log              *logger.Logger
 	mgr              ctrl.Manager
@@ -93,7 +93,7 @@ type ClusterAccessReconciler struct {
 
 func NewReconciler(
 	opts reconciler.ReconcilerOpts,
-	ioHandler workspacefile.IOHandler,
+	ioHandler *workspacefile.Handler,
 	schemaResolver apischema.Resolver,
 	log *logger.Logger,
 ) (reconciler.CustomReconciler, error) {

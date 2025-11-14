@@ -9,6 +9,7 @@ import (
 
 	"github.com/platform-mesh/golang-commons/logger/testlogger"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/workspacefile"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -632,7 +633,7 @@ func TestVirtualWorkspaceReconciler_ReconcileConfig_Simple(t *testing.T) {
 				},
 			}
 
-			reconciler := NewVirtualWorkspaceReconciler(manager, ioHandler, apiResolver, testlogger.New().Logger)
+			reconciler := NewVirtualWorkspaceReconciler(manager, workspacefile.HandlerFrom(ioHandler), apiResolver, testlogger.New().Logger)
 			reconciler.currentWorkspaces = tt.initialWorkspaces
 
 			// For this simplified test, we'll mock the individual methods to avoid network calls
@@ -730,7 +731,7 @@ func TestVirtualWorkspaceReconciler_ProcessVirtualWorkspace(t *testing.T) {
 				},
 			}
 
-			reconciler := NewVirtualWorkspaceReconciler(manager, ioHandler, apiResolver, testlogger.New().Logger)
+			reconciler := NewVirtualWorkspaceReconciler(manager, workspacefile.HandlerFrom(ioHandler), apiResolver, testlogger.New().Logger)
 
 			err := reconciler.processVirtualWorkspace(context.Background(), tt.workspace)
 
@@ -791,7 +792,7 @@ func TestVirtualWorkspaceReconciler_RemoveVirtualWorkspace(t *testing.T) {
 			}
 
 			reconciler := NewVirtualWorkspaceReconciler(manager, nil, nil, testlogger.New().Logger)
-			reconciler.ioHandler = ioHandler
+			reconciler.ioHandler = workspacefile.HandlerFrom(ioHandler)
 
 			err := reconciler.removeVirtualWorkspace(tt.workspaceName)
 
