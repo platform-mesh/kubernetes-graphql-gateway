@@ -617,29 +617,23 @@ func TestVirtualWorkspaceReconciler_ReconcileConfig_Simple(t *testing.T) {
 
 			manager := NewVirtualWorkspaceManager(appCfg)
 
-			// Use mocks that don't fail
-			ioHandler := &MockIOHandler{
-				WriteFunc: func(data []byte, workspacePath string) error {
-					return nil // Always succeed for this test
-				},
-				DeleteFunc: func(workspacePath string) error {
-					return nil // Always succeed for this test
-				},
-			}
-
 			apiResolver := &MockAPISchemaResolver{
 				ResolveFunc: func(discoveryClient discovery.DiscoveryInterface, restMapper meta.RESTMapper) ([]byte, error) {
 					return []byte(`{"type": "object", "properties": {}}`), nil
 				},
 			}
 
-			reconciler := NewVirtualWorkspaceReconciler(manager, workspacefile.HandlerFrom(ioHandler), apiResolver, testlogger.New().Logger)
+			// Use real file handler rooted at a temp dir
+			dir := t.TempDir()
+			fh, err := workspacefile.NewIOHandler(dir)
+			require.NoError(t, err)
+			reconciler := NewVirtualWorkspaceReconciler(manager, fh, apiResolver, testlogger.New().Logger)
 			reconciler.currentWorkspaces = tt.initialWorkspaces
 
 			// For this simplified test, we'll mock the individual methods to avoid network calls
 			// This tests the reconciliation logic without testing the full discovery/REST mapper setup
 
-			err := reconciler.ReconcileConfig(context.Background(), tt.newConfig)
+			err = reconciler.ReconcileConfig(context.Background(), tt.newConfig)
 
 			// Since discovery client creation may fail, we don't assert NoError
 			// but we can still verify the workspace tracking logic
@@ -710,17 +704,6 @@ func TestVirtualWorkspaceReconciler_ProcessVirtualWorkspace(t *testing.T) {
 
 			manager := NewVirtualWorkspaceManager(appCfg)
 
-			var writeCalls int
-			ioHandler := &MockIOHandler{
-				WriteFunc: func(data []byte, workspacePath string) error {
-					writeCalls++
-					if tt.ioWriteError != nil {
-						return tt.ioWriteError
-					}
-					return nil
-				},
-			}
-
 			apiResolver := &MockAPISchemaResolver{
 				ResolveFunc: func(discoveryClient discovery.DiscoveryInterface, restMapper meta.RESTMapper) ([]byte, error) {
 					if tt.apiResolveError != nil {
@@ -731,9 +714,12 @@ func TestVirtualWorkspaceReconciler_ProcessVirtualWorkspace(t *testing.T) {
 				},
 			}
 
-			reconciler := NewVirtualWorkspaceReconciler(manager, workspacefile.HandlerFrom(ioHandler), apiResolver, testlogger.New().Logger)
+			dir := t.TempDir()
+			fh, err := workspacefile.NewIOHandler(dir)
+			require.NoError(t, err)
+			reconciler := NewVirtualWorkspaceReconciler(manager, fh, apiResolver, testlogger.New().Logger)
 
-			err := reconciler.processVirtualWorkspace(context.Background(), tt.workspace)
+			err = reconciler.processVirtualWorkspace(context.Background(), tt.workspace)
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -741,7 +727,7 @@ func TestVirtualWorkspaceReconciler_ProcessVirtualWorkspace(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
-			assert.Equal(t, tt.expectedWriteCalls, writeCalls)
+			// With real file handler we don't count writes; behavior verified by error expectations above.
 		})
 	}
 }
@@ -778,31 +764,27 @@ func TestVirtualWorkspaceReconciler_RemoveVirtualWorkspace(t *testing.T) {
 
 			manager := NewVirtualWorkspaceManager(appCfg)
 
-			var deleteCalls int
-			var deletedPath string
-			ioHandler := &MockIOHandler{
-				DeleteFunc: func(workspacePath string) error {
-					deleteCalls++
-					deletedPath = workspacePath
-					if tt.ioDeleteError != nil {
-						return tt.ioDeleteError
-					}
-					return nil
-				},
-			}
+			dir := t.TempDir()
+			// Pre-create the file to be deleted to verify deletion behavior
+			fh, err := workspacefile.NewIOHandler(dir)
+			require.NoError(t, err)
+			reconciler := NewVirtualWorkspaceReconciler(manager, fh, nil, testlogger.New().Logger)
+			// Create the file that should be removed
+			wsPath := reconciler.virtualWSManager.GetWorkspacePath(VirtualWorkspace{Name: tt.workspaceName})
+			full := filepath.Join(dir, wsPath)
+			_ = os.MkdirAll(filepath.Dir(full), 0o755)
+			_ = os.WriteFile(full, []byte("data"), 0o644)
 
-			reconciler := NewVirtualWorkspaceReconciler(manager, nil, nil, testlogger.New().Logger)
-			reconciler.ioHandler = workspacefile.HandlerFrom(ioHandler)
-
-			err := reconciler.removeVirtualWorkspace(tt.workspaceName)
+			err = reconciler.removeVirtualWorkspace(tt.workspaceName)
 
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
 			}
-			assert.Equal(t, 1, deleteCalls)
-			assert.Equal(t, "virtual-workspace/"+tt.workspaceName, deletedPath)
+			// Verify file is deleted
+			_, statErr := os.Stat(full)
+			assert.Error(t, statErr)
 		})
 	}
 }

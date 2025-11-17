@@ -2,15 +2,15 @@ package clusteraccess
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/platform-mesh/golang-commons/logger"
 	gatewayv1alpha1 "github.com/platform-mesh/kubernetes-graphql-gateway/common/apis/v1alpha1"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/workspacefile"
-	workspacefile_mocks "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/workspacefile/mocks"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -20,11 +20,13 @@ import (
 )
 
 func TestGenerateSchemaSubroutine_Process_InvalidResourceType(t *testing.T) {
-	mockIO := workspacefile_mocks.NewMockIOHandler(t)
+	tmp := t.TempDir()
+	fh, err := workspacefile.NewIOHandler(tmp)
+	assert.NoError(t, err)
 	log, _ := logger.New(logger.DefaultConfig())
 
 	r := &ClusterAccessReconciler{
-		ioHandler: workspacefile.HandlerFrom(mockIO),
+		ioHandler: fh,
 		log:       log,
 	}
 	s := &generateSchemaSubroutine{reconciler: r}
@@ -50,14 +52,14 @@ func TestGenerateSchemaSubroutine_Process_MissingHostReturnsError(t *testing.T) 
 
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(ca).Build()
 
-	mockIO := workspacefile_mocks.NewMockIOHandler(t)
-	mockIO.EXPECT().Write(mock.Anything, mock.Anything).Maybe().Return(nil)
-	mockIO.EXPECT().Delete(mock.Anything).Maybe().Return(nil)
+	tmp := t.TempDir()
+	fh, err := workspacefile.NewIOHandler(tmp)
+	assert.NoError(t, err)
 
 	log, _ := logger.New(logger.DefaultConfig())
 
 	r := &ClusterAccessReconciler{
-		ioHandler: workspacefile.HandlerFrom(mockIO),
+		ioHandler: fh,
 		log:       log,
 		opts: reconciler.ReconcilerOpts{
 			Client:      fakeClient,
@@ -75,15 +77,21 @@ func TestGenerateSchemaSubroutine_Process_MissingHostReturnsError(t *testing.T) 
 }
 
 func TestGenerateSchemaSubroutine_Finalize_DeletesCurrentAndPreviousPaths(t *testing.T) {
-	mockIO := workspacefile_mocks.NewMockIOHandler(t)
+	tmp := t.TempDir()
+	fh, err := workspacefile.NewIOHandler(tmp)
+	assert.NoError(t, err)
 	log, _ := logger.New(logger.DefaultConfig())
 
-	// Expect deletion of both current and previous paths
-	mockIO.EXPECT().Delete("current-path").Return(nil).Once()
-	mockIO.EXPECT().Delete("previous-path").Return(nil).Once()
+	// Create both files that should be deleted
+	err = os.MkdirAll(filepath.Join(tmp, filepath.Dir("current-path")), 0o755)
+	assert.NoError(t, err)
+	err = os.WriteFile(filepath.Join(tmp, "current-path"), []byte("data"), 0o644)
+	assert.NoError(t, err)
+	err = os.WriteFile(filepath.Join(tmp, "previous-path"), []byte("data"), 0o644)
+	assert.NoError(t, err)
 
 	r := &ClusterAccessReconciler{
-		ioHandler: workspacefile.HandlerFrom(mockIO),
+		ioHandler: fh,
 		log:       log,
 	}
 	s := &generateSchemaSubroutine{reconciler: r}
@@ -104,14 +112,21 @@ func TestGenerateSchemaSubroutine_Finalize_DeletesCurrentAndPreviousPaths(t *tes
 
 	assert.Nil(t, opErr)
 	assert.Equal(t, ctrl.Result{}, res)
+	// Verify files are deleted
+	_, err = os.Stat(filepath.Join(tmp, "current-path"))
+	assert.Error(t, err)
+	_, err = os.Stat(filepath.Join(tmp, "previous-path"))
+	assert.Error(t, err)
 }
 
 func TestGenerateSchemaSubroutine_restMapperFromConfig_SucceedsWithMinimalConfig(t *testing.T) {
-	mockIO := workspacefile_mocks.NewMockIOHandler(t)
+	tmp := t.TempDir()
+	fh, err := workspacefile.NewIOHandler(tmp)
+	assert.NoError(t, err)
 	log, _ := logger.New(logger.DefaultConfig())
 
 	r := &ClusterAccessReconciler{
-		ioHandler: workspacefile.HandlerFrom(mockIO),
+		ioHandler: fh,
 		log:       log,
 	}
 	s := &generateSchemaSubroutine{reconciler: r}

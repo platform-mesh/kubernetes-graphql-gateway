@@ -11,7 +11,6 @@ import (
 	"github.com/platform-mesh/kubernetes-graphql-gateway/common/mocks"
 	apischema_mocks "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema/mocks"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/workspacefile"
-	workspacefile_mocks "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/workspacefile/mocks"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler/clusteraccess"
 	"github.com/stretchr/testify/assert"
@@ -145,15 +144,16 @@ func TestNewClusterAccessReconciler(t *testing.T) {
 				OpenAPIDefinitionsPath: "/tmp/test",
 			}
 
-			// Create required dependencies using mocks
-			mockIOHandler := &workspacefile_mocks.MockIOHandler{}
+			// Create required dependencies using real file handler
+			ioHandler, ioErr := workspacefile.NewIOHandler(t.TempDir())
+			assert.NoError(t, ioErr)
 			mockSchemaResolver := &apischema_mocks.MockResolver{}
 
 			reconciler, err := clusteraccess.NewClusterAccessReconciler(
 				ctx,
 				appCfg,
 				opts,
-				workspacefile.HandlerFrom(mockIOHandler),
+				ioHandler,
 				mockSchemaResolver,
 				mockLogger,
 			)
@@ -206,13 +206,14 @@ func TestNewClusterAccessReconciler_NilDependencyValidation(t *testing.T) {
 	})
 
 	t.Run("nil_schemaResolver", func(t *testing.T) {
-		mockIOHandler := &workspacefile_mocks.MockIOHandler{}
+		ioHandler, ioErr := workspacefile.NewIOHandler(t.TempDir())
+		assert.NoError(t, ioErr)
 
 		reconciler, err := clusteraccess.NewClusterAccessReconciler(
 			ctx,
 			appCfg,
 			opts,
-			workspacefile.HandlerFrom(mockIOHandler),
+			ioHandler,
 			nil, // nil schemaResolver
 			mockLogger,
 		)
