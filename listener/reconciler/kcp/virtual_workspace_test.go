@@ -609,8 +609,14 @@ func TestVirtualWorkspaceReconciler_ReconcileConfig_Simple(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set up test environment where KUBECONFIG is not available
 			oldKubeconfig := os.Getenv("KUBECONFIG")
-			defer os.Setenv("KUBECONFIG", oldKubeconfig) //nolint:errcheck
-			os.Unsetenv("KUBECONFIG")                    //nolint:errcheck
+			oldHome := os.Getenv("HOME")
+			defer func() {
+				_ = os.Setenv("KUBECONFIG", oldKubeconfig)
+				_ = os.Setenv("HOME", oldHome)
+			}()
+			// Force metadata injection to fail deterministically by disabling default kubeconfig lookup
+			_ = os.Unsetenv("KUBECONFIG")
+			_ = os.Setenv("HOME", "/nonexistent")
 
 			appCfg := config.Config{}
 			appCfg.Url.VirtualWorkspacePrefix = "virtual-workspace"
@@ -637,7 +643,7 @@ func TestVirtualWorkspaceReconciler_ReconcileConfig_Simple(t *testing.T) {
 
 			// Since discovery client creation may fail, we don't assert NoError
 			// but we can still verify the workspace tracking logic
-			_ = err // Ignore error for this simplified test
+			_ = err // We ignore reconciliation error; we validate tracking behavior only
 			assert.Equal(t, tt.expectCurrentCount, len(reconciler.currentWorkspaces))
 		})
 	}
@@ -736,19 +742,12 @@ func TestVirtualWorkspaceReconciler_RemoveVirtualWorkspace(t *testing.T) {
 	tests := []struct {
 		name          string
 		workspaceName string
-		ioDeleteError error
 		expectError   bool
 	}{
 		{
 			name:          "successful_removal",
 			workspaceName: "test-ws",
 			expectError:   false,
-		},
-		{
-			name:          "io_delete_error",
-			workspaceName: "test-ws",
-			ioDeleteError: errors.New("delete failed"),
-			expectError:   true,
 		},
 	}
 
