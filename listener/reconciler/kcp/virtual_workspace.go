@@ -198,6 +198,8 @@ func (r *VirtualWorkspaceReconciler) ReconcileConfig(ctx context.Context, config
 			r.log.Info().Str("workspace", name).Msg("removing deleted virtual workspace")
 			if err := r.removeVirtualWorkspace(name); err != nil {
 				r.log.Error().Err(err).Str("workspace", name).Msg("failed to remove virtual workspace")
+				// Surface deletion failures to the caller so they can be observed and retried
+				return err
 			}
 		}
 	}

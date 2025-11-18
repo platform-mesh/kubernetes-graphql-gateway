@@ -749,6 +749,11 @@ func TestVirtualWorkspaceReconciler_RemoveVirtualWorkspace(t *testing.T) {
 			workspaceName: "test-ws",
 			expectError:   false,
 		},
+		{
+			name:          "io_delete_error",
+			workspaceName: "cannot-delete",
+			expectError:   true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -772,7 +777,15 @@ func TestVirtualWorkspaceReconciler_RemoveVirtualWorkspace(t *testing.T) {
 			wsPath := reconciler.virtualWSManager.GetWorkspacePath(VirtualWorkspace{Name: tt.workspaceName})
 			full := filepath.Join(dir, wsPath)
 			_ = os.MkdirAll(filepath.Dir(full), 0o755)
-			_ = os.WriteFile(full, []byte("data"), 0o644)
+			// For the error case, create a non-empty directory at the target path so 'os.Remove' fails with ENOTEMPTY
+			if tt.expectError {
+				// Make the target path a directory and add a child file
+				_ = os.MkdirAll(full, 0o755)
+				_ = os.WriteFile(filepath.Join(full, "child"), []byte("data"), 0o644)
+			} else {
+				// Normal success path: create a regular file that can be removed
+				_ = os.WriteFile(full, []byte("data"), 0o644)
+			}
 
 			err = reconciler.removeVirtualWorkspace(tt.workspaceName)
 
@@ -783,7 +796,11 @@ func TestVirtualWorkspaceReconciler_RemoveVirtualWorkspace(t *testing.T) {
 			}
 			// Verify file is deleted
 			_, statErr := os.Stat(full)
-			assert.Error(t, statErr)
+			if tt.expectError {
+				assert.NoError(t, statErr, "path should remain when deletion fails")
+			} else {
+				assert.Error(t, statErr)
+			}
 		})
 	}
 }

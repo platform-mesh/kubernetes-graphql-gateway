@@ -16,18 +16,12 @@ var (
 
 // FileHandler is a simple, concrete file store for schemas.
 // It provides basic Read/Write/Delete operations backed by the local filesystem.
-//
-// Note: In production, the handler operates purely on the filesystem. For backward
-// compatibility during test refactoring, an optional hidden delegate can be used by
-// tests that still rely on mocks. Once tests are migrated to temp dirs, the delegate
-// will be removed.
 type FileHandler struct {
 	// schemasDir is the base directory where schema files are stored.
 	schemasDir string
 }
 
 // NewIOHandler constructs a concrete FileHandler that stores files under schemasDir.
-// Kept name-compatible for minimal changes at call sites.
 func NewIOHandler(schemasDir string) (*FileHandler, error) {
 	if err := os.MkdirAll(schemasDir, os.ModePerm); err != nil {
 		return nil, errors.Join(ErrCreateSchemasDir, err)

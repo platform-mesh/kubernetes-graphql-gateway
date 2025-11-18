@@ -335,7 +335,6 @@ users:
 			wantErr:     true,
 			errContains: "schema resolution failed",
 		},
-		// removed write-error test; with real filesystem it's hard to force reliably
 		{
 			name: "file_read_error",
 			req: ctrl.Request{
@@ -372,6 +371,7 @@ users:
 				mdf.EXPECT().RestMapperForCluster("root:org:read-error-cluster").
 					Return(mockRestMapper, nil).Once()
 
+				// Schema generation happens before read, so we need this expectation
 				schemaJSON := []byte(`{"schema": "test"}`)
 				mar.EXPECT().Resolve(mockDiscoveryClient, mockRestMapper).
 					Return(schemaJSON, nil).Once()
