@@ -28,7 +28,10 @@ type FileData struct {
 
 // ClusterMetadata represents the cluster connection metadata stored in schema files
 type ClusterMetadata struct {
-	Host string        `json:"host"`
+	Host string `json:"host"`
+	// Deprecated: Path is ignored by the gateway. The effective cluster/path is derived
+	// from the schema file name and request context. The field may still be present in
+	// schema files for backward compatibility with older listeners.
 	Path string        `json:"path,omitempty"`
 	Auth *AuthMetadata `json:"auth,omitempty"`
 	CA   *CAMetadata   `json:"ca,omitempty"`

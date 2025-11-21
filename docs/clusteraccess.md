@@ -33,7 +33,9 @@ kind: ClusterAccess
 metadata:
   name: my-target-cluster
 spec:
-  path: my-target-cluster  # Used as schema filename
+  # Optional: path overrides the output schema filename. If omitted, metadata.name is used.
+  # Note: This value is not used by the gateway at runtime.
+  path: my-target-cluster
   host: https://my-cluster-api-server:6443
   auth:
     kubeconfigSecretRef:
@@ -68,14 +70,13 @@ The listener:
 
 Generated schema files contain:
 
-```json
+```
 {
   "definitions": {
-    // ... Kubernetes API definitions
+    
   },
   "x-cluster-metadata": {
     "host": "https://my-cluster-api-server:6443",
-    "path": "my-target-cluster",
     "auth": {
       "type": "kubeconfig",
       "kubeconfig": "base64-encoded-kubeconfig"
@@ -86,6 +87,8 @@ Generated schema files contain:
   }
 }
 ```
+
+Optional (deprecated) field: you may still see `"path": "my-target-cluster"` inside `x-cluster-metadata` in legacy files. The gateway ignores this value.
 
 ### 4. Gateway Usage
 
@@ -99,11 +102,17 @@ export GATEWAY_SHOULD_IMPERSONATE=false
 The gateway:
 - Watches the definitions directory for schema files
 - For each schema file:
-  - Reads the `x-cluster-metadata` section
+  - Reads the `x-cluster-metadata` section (only `host`, `auth`, `ca` are used)
   - Creates a `rest.Config` using the embedded connection info
   - Establishes a Kubernetes client connection to the target cluster
   - Serves GraphQL API at `/{cluster-name}/graphql`
 - **Does NOT require KUBECONFIG** - all connection info comes from schema files
+
+### Notes on `path` simplification
+
+- Historically the listener embedded `"path"` inside `x-cluster-metadata` and also used `spec.path` to control the output filename.
+- The gateway no longer uses the embedded `path` value; routing is derived from the schema file name and request path context.
+- You may keep `spec.path` to control filenames on disk. The embedded metadata `path` field is optional and considered deprecated.
 
 ## Troubleshooting
 

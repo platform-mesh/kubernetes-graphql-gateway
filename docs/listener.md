@@ -19,6 +19,46 @@ Contains reconciliation logic for different operational modes:
 - Generates schema files with embedded cluster connection metadata
 - Injects `x-cluster-metadata` into schema files for gateway consumption
 
+## Custom OpenAPI properties used by the project
+
+The project uses two categories of OpenAPI extensions:
+
+- Kubernetes-standard extensions (consumed during schema building):
+  - `x-kubernetes-group-version-kind`
+  - `x-kubernetes-categories`
+  - `x-kubernetes-scope`
+  These are provided by kube-openapi and are not defined by this project.
+
+- Project-defined extension (produced by the listener and consumed by the gateway):
+  - `x-cluster-metadata`: carries connection information for the target cluster.
+
+### `x-cluster-metadata`
+
+The listener injects `x-cluster-metadata` into each schema file so the gateway can establish a connection to the referenced cluster without any external configuration.
+
+Structure (minimal shape used by the gateway):
+
+```
+"x-cluster-metadata": {
+  "host": "https://<api-server>",
+  "auth": { /* one of: token | kubeconfig | clientCert */ },
+  "ca": { "data": "<base64-PEM>" }
+}
+```
+
+Notes:
+- The `host` field is required.
+- Exactly one authentication method should be provided under `auth`:
+  - `{"type":"token","token":"<base64>"}`
+  - `{"type":"kubeconfig","kubeconfig":"<base64>"}`
+  - `{"type":"clientCert","certData":"<base64>","keyData":"<base64>"}`
+- The `ca.data` field is optional but recommended; if omitted and `auth` contains a kubeconfig, the listener attempts to extract the CA from that kubeconfig automatically.
+- Deprecated/optional: `path`. Older listeners included `"path":"<logical-or-file-path>"`. The gateway ignores this value and derives routing from the schema file name and request context. Keep it only for backward compatibility.
+
+Why we keep it simple:
+- All information needed to connect is either intrinsic to the target cluster (host, CA) or already available via selected auth material. We avoid injecting duplicate or derivable data.
+- We do not replicate routing information (`path`) since it’s defined by where the file is stored and how the gateway is addressed.
+
 #### KCP Reconciler (`reconciler/kcp/`)
 - Watches APIBinding resources in KCP workspaces
 - Discovers virtual workspaces and their API resources
