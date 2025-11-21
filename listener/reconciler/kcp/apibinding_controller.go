@@ -26,7 +26,7 @@ type APIBindingReconciler struct {
 	Client              client.Client
 	Scheme              *runtime.Scheme
 	RestConfig          *rest.Config
-	IOHandler           workspacefile.IOHandler
+	IOHandler           *workspacefile.FileHandler
 	DiscoveryFactory    DiscoveryFactory
 	APISchemaResolver   apischema.Resolver
 	ClusterPathResolver ClusterPathResolver

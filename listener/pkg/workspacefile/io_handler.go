@@ -14,27 +14,23 @@ var (
 	ErrDeleteJSONFile   = errors.New("failed to delete JSON file")
 )
 
-type IOHandler interface {
-	Read(clusterName string) ([]byte, error)
-	Write(JSON []byte, clusterName string) error
-	Delete(clusterName string) error
-}
-
-type IOHandlerProvider struct {
+// FileHandler is a simple, concrete file store for schemas.
+// It provides basic Read/Write/Delete operations backed by the local filesystem.
+type FileHandler struct {
+	// schemasDir is the base directory where schema files are stored.
 	schemasDir string
 }
 
-func NewIOHandler(schemasDir string) (*IOHandlerProvider, error) {
+// NewIOHandler constructs a concrete FileHandler that stores files under schemasDir.
+func NewIOHandler(schemasDir string) (*FileHandler, error) {
 	if err := os.MkdirAll(schemasDir, os.ModePerm); err != nil {
 		return nil, errors.Join(ErrCreateSchemasDir, err)
 	}
-
-	return &IOHandlerProvider{
-		schemasDir: schemasDir,
-	}, nil
+	return &FileHandler{schemasDir: schemasDir}, nil
 }
 
-func (h *IOHandlerProvider) Read(clusterName string) ([]byte, error) {
+// Read reads the schema file for the given cluster name (relative path) from the schemasDir.
+func (h *FileHandler) Read(clusterName string) ([]byte, error) {
 	fileName := path.Join(h.schemasDir, clusterName)
 	JSON, err := os.ReadFile(fileName)
 	if err != nil {
@@ -43,26 +39,25 @@ func (h *IOHandlerProvider) Read(clusterName string) ([]byte, error) {
 	return JSON, nil
 }
 
-func (h *IOHandlerProvider) Write(JSON []byte, clusterName string) error {
+// Write writes the given JSON bytes under the clusterName path, creating subdirectories as needed.
+func (h *FileHandler) Write(JSON []byte, clusterName string) error {
 	fileName := path.Join(h.schemasDir, clusterName)
-
 	// Create intermediate directories if they don't exist
 	dir := filepath.Dir(fileName)
 	if err := os.MkdirAll(dir, os.ModePerm); err != nil {
 		return errors.Join(ErrWriteJSONFile, err)
 	}
-
 	if err := os.WriteFile(fileName, JSON, os.ModePerm); err != nil {
 		return errors.Join(ErrWriteJSONFile, err)
 	}
 	return nil
 }
 
-func (h *IOHandlerProvider) Delete(clusterName string) error {
+// Delete removes the schema file for the given cluster name.
+func (h *FileHandler) Delete(clusterName string) error {
 	fileName := path.Join(h.schemasDir, clusterName)
 	if err := os.Remove(fileName); err != nil {
 		return errors.Join(ErrDeleteJSONFile, err)
 	}
-
 	return nil
 }

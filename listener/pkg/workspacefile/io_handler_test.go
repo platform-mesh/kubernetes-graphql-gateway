@@ -45,9 +45,8 @@ func TestRead(t *testing.T) {
 	err := os.WriteFile(validFile, testJSON, 0644)
 	assert.NoError(t, err)
 
-	handler := &IOHandlerProvider{
-		schemasDir: tempDir,
-	}
+	handler, err := NewIOHandler(tempDir)
+	assert.NoError(t, err)
 
 	tests := map[string]struct {
 		clusterName string
@@ -71,9 +70,8 @@ func TestRead(t *testing.T) {
 
 func TestWrite(t *testing.T) {
 	tempDir := t.TempDir()
-	handler := &IOHandlerProvider{
-		schemasDir: tempDir,
-	}
+	handler, err := NewIOHandler(tempDir)
+	assert.NoError(t, err)
 
 	tests := map[string]struct {
 		clusterName string
@@ -95,6 +93,44 @@ func TestWrite(t *testing.T) {
 			writtenData, err := os.ReadFile(filepath.Join(tempDir, tc.clusterName))
 			assert.NoError(t, err)
 			assert.Equal(t, string(writtenData), string(testJSON))
+		})
+	}
+}
+
+func TestDelete(t *testing.T) {
+	tempDir := t.TempDir()
+	handler, err := NewIOHandler(tempDir)
+	assert.NoError(t, err)
+
+	existing := "root:sap:openmfp"
+	nested := filepath.Join("some", "nested", "path", "workspace")
+
+	err = os.WriteFile(filepath.Join(tempDir, existing), testJSON, 0o644)
+	assert.NoError(t, err)
+	err = os.MkdirAll(filepath.Join(tempDir, filepath.Dir(nested)), 0o755)
+	assert.NoError(t, err)
+	err = os.WriteFile(filepath.Join(tempDir, nested), testJSON, 0o644)
+	assert.NoError(t, err)
+
+	tests := map[string]struct {
+		clusterName string
+		expectErr   bool
+	}{
+		"existing_file":     {clusterName: existing, expectErr: false},
+		"nested_file":       {clusterName: nested, expectErr: false},
+		"non_existent_file": {clusterName: "does/not/exist", expectErr: true},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			err := handler.Delete(tc.clusterName)
+			if tc.expectErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			_, statErr := os.Stat(filepath.Join(tempDir, tc.clusterName))
+			assert.Error(t, statErr)
 		})
 	}
 }

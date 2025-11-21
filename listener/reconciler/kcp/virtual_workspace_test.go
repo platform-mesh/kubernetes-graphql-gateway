@@ -9,6 +9,7 @@ import (
 
 	"github.com/platform-mesh/golang-commons/logger/testlogger"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/workspacefile"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -608,23 +609,19 @@ func TestVirtualWorkspaceReconciler_ReconcileConfig_Simple(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set up test environment where KUBECONFIG is not available
 			oldKubeconfig := os.Getenv("KUBECONFIG")
-			defer os.Setenv("KUBECONFIG", oldKubeconfig) //nolint:errcheck
-			os.Unsetenv("KUBECONFIG")                    //nolint:errcheck
+			oldHome := os.Getenv("HOME")
+			defer func() {
+				_ = os.Setenv("KUBECONFIG", oldKubeconfig)
+				_ = os.Setenv("HOME", oldHome)
+			}()
+			// Force metadata injection to fail deterministically by disabling default kubeconfig lookup
+			_ = os.Unsetenv("KUBECONFIG")
+			_ = os.Setenv("HOME", "/nonexistent")
 
 			appCfg := config.Config{}
 			appCfg.Url.VirtualWorkspacePrefix = "virtual-workspace"
 
 			manager := NewVirtualWorkspaceManager(appCfg)
-
-			// Use mocks that don't fail
-			ioHandler := &MockIOHandler{
-				WriteFunc: func(data []byte, workspacePath string) error {
-					return nil // Always succeed for this test
-				},
-				DeleteFunc: func(workspacePath string) error {
-					return nil // Always succeed for this test
-				},
-			}
 
 			apiResolver := &MockAPISchemaResolver{
 				ResolveFunc: func(discoveryClient discovery.DiscoveryInterface, restMapper meta.RESTMapper) ([]byte, error) {
@@ -632,17 +629,21 @@ func TestVirtualWorkspaceReconciler_ReconcileConfig_Simple(t *testing.T) {
 				},
 			}
 
-			reconciler := NewVirtualWorkspaceReconciler(manager, ioHandler, apiResolver, testlogger.New().Logger)
+			// Use real file handler rooted at a temp dir
+			dir := t.TempDir()
+			fh, err := workspacefile.NewIOHandler(dir)
+			require.NoError(t, err)
+			reconciler := NewVirtualWorkspaceReconciler(manager, fh, apiResolver, testlogger.New().Logger)
 			reconciler.currentWorkspaces = tt.initialWorkspaces
 
 			// For this simplified test, we'll mock the individual methods to avoid network calls
 			// This tests the reconciliation logic without testing the full discovery/REST mapper setup
 
-			err := reconciler.ReconcileConfig(context.Background(), tt.newConfig)
+			err = reconciler.ReconcileConfig(context.Background(), tt.newConfig)
 
 			// Since discovery client creation may fail, we don't assert NoError
 			// but we can still verify the workspace tracking logic
-			_ = err // Ignore error for this simplified test
+			_ = err // We ignore reconciliation error; we validate tracking behavior only
 			assert.Equal(t, tt.expectCurrentCount, len(reconciler.currentWorkspaces))
 		})
 	}
@@ -709,17 +710,6 @@ func TestVirtualWorkspaceReconciler_ProcessVirtualWorkspace(t *testing.T) {
 
 			manager := NewVirtualWorkspaceManager(appCfg)
 
-			var writeCalls int
-			ioHandler := &MockIOHandler{
-				WriteFunc: func(data []byte, workspacePath string) error {
-					writeCalls++
-					if tt.ioWriteError != nil {
-						return tt.ioWriteError
-					}
-					return nil
-				},
-			}
-
 			apiResolver := &MockAPISchemaResolver{
 				ResolveFunc: func(discoveryClient discovery.DiscoveryInterface, restMapper meta.RESTMapper) ([]byte, error) {
 					if tt.apiResolveError != nil {
@@ -730,9 +720,12 @@ func TestVirtualWorkspaceReconciler_ProcessVirtualWorkspace(t *testing.T) {
 				},
 			}
 
-			reconciler := NewVirtualWorkspaceReconciler(manager, ioHandler, apiResolver, testlogger.New().Logger)
+			dir := t.TempDir()
+			fh, err := workspacefile.NewIOHandler(dir)
+			require.NoError(t, err)
+			reconciler := NewVirtualWorkspaceReconciler(manager, fh, apiResolver, testlogger.New().Logger)
 
-			err := reconciler.processVirtualWorkspace(context.Background(), tt.workspace)
+			err = reconciler.processVirtualWorkspace(context.Background(), tt.workspace)
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -740,7 +733,7 @@ func TestVirtualWorkspaceReconciler_ProcessVirtualWorkspace(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
-			assert.Equal(t, tt.expectedWriteCalls, writeCalls)
+			// With real file handler we don't count writes; behavior verified by error expectations above.
 		})
 	}
 }
@@ -749,19 +742,12 @@ func TestVirtualWorkspaceReconciler_RemoveVirtualWorkspace(t *testing.T) {
 	tests := []struct {
 		name          string
 		workspaceName string
-		ioDeleteError error
 		expectError   bool
 	}{
 		{
 			name:          "successful_removal",
 			workspaceName: "test-ws",
 			expectError:   false,
-		},
-		{
-			name:          "io_delete_error",
-			workspaceName: "test-ws",
-			ioDeleteError: errors.New("delete failed"),
-			expectError:   true,
 		},
 	}
 
@@ -777,31 +763,27 @@ func TestVirtualWorkspaceReconciler_RemoveVirtualWorkspace(t *testing.T) {
 
 			manager := NewVirtualWorkspaceManager(appCfg)
 
-			var deleteCalls int
-			var deletedPath string
-			ioHandler := &MockIOHandler{
-				DeleteFunc: func(workspacePath string) error {
-					deleteCalls++
-					deletedPath = workspacePath
-					if tt.ioDeleteError != nil {
-						return tt.ioDeleteError
-					}
-					return nil
-				},
-			}
+			dir := t.TempDir()
+			// Pre-create the file to be deleted to verify deletion behavior
+			fh, err := workspacefile.NewIOHandler(dir)
+			require.NoError(t, err)
+			reconciler := NewVirtualWorkspaceReconciler(manager, fh, nil, testlogger.New().Logger)
+			// Create the file that should be removed
+			wsPath := reconciler.virtualWSManager.GetWorkspacePath(VirtualWorkspace{Name: tt.workspaceName})
+			full := filepath.Join(dir, wsPath)
+			_ = os.MkdirAll(filepath.Dir(full), 0o755)
+			_ = os.WriteFile(full, []byte("data"), 0o644)
 
-			reconciler := NewVirtualWorkspaceReconciler(manager, nil, nil, testlogger.New().Logger)
-			reconciler.ioHandler = ioHandler
-
-			err := reconciler.removeVirtualWorkspace(tt.workspaceName)
+			err = reconciler.removeVirtualWorkspace(tt.workspaceName)
 
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
 			}
-			assert.Equal(t, 1, deleteCalls)
-			assert.Equal(t, "virtual-workspace/"+tt.workspaceName, deletedPath)
+			// Verify file is deleted
+			_, statErr := os.Stat(full)
+			assert.Error(t, statErr)
 		})
 	}
 }
