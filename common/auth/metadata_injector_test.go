@@ -157,11 +157,6 @@ users:
 			require.True(t, exists, "host should be present")
 			assert.Equal(t, tt.expectedHost, host)
 
-			// Verify path
-			path, exists := metadataMap["path"]
-			require.True(t, exists, "path should be present")
-			assert.Equal(t, tt.clusterPath, path)
-
 			// Verify auth
 			auth, exists := metadataMap["auth"]
 			require.True(t, exists, "auth should be present")
@@ -198,7 +193,6 @@ func TestInjectClusterMetadata(t *testing.T) {
 		schemaJSON   []byte
 		config       MetadataInjectionConfig
 		expectedHost string
-		expectedPath string
 		expectError  bool
 	}{
 		{
@@ -217,10 +211,8 @@ func TestInjectClusterMetadata(t *testing.T) {
 			}`),
 			config: MetadataInjectionConfig{
 				Host: "https://test-cluster.example.com:6443",
-				Path: "test-cluster",
 			},
 			expectedHost: "https://test-cluster.example.com:6443",
-			expectedPath: "test-cluster",
 			expectError:  false,
 		},
 		{
@@ -234,11 +226,9 @@ func TestInjectClusterMetadata(t *testing.T) {
 			}`),
 			config: MetadataInjectionConfig{
 				Host:         "https://original.example.com:6443",
-				Path:         "virtual-workspace/test",
 				HostOverride: "https://override.example.com:6443/services/test",
 			},
 			expectedHost: "https://override.example.com:6443/services/test",
-			expectedPath: "virtual-workspace/test",
 			expectError:  false,
 		},
 		{
@@ -252,10 +242,8 @@ func TestInjectClusterMetadata(t *testing.T) {
 			}`),
 			config: MetadataInjectionConfig{
 				Host: "https://kcp.example.com:6443/services/apiexport/some/path",
-				Path: "test-workspace",
 			},
 			expectedHost: "https://kcp.example.com:6443", // Should be stripped
-			expectedPath: "test-workspace",
 			expectError:  false,
 		},
 		{
@@ -267,7 +255,6 @@ func TestInjectClusterMetadata(t *testing.T) {
 			}`),
 			config: MetadataInjectionConfig{
 				Host: "https://test.example.com:6443",
-				Path: "test",
 			},
 			expectError: true,
 		},
@@ -302,11 +289,6 @@ func TestInjectClusterMetadata(t *testing.T) {
 			host, exists := metadataMap["host"]
 			require.True(t, exists, "host should be present")
 			assert.Equal(t, tt.expectedHost, host)
-
-			// Verify path
-			path, exists := metadataMap["path"]
-			require.True(t, exists, "path should be present")
-			assert.Equal(t, tt.expectedPath, path)
 		})
 	}
 }

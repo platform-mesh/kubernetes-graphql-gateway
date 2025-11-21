@@ -285,7 +285,6 @@ users:
 				assert.Contains(t, s, `"schema":"test"`)
 				assert.Contains(t, s, `"x-cluster-metadata"`)
 				assert.Contains(t, s, `"host":"https://test.example.com"`)
-				assert.Contains(t, s, `"path":"root:org:new-cluster"`)
 			},
 			wantResult: ctrl.Result{},
 			wantErr:    false,
@@ -434,7 +433,6 @@ users:
 				s := string(data)
 				assert.Contains(t, s, `"schema":"existing"`)
 				assert.Contains(t, s, `"x-cluster-metadata"`)
-				assert.Contains(t, s, `"path":"root:org:unchanged-cluster"`)
 			},
 			wantResult: ctrl.Result{},
 			wantErr:    false,
@@ -488,7 +486,6 @@ users:
 				s := string(data)
 				assert.Contains(t, s, `"schema":"new"`)
 				assert.Contains(t, s, `"x-cluster-metadata"`)
-				assert.Contains(t, s, `"path":"root:org:changed-cluster"`)
 			},
 			wantResult: ctrl.Result{},
 			wantErr:    false,

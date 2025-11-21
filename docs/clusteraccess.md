@@ -88,7 +88,6 @@ Generated schema files contain:
 }
 ```
 
-Optional (deprecated) field: you may still see `"path": "my-target-cluster"` inside `x-cluster-metadata` in legacy files. The gateway ignores this value.
 
 ### 4. Gateway Usage
 
@@ -108,11 +107,6 @@ The gateway:
   - Serves GraphQL API at `/{cluster-name}/graphql`
 - **Does NOT require KUBECONFIG** - all connection info comes from schema files
 
-### Notes on `path` simplification
-
-- Historically the listener embedded `"path"` inside `x-cluster-metadata` and also used `spec.path` to control the output filename.
-- The gateway no longer uses the embedded `path` value; routing is derived from the schema file name and request path context.
-- You may keep `spec.path` to control filenames on disk. The embedded metadata `path` field is optional and considered deprecated.
 
 ## Troubleshooting
 

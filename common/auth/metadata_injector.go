@@ -22,7 +22,6 @@ import (
 // MetadataInjectionConfig contains configuration for metadata injection
 type MetadataInjectionConfig struct {
 	Host         string
-	Path         string
 	Auth         *gatewayv1alpha1.AuthConfig
 	CA           *gatewayv1alpha1.CAConfig
 	HostOverride string // For virtual workspaces
@@ -57,7 +56,6 @@ func (m *MetadataInjector) InjectClusterMetadata(ctx context.Context, schemaJSON
 	// Create cluster metadata
 	metadata := map[string]any{
 		"host": host,
-		"path": config.Path,
 	}
 
 	// Add auth data if configured
@@ -84,7 +82,7 @@ func (m *MetadataInjector) InjectClusterMetadata(ctx context.Context, schemaJSON
 		m.tryExtractKubeconfigCA(ctx, config.Auth, metadata)
 	}
 
-	return m.finalizeSchemaInjection(schemaData, metadata, host, config.Path, config.CA != nil || config.Auth != nil)
+	return m.finalizeSchemaInjection(schemaData, metadata, host, config.CA != nil || config.Auth != nil)
 }
 
 // InjectKCPMetadataFromEnv injects KCP metadata using kubeconfig from environment
@@ -114,7 +112,6 @@ func (m *MetadataInjector) InjectKCPMetadataFromEnv(schemaJSON []byte, clusterPa
 	// Create cluster metadata with environment kubeconfig
 	metadata := map[string]any{
 		"host": host,
-		"path": clusterPath,
 		"auth": map[string]any{
 			"type":       "kubeconfig",
 			"kubeconfig": base64.StdEncoding.EncodeToString(kubeconfigData),
@@ -129,7 +126,7 @@ func (m *MetadataInjector) InjectKCPMetadataFromEnv(schemaJSON []byte, clusterPa
 		}
 	}
 
-	return m.finalizeSchemaInjection(schemaData, metadata, host, clusterPath, caData != nil)
+	return m.finalizeSchemaInjection(schemaData, metadata, host, caData != nil)
 }
 
 // extractAuthDataForMetadata extracts auth data from AuthConfig for metadata injection
@@ -436,7 +433,7 @@ func (m *MetadataInjector) determineKCPHost(kubeconfigHost, override, clusterPat
 }
 
 // finalizeSchemaInjection finalizes the schema injection process
-func (m *MetadataInjector) finalizeSchemaInjection(schemaData map[string]any, metadata map[string]any, host, path string, hasCA bool) ([]byte, error) {
+func (m *MetadataInjector) finalizeSchemaInjection(schemaData map[string]any, metadata map[string]any, host string, hasCA bool) ([]byte, error) {
 	// Inject the metadata into the schema
 	schemaData["x-cluster-metadata"] = metadata
 
@@ -448,7 +445,6 @@ func (m *MetadataInjector) finalizeSchemaInjection(schemaData map[string]any, me
 
 	m.log.Info().
 		Str("host", host).
-		Str("path", path).
 		Bool("hasCA", hasCA).
 		Msg("successfully injected cluster metadata into schema")
 

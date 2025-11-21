@@ -53,11 +53,10 @@ Notes:
   - `{"type":"kubeconfig","kubeconfig":"<base64>"}`
   - `{"type":"clientCert","certData":"<base64>","keyData":"<base64>"}`
 - The `ca.data` field is optional but recommended; if omitted and `auth` contains a kubeconfig, the listener attempts to extract the CA from that kubeconfig automatically.
-- Deprecated/optional: `path`. Older listeners included `"path":"<logical-or-file-path>"`. The gateway ignores this value and derives routing from the schema file name and request context. Keep it only for backward compatibility.
 
 Why we keep it simple:
 - All information needed to connect is either intrinsic to the target cluster (host, CA) or already available via selected auth material. We avoid injecting duplicate or derivable data.
-- We do not replicate routing information (`path`) since it’s defined by where the file is stored and how the gateway is addressed.
+- We do not replicate routing information in metadata; routing is defined by where the file is stored and how the gateway is addressed.
 
 #### KCP Reconciler (`reconciler/kcp/`)
 - Watches APIBinding resources in KCP workspaces
