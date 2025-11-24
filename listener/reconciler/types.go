@@ -3,6 +3,9 @@ package reconciler
 import (
 	"context"
 
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/workspacefile"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -23,4 +26,8 @@ type ReconcilerOpts struct {
 	client.Client
 	ManagerOpts            ctrl.Options
 	OpenAPIDefinitionsPath string
+	// Optional shared dependencies to maximize reuse across modes. If nil,
+	// each reconciler may construct its own defaults.
+	IOHandler      *workspacefile.FileHandler
+	SchemaResolver apischema.Resolver
 }

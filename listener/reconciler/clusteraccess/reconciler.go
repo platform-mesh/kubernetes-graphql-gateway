@@ -40,6 +40,14 @@ func NewClusterAccessReconciler(
 	schemaResolver apischema.Resolver,
 	log *logger.Logger,
 ) (reconciler.CustomReconciler, error) {
+	// Allow dependencies to be supplied via opts when not provided explicitly for reuse
+	if ioHandler == nil {
+		ioHandler = opts.IOHandler
+	}
+	if schemaResolver == nil {
+		schemaResolver = opts.SchemaResolver
+	}
+
 	// Validate required dependencies
 	if ioHandler == nil {
 		return nil, fmt.Errorf("ioHandler is required")
