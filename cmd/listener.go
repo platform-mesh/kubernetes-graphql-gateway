@@ -86,12 +86,21 @@ var listenCmd = &cobra.Command{
 			log.Fatal().Err(err).Msg("failed to create client from config")
 		}
 
+		// Build shared components to maximize reuse across modes
+		ioHandler, err := workspacefile.NewIOHandler(appCfg.OpenApiDefinitionsPath)
+		if err != nil {
+			log.Fatal().Err(err).Msg("unable to create IO handler")
+		}
+		schemaResolver := apischema.NewResolver(log)
+
 		reconcilerOpts := reconciler.ReconcilerOpts{
 			Scheme:                 scheme,
 			Client:                 clt,
 			Config:                 restCfg,
 			ManagerOpts:            mgrOpts,
 			OpenAPIDefinitionsPath: appCfg.OpenApiDefinitionsPath,
+			IOHandler:              ioHandler,
+			SchemaResolver:         schemaResolver,
 		}
 
 		// Create the appropriate reconciler based on configuration
@@ -114,12 +123,8 @@ var listenCmd = &cobra.Command{
 
 			reconcilerInstance = kcpReconciler
 		} else {
-			ioHandler, err := workspacefile.NewIOHandler(appCfg.OpenApiDefinitionsPath)
-			if err != nil {
-				log.Fatal().Err(err).Msg("unable to create IO handler")
-			}
-
-			reconcilerInstance, err = clusteraccess.NewClusterAccessReconciler(ctx, appCfg, reconcilerOpts, ioHandler, apischema.NewResolver(log), log)
+			// Reuse shared IO handler and schema resolver via opts (pass nils to use opts)
+			reconcilerInstance, err = clusteraccess.NewClusterAccessReconciler(ctx, appCfg, reconcilerOpts, nil, nil, log)
 			if err != nil {
 				log.Fatal().Err(err).Msg("unable to create cluster access reconciler")
 			}

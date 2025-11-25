@@ -37,15 +37,25 @@ func NewKCPReconciler(
 		return nil, err
 	}
 
-	// Create IO handler for schema files
-	ioHandler, err := workspacefile.NewIOHandler(appCfg.OpenApiDefinitionsPath)
-	if err != nil {
-		log.Error().Err(err).Msg("failed to create IO handler")
-		return nil, err
+	// Create or reuse IO handler for schema files
+	var ioHandler *workspacefile.FileHandler
+	if opts.IOHandler != nil {
+		ioHandler = opts.IOHandler
+	} else {
+		ioHandler, err = workspacefile.NewIOHandler(appCfg.OpenApiDefinitionsPath)
+		if err != nil {
+			log.Error().Err(err).Msg("failed to create IO handler")
+			return nil, err
+		}
 	}
 
-	// Create schema resolver
-	schemaResolver := apischema.NewResolver(log)
+	// Create or reuse schema resolver
+	var schemaResolver apischema.Resolver
+	if opts.SchemaResolver != nil {
+		schemaResolver = opts.SchemaResolver
+	} else {
+		schemaResolver = apischema.NewResolver(log)
+	}
 
 	// Create cluster path resolver
 	clusterPathResolver, err := NewClusterPathResolver(opts.Config, opts.Scheme)
