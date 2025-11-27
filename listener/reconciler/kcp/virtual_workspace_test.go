@@ -385,10 +385,7 @@ users:
 			os.Setenv("KUBECONFIG", tempKubeconfig) //nolint:errcheck
 			os.Setenv("HOME", tempDir)              //nolint:errcheck
 
-			appCfg := config.Config{}
-			manager := NewVirtualWorkspaceManager(appCfg)
-
-			config, err := manager.CreateRESTConfig(tt.workspace)
+			config, err := createVirtualConfig(tt.workspace)
 
 			if tt.expectError {
 				assert.Error(t, err)

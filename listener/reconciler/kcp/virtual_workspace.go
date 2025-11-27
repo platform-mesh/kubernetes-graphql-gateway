@@ -14,6 +14,7 @@ import (
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/workspacefile"
 	"gopkg.in/yaml.v3"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -110,11 +111,6 @@ func (v *VirtualWorkspaceManager) CreateDiscoveryClient(workspace VirtualWorkspa
 	return discoveryClient, nil
 }
 
-// CreateRESTConfig creates a REST config for the virtual workspace (for REST mappers)
-func (v *VirtualWorkspaceManager) CreateRESTConfig(workspace VirtualWorkspace) (*rest.Config, error) {
-	return createVirtualConfig(workspace)
-}
-
 // LoadConfig loads the virtual workspaces configuration from a file
 func (v *VirtualWorkspaceManager) LoadConfig(configPath string) (*VirtualWorkspacesConfig, error) {
 	if configPath == "" {
@@ -169,41 +165,57 @@ func NewVirtualWorkspaceReconciler(
 
 // ReconcileConfig processes a virtual workspaces configuration update
 func (r *VirtualWorkspaceReconciler) ReconcileConfig(ctx context.Context, config *VirtualWorkspacesConfig) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	r.log.Info().Int("count", len(config.VirtualWorkspaces)).Msg("reconciling virtual workspaces")
 
-	// Track new workspaces for comparison
-	newWorkspaces := make(map[string]VirtualWorkspace)
+	// Snapshot current state under read lock to minimize contention
+	r.mu.RLock()
+	current := make(map[string]VirtualWorkspace, len(r.currentWorkspaces))
+	for k, v := range r.currentWorkspaces {
+		current[k] = v
+	}
+	r.mu.RUnlock()
+
+	// Build desired map from incoming config
+	desired := make(map[string]VirtualWorkspace, len(config.VirtualWorkspaces))
 	for _, ws := range config.VirtualWorkspaces {
-		newWorkspaces[ws.Name] = ws
+		desired[ws.Name] = ws
 	}
 
-	// Process new or updated workspaces
-	for name, workspace := range newWorkspaces {
-		if current, exists := r.currentWorkspaces[name]; !exists || current.URL != workspace.URL {
-			r.log.Info().Str("workspace", name).Str("url", workspace.URL).Msg("processing virtual workspace")
-
-			if err := r.processVirtualWorkspace(ctx, workspace); err != nil {
-				r.log.Error().Err(err).Str("workspace", name).Msg("failed to process virtual workspace")
-				return err
-			}
+	// Compute creations/updates (URL or kubeconfig changed) and removals
+	toProcess := make([]VirtualWorkspace, 0)
+	for name, ws := range desired {
+		if cur, ok := current[name]; !ok || cur.URL != ws.URL || cur.Kubeconfig != ws.Kubeconfig {
+			toProcess = append(toProcess, ws)
+		}
+	}
+	toRemove := make([]string, 0)
+	for name := range current {
+		if _, ok := desired[name]; !ok {
+			toRemove = append(toRemove, name)
 		}
 	}
 
-	// Remove deleted workspaces
-	for name := range r.currentWorkspaces {
-		if _, exists := newWorkspaces[name]; !exists {
-			r.log.Info().Str("workspace", name).Msg("removing deleted virtual workspace")
-			if err := r.removeVirtualWorkspace(name); err != nil {
-				r.log.Error().Err(err).Str("workspace", name).Msg("failed to remove virtual workspace")
-			}
+	// Process new or updated workspaces without holding the lock
+	for _, ws := range toProcess {
+		r.log.Info().Str("workspace", ws.Name).Str("url", ws.URL).Msg("processing virtual workspace")
+		if err := r.processVirtualWorkspace(ctx, ws); err != nil {
+			r.log.Error().Err(err).Str("workspace", ws.Name).Msg("failed to process virtual workspace")
+			return err
 		}
 	}
 
-	// Update current workspaces
-	r.currentWorkspaces = newWorkspaces
+	// Remove deleted workspaces (best-effort, continue on error)
+	for _, name := range toRemove {
+		r.log.Info().Str("workspace", name).Msg("removing deleted virtual workspace")
+		if err := r.removeVirtualWorkspace(name); err != nil {
+			r.log.Error().Err(err).Str("workspace", name).Msg("failed to remove virtual workspace")
+		}
+	}
+
+	// Update current workspaces under write lock
+	r.mu.Lock()
+	r.currentWorkspaces = desired
+	r.mu.Unlock()
 
 	r.log.Info().Msg("completed virtual workspaces reconciliation")
 	return nil
@@ -219,28 +231,10 @@ func (r *VirtualWorkspaceReconciler) processVirtualWorkspace(ctx context.Context
 		Str("path", workspacePath).
 		Msg("generating schema for virtual workspace")
 
-	// Create discovery client for the virtual workspace
-	discoveryClient, err := r.virtualWSManager.CreateDiscoveryClient(workspace)
+	// Create discovery client and REST mapper for the virtual workspace
+	discoveryClient, restMapper, err := r.buildClientsForWorkspace(workspace)
 	if err != nil {
-		return fmt.Errorf("failed to create discovery client: %w", err)
-	}
-
-	r.log.Debug().Str("workspace", workspace.Name).Str("url", workspace.URL).Msg("created discovery client for virtual workspace")
-
-	// Create REST config and mapper for the virtual workspace
-	virtualConfig, err := r.virtualWSManager.CreateRESTConfig(workspace)
-	if err != nil {
-		return fmt.Errorf("failed to create REST config: %w", err)
-	}
-
-	httpClient, err := rest.HTTPClientFor(virtualConfig)
-	if err != nil {
-		return fmt.Errorf("failed to create HTTP client for virtual workspace: %w", err)
-	}
-
-	restMapper, err := apiutil.NewDynamicRESTMapper(virtualConfig, httpClient)
-	if err != nil {
-		return fmt.Errorf("failed to create REST mapper for virtual workspace: %w", err)
+		return err
 	}
 
 	// Use shared schema generation logic
@@ -283,4 +277,38 @@ func (r *VirtualWorkspaceReconciler) removeVirtualWorkspace(name string) error {
 
 	r.log.Info().Str("workspace", name).Str("path", workspacePath).Msg("removed schema file for virtual workspace")
 	return nil
+}
+
+// buildRESTMapper creates a dynamic RESTMapper for a given REST config.
+func buildRESTMapper(cfg *rest.Config) (meta.RESTMapper, error) {
+	httpClient, err := rest.HTTPClientFor(cfg)
+	if err != nil {
+		return nil, err
+	}
+	return apiutil.NewDynamicRESTMapper(cfg, httpClient)
+}
+
+// buildClientsForWorkspace consolidates creation of discovery client and REST mapper
+// for a given virtual workspace. Keeps wiring in a single place.
+func (r *VirtualWorkspaceReconciler) buildClientsForWorkspace(workspace VirtualWorkspace) (discovery.DiscoveryInterface, meta.RESTMapper, error) {
+	// Create REST config first (single source of truth)
+	virtualConfig, err := createVirtualConfig(workspace)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create REST config: %w", err)
+	}
+
+	// Discovery client
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(virtualConfig)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create discovery client: %w", err)
+	}
+
+	r.log.Debug().Str("workspace", workspace.Name).Str("url", workspace.URL).Msg("created discovery client for virtual workspace")
+
+	// REST mapper
+	restMapper, err := buildRESTMapper(virtualConfig)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create REST mapper for virtual workspace: %w", err)
+	}
+	return discoveryClient, restMapper, nil
 }
