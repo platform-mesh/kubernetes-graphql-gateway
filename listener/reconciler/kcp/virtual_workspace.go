@@ -13,8 +13,8 @@ import (
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/workspacefile"
 	"gopkg.in/yaml.v3"
-
 	"k8s.io/apimachinery/pkg/api/meta"
+
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -282,8 +282,6 @@ func (r *VirtualWorkspaceReconciler) removeVirtualWorkspace(name string) error {
 }
 
 // buildRESTMapper creates a dynamic RESTMapper for a given REST config.
-// Keeping it as a tiny helper avoids duplicating HTTP client + mapper wiring logic
-// at call sites and makes processVirtualWorkspace easier to follow.
 func buildRESTMapper(cfg *rest.Config) (meta.RESTMapper, error) {
 	httpClient, err := rest.HTTPClientFor(cfg)
 	if err != nil {
