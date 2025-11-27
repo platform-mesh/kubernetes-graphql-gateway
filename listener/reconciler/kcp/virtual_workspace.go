@@ -14,6 +14,7 @@ import (
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/workspacefile"
 	"gopkg.in/yaml.v3"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -96,7 +97,7 @@ func createVirtualConfig(workspace VirtualWorkspace) (*rest.Config, error) {
 
 // CreateDiscoveryClient creates a discovery client for the virtual workspace
 func (v *VirtualWorkspaceManager) CreateDiscoveryClient(workspace VirtualWorkspace) (discovery.DiscoveryInterface, error) {
-	virtualConfig, err := createVirtualConfig(workspace)
+	virtualConfig, err := v.CreateRESTConfig(workspace)
 	if err != nil {
 		return nil, err
 	}
@@ -233,12 +234,7 @@ func (r *VirtualWorkspaceReconciler) processVirtualWorkspace(ctx context.Context
 		return fmt.Errorf("failed to create REST config: %w", err)
 	}
 
-	httpClient, err := rest.HTTPClientFor(virtualConfig)
-	if err != nil {
-		return fmt.Errorf("failed to create HTTP client for virtual workspace: %w", err)
-	}
-
-	restMapper, err := apiutil.NewDynamicRESTMapper(virtualConfig, httpClient)
+	restMapper, err := buildRESTMapper(virtualConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create REST mapper for virtual workspace: %w", err)
 	}
@@ -283,4 +279,15 @@ func (r *VirtualWorkspaceReconciler) removeVirtualWorkspace(name string) error {
 
 	r.log.Info().Str("workspace", name).Str("path", workspacePath).Msg("removed schema file for virtual workspace")
 	return nil
+}
+
+// buildRESTMapper creates a dynamic RESTMapper for a given REST config.
+// Keeping it as a tiny helper avoids duplicating HTTP client + mapper wiring logic
+// at call sites and makes processVirtualWorkspace easier to follow.
+func buildRESTMapper(cfg *rest.Config) (meta.RESTMapper, error) {
+	httpClient, err := rest.HTTPClientFor(cfg)
+	if err != nil {
+		return nil, err
+	}
+	return apiutil.NewDynamicRESTMapper(cfg, httpClient)
 }
