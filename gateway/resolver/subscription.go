@@ -134,12 +134,51 @@ func (r *Service) runWatch(
 		opts = append(opts, client.MatchingFields{"metadata.name": name})
 	}
 
-	// Apply resourceVersion if provided
-	if resourceVersion != "" {
-		opts = append(opts, &client.ListOptions{Raw: &metav1.ListOptions{ResourceVersion: resourceVersion}})
+	// If no resourceVersion provided, perform an initial LIST to obtain current items and resourceVersion,
+	// If a resourceVersion is provided, start WATCH from that resourceVersion without initial listing.
+
+	var watchOpts []client.ListOption
+	watchOpts = append(watchOpts, opts...)
+
+	// Track last-seen objects for change detection on MODIFIED
+	previousObjects := make(map[string]*unstructured.Unstructured)
+
+	if resourceVersion == "" {
+		// Initial LIST without a resourceVersion to get current items and resourceVersion
+		if err := r.runtimeClient.List(ctx, list, opts...); err != nil {
+			r.log.Error().Err(err).Str("gvk", gvk.String()).Msg("Failed to list resources for initial watch state")
+			sentry.CaptureError(err, sentry.Tags{"namespace": namespace}, sentry.Extras{"gvk": gvk.String()})
+			resultChannel <- errors.Wrap(err, "failed to list resources for initial watch state")
+			return
+		}
+
+		for i := range list.Items {
+			item := list.Items[i]
+			key := item.GetNamespace() + "/" + item.GetName()
+			previousObjects[key] = item.DeepCopy()
+
+			envelope := map[string]any{
+				"type":   EventTypeAdded,
+				"object": item.Object,
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case resultChannel <- envelope:
+			}
+		}
+
+		// Start WATCH from the LIST's resourceVersion
+		rv := list.GetResourceVersion()
+		if rv != "" {
+			watchOpts = append(watchOpts, &client.ListOptions{Raw: &metav1.ListOptions{ResourceVersion: rv}})
+		}
+	} else {
+		// Start WATCH from provided resourceVersion
+		watchOpts = append(watchOpts, &client.ListOptions{Raw: &metav1.ListOptions{ResourceVersion: resourceVersion}})
 	}
 
-	watcher, err := r.runtimeClient.Watch(ctx, list, opts...)
+	watcher, err := r.runtimeClient.Watch(ctx, list, watchOpts...)
 	if err != nil {
 		r.log.Error().Err(err).Str("gvk", gvk.String()).Msg("Failed to start watch")
 
@@ -150,7 +189,6 @@ func (r *Service) runWatch(
 	}
 	defer watcher.Stop()
 
-	previousObjects := make(map[string]*unstructured.Unstructured)
 	for {
 		select {
 		case event, ok := <-watcher.ResultChan():
