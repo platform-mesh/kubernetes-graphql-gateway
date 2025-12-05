@@ -13,13 +13,14 @@ import (
 )
 
 const (
-	LabelSelectorArg  = "labelselector"
-	NameArg           = "name"
-	NamespaceArg      = "namespace"
-	ObjectArg         = "object"
-	SubscribeToAllArg = "subscribeToAll"
-	SortByArg         = "sortBy"
-	DryRunArg         = "dryRun"
+	LabelSelectorArg   = "labelselector"
+	NameArg            = "name"
+	NamespaceArg       = "namespace"
+	ObjectArg          = "object"
+	SubscribeToAllArg  = "subscribeToAll"
+	SortByArg          = "sortBy"
+	DryRunArg          = "dryRun"
+	ResourceVersionArg = "resourceVersion"
 )
 
 // FieldConfigArgumentsBuilder helps construct GraphQL field config arguments
@@ -80,6 +81,14 @@ func (b *FieldConfigArgumentsBuilder) WithSubscribeToAll() *FieldConfigArguments
 		Type:         graphql.Boolean,
 		DefaultValue: false,
 		Description:  "If true, events will be emitted on every field change",
+	}
+	return b
+}
+
+func (b *FieldConfigArgumentsBuilder) WithResourceVersion() *FieldConfigArgumentsBuilder {
+	b.arguments[ResourceVersionArg] = &graphql.ArgumentConfig{
+		Type:        graphql.String,
+		Description: "If set, subscription will stream changes starting from this resourceVersion. If omitted, starts from the latest.",
 	}
 	return b
 }

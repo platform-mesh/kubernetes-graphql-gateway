@@ -18,6 +18,17 @@ import (
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
+// watchEventTypeEnum defines constant event types for subscriptions
+var watchEventTypeEnum = graphql.NewEnum(graphql.EnumConfig{
+	Name:        "WatchEventType",
+	Description: "Event type for resource change notifications",
+	Values: graphql.EnumValueConfigMap{
+		"ADDED":    &graphql.EnumValueConfig{Value: resolver.EventTypeAdded},
+		"MODIFIED": &graphql.EnumValueConfig{Value: resolver.EventTypeModified},
+		"DELETED":  &graphql.EnumValueConfig{Value: resolver.EventTypeDeleted},
+	},
+})
+
 type Provider interface {
 	GetSchema() *graphql.Schema
 }
@@ -364,11 +375,21 @@ func (g *Gateway) processSingleResource(
 		Resolve: g.resolver.DeleteItem(*gvk, resourceScope),
 	})
 
+	// Define an event envelope type for subscriptions
+	eventType := graphql.NewObject(graphql.ObjectConfig{
+		Name: singular + "Event",
+		Fields: graphql.Fields{
+			"type":   &graphql.Field{Type: graphql.NewNonNull(watchEventTypeEnum)},
+			"object": &graphql.Field{Type: resourceType},
+		},
+	})
+
 	subscriptionSingular := strings.ToLower(fmt.Sprintf("%s_%s", gvk.Group, singular))
 	rootSubscriptionFields[subscriptionSingular] = &graphql.Field{
-		Type: resourceType,
+		Type: eventType,
 		Args: itemArgsBuilder.
 			WithSubscribeToAll().
+			WithResourceVersion().
 			Complete(),
 		Resolve:     resolver.CreateSubscriptionResolver(true),
 		Subscribe:   g.resolver.SubscribeItem(*gvk, resourceScope),
@@ -377,9 +398,10 @@ func (g *Gateway) processSingleResource(
 
 	subscriptionPlural := strings.ToLower(fmt.Sprintf("%s_%s", gvk.Group, plural))
 	rootSubscriptionFields[subscriptionPlural] = &graphql.Field{
-		Type: graphql.NewList(resourceType),
+		Type: eventType,
 		Args: listArgsBuilder.
 			WithSubscribeToAll().
+			WithResourceVersion().
 			Complete(),
 		Resolve:     resolver.CreateSubscriptionResolver(false),
 		Subscribe:   g.resolver.SubscribeItems(*gvk, resourceScope),
