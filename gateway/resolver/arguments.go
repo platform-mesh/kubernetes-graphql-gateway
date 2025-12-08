@@ -88,7 +88,7 @@ func (b *FieldConfigArgumentsBuilder) WithSubscribeToAll() *FieldConfigArguments
 func (b *FieldConfigArgumentsBuilder) WithResourceVersion() *FieldConfigArgumentsBuilder {
 	b.arguments[ResourceVersionArg] = &graphql.ArgumentConfig{
 		Type:        graphql.String,
-		Description: "If set, subscription will stream changes starting from this resourceVersion. If omitted, starts from the latest.",
+		Description: "If set, subscription will stream changes starting from this resourceVersion. If omitted will return all",
 	}
 	return b
 }
