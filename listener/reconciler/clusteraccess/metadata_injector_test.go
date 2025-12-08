@@ -38,7 +38,6 @@ func TestInjectClusterMetadata(t *testing.T) {
 			mockSetup: func(m *mocks.MockClient) {},
 			wantMetadata: map[string]any{
 				"host": "https://test-cluster.example.com",
-				"path": "test-cluster",
 			},
 			wantErr: false,
 		},
@@ -55,7 +54,6 @@ func TestInjectClusterMetadata(t *testing.T) {
 			mockSetup: func(m *mocks.MockClient) {},
 			wantMetadata: map[string]any{
 				"host": "https://test-cluster.example.com",
-				"path": "custom-path",
 			},
 			wantErr: false,
 		},
@@ -83,7 +81,6 @@ func TestInjectClusterMetadata(t *testing.T) {
 			mockSetup: func(m *mocks.MockClient) {},
 			wantMetadata: map[string]any{
 				"host": "https://example.com",
-				"path": "",
 			},
 			wantErr: false,
 		},
@@ -100,7 +97,6 @@ func TestInjectClusterMetadata(t *testing.T) {
 			mockSetup: func(m *mocks.MockClient) {},
 			wantMetadata: map[string]any{
 				"host": "https://example.com",
-				"path": "",
 			},
 			wantErr: false,
 		},
@@ -116,7 +112,6 @@ func TestInjectClusterMetadata(t *testing.T) {
 			mockSetup: func(m *mocks.MockClient) {},
 			wantMetadata: map[string]any{
 				"host": "",
-				"path": "no-host-cluster",
 			},
 			wantErr: false,
 		},
@@ -133,7 +128,6 @@ func TestInjectClusterMetadata(t *testing.T) {
 			mockSetup: func(m *mocks.MockClient) {},
 			wantMetadata: map[string]any{
 				"host": "https://special.example.com",
-				"path": "special/chars_path.test",
 			},
 			wantErr: false,
 		},
@@ -149,7 +143,6 @@ func TestInjectClusterMetadata(t *testing.T) {
 			mockSetup: func(m *mocks.MockClient) {},
 			wantMetadata: map[string]any{
 				"host": "https://minimal.example.com",
-				"path": "minimal",
 			},
 			wantErr: false,
 		},
@@ -166,7 +159,6 @@ func TestInjectClusterMetadata(t *testing.T) {
 			mockSetup: func(m *mocks.MockClient) {},
 			wantMetadata: map[string]any{
 				"host": "https://example.com",
-				"path": "very/long/path/with/multiple/segments",
 			},
 			wantErr: false,
 		},
@@ -182,7 +174,6 @@ func TestInjectClusterMetadata(t *testing.T) {
 			mockSetup: func(m *mocks.MockClient) {},
 			wantMetadata: map[string]any{
 				"host": "https://unicode.example.com",
-				"path": "üñíçødé-cluster",
 			},
 			wantErr: false,
 		},
@@ -250,51 +241,4 @@ func TestInjectClusterMetadata(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestInjectClusterMetadata_PathLogic(t *testing.T) {
-	mockLogger, err := logger.New(logger.DefaultConfig())
-	require.NoError(t, err)
-	mockClient := mocks.NewMockClient(t)
-	schemaJSON := []byte(`{"openapi": "3.0.0", "info": {"title": "Test"}}`)
-
-	t.Run("path_precedence_custom_over_name", func(t *testing.T) {
-		clusterAccess := gatewayv1alpha1.ClusterAccess{
-			ObjectMeta: metav1.ObjectMeta{Name: "cluster-name"},
-			Spec: gatewayv1alpha1.ClusterAccessSpec{
-				Host: "https://test.example.com",
-				Path: "custom-path",
-			},
-		}
-
-		result, err := clusteraccess.InjectClusterMetadata(t.Context(), schemaJSON, clusterAccess, mockClient, mockLogger)
-		require.NoError(t, err)
-
-		var resultData map[string]any
-		err = json.Unmarshal(result, &resultData)
-		require.NoError(t, err)
-
-		metadata := resultData["x-cluster-metadata"].(map[string]any)
-		assert.Equal(t, "custom-path", metadata["path"])
-	})
-
-	t.Run("fallback_to_name_when_path_empty", func(t *testing.T) {
-		clusterAccess := gatewayv1alpha1.ClusterAccess{
-			ObjectMeta: metav1.ObjectMeta{Name: "fallback-name"},
-			Spec: gatewayv1alpha1.ClusterAccessSpec{
-				Host: "https://test.example.com",
-				Path: "",
-			},
-		}
-
-		result, err := clusteraccess.InjectClusterMetadata(t.Context(), schemaJSON, clusterAccess, mockClient, mockLogger)
-		require.NoError(t, err)
-
-		var resultData map[string]any
-		err = json.Unmarshal(result, &resultData)
-		require.NoError(t, err)
-
-		metadata := resultData["x-cluster-metadata"].(map[string]any)
-		assert.Equal(t, "fallback-name", metadata["path"])
-	})
 }
