@@ -3,7 +3,6 @@ package resolver
 import (
 	"fmt"
 	"reflect"
-	"sort"
 	"strings"
 
 	"github.com/graphql-go/graphql"
@@ -15,6 +14,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -24,6 +24,13 @@ import (
 
 var (
 	ErrFailedToCastEventObjectToUnstructured = fmt.Errorf("failed to cast event object to unstructured")
+)
+
+// Event type constants used in subscription envelopes
+const (
+	EventTypeAdded    = "ADDED"
+	EventTypeModified = "MODIFIED"
+	EventTypeDeleted  = "DELETED"
 )
 
 func (r *Service) SubscribeItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
@@ -75,6 +82,14 @@ func (r *Service) runWatch(
 		return
 	}
 
+	// optional resourceVersion to continue subscription from
+	resourceVersion, err := getStringArg(p.Args, ResourceVersionArg, false)
+	if err != nil {
+		r.log.Error().Err(err).Msg("Failed to get resourceVersion argument")
+		resultChannel <- errors.Wrap(err, "failed to get resourceVersion argument")
+		return
+	}
+
 	fieldsToWatch := extractRequestedFields(p.Info)
 
 	list := &unstructured.UnstructuredList{}
@@ -119,22 +134,51 @@ func (r *Service) runWatch(
 		opts = append(opts, client.MatchingFields{"metadata.name": name})
 	}
 
-	sortBy, err := getStringArg(p.Args, SortByArg, false)
-	if err != nil {
-		r.log.Error().Err(err).Msg("Failed to get sortBy argument")
-		resultChannel <- errors.Wrap(err, "failed to get sortBy argument")
-		return
-	}
+	// If no resourceVersion provided, perform an initial LIST to obtain current items and resourceVersion,
+	// If a resourceVersion is provided, start WATCH from that resourceVersion without initial listing.
 
-	if !singleItem {
-		select {
-		case <-ctx.Done():
+	var watchOpts []client.ListOption
+	watchOpts = append(watchOpts, opts...)
+
+	// Track last-seen objects for change detection on MODIFIED
+	previousObjects := make(map[string]*unstructured.Unstructured)
+
+	if resourceVersion == "" {
+		// Initial LIST without a resourceVersion to get current items and resourceVersion
+		if err := r.runtimeClient.List(ctx, list, opts...); err != nil {
+			r.log.Error().Err(err).Str("gvk", gvk.String()).Msg("Failed to list resources for initial watch state")
+			sentry.CaptureError(err, sentry.Tags{"namespace": namespace}, sentry.Extras{"gvk": gvk.String()})
+			resultChannel <- errors.Wrap(err, "failed to list resources for initial watch state")
 			return
-		case resultChannel <- []map[string]any{}:
 		}
+
+		for i := range list.Items {
+			item := list.Items[i]
+			key := item.GetNamespace() + "/" + item.GetName()
+			previousObjects[key] = item.DeepCopy()
+
+			envelope := map[string]any{
+				"type":   EventTypeAdded,
+				"object": item.Object,
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case resultChannel <- envelope:
+			}
+		}
+
+		// Start WATCH from the LIST's resourceVersion
+		rv := list.GetResourceVersion()
+		if rv != "" {
+			watchOpts = append(watchOpts, &client.ListOptions{Raw: &metav1.ListOptions{ResourceVersion: rv}})
+		}
+	} else {
+		// Start WATCH from provided resourceVersion
+		watchOpts = append(watchOpts, &client.ListOptions{Raw: &metav1.ListOptions{ResourceVersion: resourceVersion}})
 	}
 
-	watcher, err := r.runtimeClient.Watch(ctx, list, opts...)
+	watcher, err := r.runtimeClient.Watch(ctx, list, watchOpts...)
 	if err != nil {
 		r.log.Error().Err(err).Str("gvk", gvk.String()).Msg("Failed to start watch")
 
@@ -145,7 +189,6 @@ func (r *Service) runWatch(
 	}
 	defer watcher.Stop()
 
-	previousObjects := make(map[string]*unstructured.Unstructured)
 	for {
 		select {
 		case event, ok := <-watcher.ResultChan():
@@ -165,10 +208,12 @@ func (r *Service) runWatch(
 			key := obj.GetNamespace() + "/" + obj.GetName()
 
 			var sendUpdate bool
+			var eventType string
 			switch event.Type {
 			case watch.Added:
 				previousObjects[key] = obj.DeepCopy()
 				sendUpdate = true
+				eventType = EventTypeAdded
 			case watch.Modified:
 				oldObj := previousObjects[key]
 				if subscribeToAll {
@@ -187,55 +232,27 @@ func (r *Service) runWatch(
 					sendUpdate = changed
 				}
 				previousObjects[key] = obj.DeepCopy()
+				if sendUpdate {
+					eventType = EventTypeModified
+				}
 			case watch.Deleted:
 				delete(previousObjects, key)
 				sendUpdate = true
+				eventType = EventTypeDeleted
 			}
 
 			if sendUpdate {
-				if singleItem {
-					var singleObj *unstructured.Unstructured
-					if name != "" {
-						singleObj = previousObjects[namespace+"/"+name]
-					}
+				var payload any = obj.Object
 
-					var data any
-					if singleObj != nil { // object can be nil in case it is deleted
-						data = singleObj.Object
-					}
+				envelope := map[string]any{
+					"type":   eventType,
+					"object": payload,
+				}
 
-					select {
-					case <-ctx.Done():
-						return
-					case resultChannel <- data:
-					}
-				} else {
-					items := make([]unstructured.Unstructured, 0, len(previousObjects))
-					for _, item := range previousObjects {
-						items = append(items, *item.DeepCopy())
-					}
-
-					err = validateSortBy(items, sortBy)
-					if err != nil {
-						r.log.Error().Err(err).Str(SortByArg, sortBy).Msg("Invalid sortBy field path")
-						resultChannel <- errors.Wrap(err, "invalid sortBy field path")
-						return
-					}
-
-					sort.Slice(items, func(i, j int) bool {
-						return compareUnstructured(items[i], items[j], sortBy) < 0
-					})
-
-					sortedItems := make([]map[string]any, len(items))
-					for i, item := range items {
-						sortedItems[i] = item.Object
-					}
-
-					select {
-					case <-ctx.Done():
-						return
-					case resultChannel <- sortedItems:
-					}
+				select {
+				case <-ctx.Done():
+					return
+				case resultChannel <- envelope:
 				}
 			}
 		case <-ctx.Done():
@@ -249,7 +266,16 @@ func (r *Service) runWatch(
 func extractRequestedFields(info graphql.ResolveInfo) []string {
 	var fields []string
 	for _, fieldAST := range info.FieldASTs {
-		fields = append(fields, parseSelectionSet(fieldAST.SelectionSet, "")...)
+		if fieldAST.SelectionSet == nil {
+			continue
+		}
+		for _, sel := range fieldAST.SelectionSet.Selections {
+			if f, ok := sel.(*ast.Field); ok {
+				if f.Name.Value == "object" {
+					fields = append(fields, parseSelectionSet(f.SelectionSet, "")...)
+				}
+			}
+		}
 	}
 	return fields
 }
