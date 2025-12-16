@@ -21,11 +21,11 @@ import (
 
 func TestListItems(t *testing.T) {
 	tests := []struct {
-		name          string
-		args          map[string]any
-		mockSetup     func(runtimeClientMock *mocks.MockWithWatch)
-		expectedItems []map[string]any
-		expectError   bool
+		name           string
+		args           map[string]any
+		mockSetup      func(runtimeClientMock *mocks.MockWithWatch)
+		expectedResult map[string]any
+		expectError    bool
 	}{
 		{
 			name: "listItems_OK",
@@ -43,14 +43,62 @@ func TestListItems(t *testing.T) {
 						client.InNamespace("test-namespace"),
 					).
 					Run(func(_ context.Context, l client.ObjectList, _ ...client.ListOption) {
-						l.(*unstructured.UnstructuredList).Items = []unstructured.Unstructured{
+						ul := l.(*unstructured.UnstructuredList)
+						ul.Items = []unstructured.Unstructured{
 							{Object: map[string]any{"metadata": map[string]any{"name": "ns-object"}}},
 						}
+						ul.SetResourceVersion("12345")
+						ul.SetContinue("ctok")
+						var ric int64 = 12
+						ul.SetRemainingItemCount(&ric)
 					}).
 					Return(nil)
 			},
-			expectedItems: []map[string]any{
-				{"metadata": map[string]any{"name": "ns-object"}},
+			expectedResult: map[string]any{
+				"resourceVersion":    "12345",
+				"continue":           "ctok",
+				"remainingItemCount": int64(12),
+				"items": []map[string]any{
+					{"metadata": map[string]any{"name": "ns-object"}},
+				},
+			},
+		},
+		{
+			name: "listItems_with_pagination_args",
+			args: map[string]any{
+				resolver.NamespaceArg: "test-namespace",
+				resolver.SortByArg:    "metadata.name",
+				resolver.LimitArg:     1,
+				resolver.ContinueArg:  "abc",
+			},
+			mockSetup: func(runtimeClientMock *mocks.MockWithWatch) {
+				runtimeClientMock.EXPECT().
+					List(
+						mock.Anything,
+						mock.AnythingOfType("*unstructured.UnstructuredList"),
+						client.InNamespace("test-namespace"),
+						client.Limit(int64(1)),
+						client.Continue("abc"),
+					).
+					Run(func(_ context.Context, l client.ObjectList, _ ...client.ListOption) {
+						ul := l.(*unstructured.UnstructuredList)
+						ul.Items = []unstructured.Unstructured{
+							{Object: map[string]any{"metadata": map[string]any{"name": "a"}}},
+						}
+						ul.SetResourceVersion("200")
+						ul.SetContinue("")
+						var ric int64 = 0
+						ul.SetRemainingItemCount(&ric)
+					}).
+					Return(nil)
+			},
+			expectedResult: map[string]any{
+				"resourceVersion":    "200",
+				"continue":           "",
+				"remainingItemCount": int64(0),
+				"items": []map[string]any{
+					{"metadata": map[string]any{"name": "a"}},
+				},
 			},
 		},
 		{
@@ -67,8 +115,8 @@ func TestListItems(t *testing.T) {
 			args: map[string]any{
 				resolver.LabelSelectorArg: ",,",
 			},
-			expectedItems: nil,
-			expectError:   true,
+			expectedResult: nil,
+			expectError:    true,
 		},
 	}
 
@@ -93,7 +141,7 @@ func TestListItems(t *testing.T) {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				require.Equal(t, tt.expectedItems, result)
+				require.Equal(t, tt.expectedResult, result)
 			}
 		})
 	}

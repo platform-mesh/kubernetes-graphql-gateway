@@ -21,9 +21,11 @@ func (s *IntegrationTestSuite) TestConfigMapCRUD() {
 				query {
 					core {
 						ConfigMaps {
-							metadata {
-								name
-								namespace
+							items {
+								metadata {
+									name
+									namespace
+								}
 							}
 						}
 					}
@@ -117,9 +119,11 @@ func (s *IntegrationTestSuite) TestConfigMapCRUD() {
 				query ListConfigMaps($namespace: String!, $labelselector: String!) {
 					core {
 						ConfigMaps(namespace: $namespace, labelselector: $labelselector) {
-							metadata {
-								name
-								labels
+							items {
+								metadata {
+									name
+									labels
+								}
 							}
 						}
 					}
