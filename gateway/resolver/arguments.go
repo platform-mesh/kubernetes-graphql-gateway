@@ -21,6 +21,8 @@ const (
 	SortByArg          = "sortBy"
 	DryRunArg          = "dryRun"
 	ResourceVersionArg = "resourceVersion"
+	LimitArg           = "limit"
+	ContinueArg        = "continue"
 )
 
 // FieldConfigArgumentsBuilder helps construct GraphQL field config arguments
@@ -102,6 +104,24 @@ func (b *FieldConfigArgumentsBuilder) WithSortBy() *FieldConfigArgumentsBuilder 
 	return b
 }
 
+// WithLimit adds a pagination limit argument for list queries
+func (b *FieldConfigArgumentsBuilder) WithLimit() *FieldConfigArgumentsBuilder {
+	b.arguments[LimitArg] = &graphql.ArgumentConfig{
+		Type:        graphql.Int,
+		Description: "Maximum number of items to return (server may return fewer)",
+	}
+	return b
+}
+
+// WithContinue adds a pagination continue token argument for list queries
+func (b *FieldConfigArgumentsBuilder) WithContinue() *FieldConfigArgumentsBuilder {
+	b.arguments[ContinueArg] = &graphql.ArgumentConfig{
+		Type:        graphql.String,
+		Description: "Continue token from a previous list call to retrieve the next page",
+	}
+	return b
+}
+
 // Complete returns the constructed arguments and dereferences the builder
 func (b *FieldConfigArgumentsBuilder) Complete() graphql.FieldConfigArgument {
 	return maps.Clone(b.arguments)
@@ -155,6 +175,26 @@ func getBoolArg(args map[string]any, key string, required bool) (bool, error) {
 	}
 
 	return res, nil
+}
+
+func getIntArg(args map[string]any, key string, required bool) (int, error) {
+	val, exists := args[key]
+	if !exists {
+		if required {
+			err := errors.New("missing required argument: " + key)
+			log.Error().Err(err).Msg(key + " argument is required")
+			return 0, err
+		}
+		return 0, nil
+	}
+
+	num, ok := val.(int)
+	if !ok {
+		err := errors.New("invalid type for argument: " + key)
+		log.Error().Err(err).Msg(key + " argument must be an int")
+		return 0, err
+	}
+	return num, nil
 }
 
 func isResourceNamespaceScoped(resourceScope apiextensionsv1.ResourceScope) bool {

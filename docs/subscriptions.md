@@ -28,7 +28,7 @@ Behavior alignment with Kubernetes watch:
 - If you start a subscription WITHOUT providing `resourceVersion`, the gateway will emit an `ADDED` event for every existing object first (initial sync), then continue streaming subsequent changes.
 - If you provide a `resourceVersion`, the gateway will stream only events that happened after that version.
 
-Recommendation: To avoid the initial burst of `ADDED` events on large collections, first issue a list query to obtain `metadata.resourceVersion`, then open the subscription with that `resourceVersion`.
+Recommendation: To avoid the initial burst of `ADDED` events on large collections, first issue a list query to obtain the list `resourceVersion` (returned alongside the items), then open the subscription with that `resourceVersion`.
 
 Example variables:
 
@@ -111,7 +111,7 @@ curl \
 
 ### Starting from a specific resourceVersion
 
-To start from a known `resourceVersion` collected from a prior query, pass the `resourceVersion` argument:
+To start from a known `resourceVersion` collected from a prior list query, pass the `resourceVersion` argument:
 
 ```shell
 curl \
@@ -119,5 +119,60 @@ curl \
   -H "Content-Type: application/json" \
   -H "Authorization: $AUTHORIZATION_TOKEN" \
   -d '{"query": "subscription ($rv: String) { core_configmaps(resourceVersion: $rv) { type object { metadata { name resourceVersion } } } }", "variables": {"rv":"12345"}}' \
+  $GRAPHQL_URL
+```
+
+## Plural list queries return pagination metadata
+
+Plural queries (returning multiple items) now return an object with the list metadata and items instead of a bare array. The object contains:
+
+- `resourceVersion: String` — list resourceVersion for starting subscriptions
+- `continue: String` — pagination token to retrieve the next page
+- `remainingItemCount: Int` — hint of how many items remain on the server
+- `items: [Item!]!` — the current page of items
+
+Example for ConfigMaps:
+
+```shell
+curl \
+  -H "Content-Type: application/json" \
+  -H "Authorization: $AUTHORIZATION_TOKEN" \
+  -d '{
+    "query": "query { core { ConfigMaps { resourceVersion continue remainingItemCount items { metadata { name resourceVersion } data } } } }"
+  }' \
+  $GRAPHQL_URL
+```
+
+Use the top-level `resourceVersion` from the list to start subscriptions without receiving the initial `ADDED` events burst.
+
+### Pagination arguments
+
+Plural list fields accept optional pagination arguments:
+
+- `limit: Int` — maximum number of items to return (server may return fewer)
+- `continue: String` — pass the token from a previous page to continue the listing
+
+Example using pagination:
+
+```shell
+curl \
+  -H "Content-Type: application/json" \
+  -H "Authorization: $AUTHORIZATION_TOKEN" \
+  -d '{
+    "query": "query { core { ConfigMaps(limit: 10) { continue items { metadata { name } } } } }"
+  }' \
+  $GRAPHQL_URL
+```
+
+Then use the returned `continue` token to fetch the next page:
+
+```shell
+curl \
+  -H "Content-Type: application/json" \
+  -H "Authorization: $AUTHORIZATION_TOKEN" \
+  -d '{
+    "query": "query($tok: String) { core { ConfigMaps(limit: 10, continue: $tok) { continue remainingItemCount items { metadata { name } } } } }",
+    "variables": {"tok": "<token-from-previous-response>"}
+  }' \
   $GRAPHQL_URL
 ```
