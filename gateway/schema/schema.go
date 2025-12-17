@@ -322,7 +322,9 @@ func (g *Gateway) processSingleResource(
 
 	listArgsBuilder := resolver.NewFieldConfigArguments().
 		WithLabelSelector().
-		WithSortBy()
+		WithSortBy().
+		WithLimit().
+		WithContinue()
 
 	itemArgsBuilder := resolver.NewFieldConfigArguments().WithName()
 
@@ -338,8 +340,18 @@ func (g *Gateway) processSingleResource(
 	itemArgs := itemArgsBuilder.Complete()
 	creationMutationArgs := creationMutationArgsBuilder.Complete()
 
+	listWrapperType := graphql.NewObject(graphql.ObjectConfig{
+		Name: singular + "List",
+		Fields: graphql.Fields{
+			"resourceVersion":    &graphql.Field{Type: graphql.String},
+			"items":              &graphql.Field{Type: graphql.NewNonNull(graphql.NewList(graphql.NewNonNull(resourceType)))},
+			"continue":           &graphql.Field{Type: graphql.String},
+			"remainingItemCount": &graphql.Field{Type: graphql.Int},
+		},
+	})
+
 	queryGroupType.AddFieldConfig(plural, &graphql.Field{
-		Type:    graphql.NewNonNull(graphql.NewList(graphql.NewNonNull(resourceType))),
+		Type:    graphql.NewNonNull(listWrapperType),
 		Args:    listArgs,
 		Resolve: g.resolver.ListItems(*gvk, resourceScope),
 	})

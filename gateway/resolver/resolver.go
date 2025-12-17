@@ -120,6 +120,22 @@ func (r *Service) ListItems(gvk schema.GroupVersionKind, scope v1.ResourceScope)
 			}
 		}
 
+		limit, err := getIntArg(p.Args, LimitArg, false)
+		if err != nil {
+			return nil, err
+		}
+		if limit > 0 {
+			opts = append(opts, client.Limit(int64(limit)))
+		}
+
+		continueToken, err := getStringArg(p.Args, ContinueArg, false)
+		if err != nil {
+			return nil, err
+		}
+		if continueToken != "" {
+			opts = append(opts, client.Continue(continueToken))
+		}
+
 		if err = r.runtimeClient.List(ctx, list, opts...); err != nil {
 			log.Error().Err(err).Msg("Unable to list objects")
 			return nil, pkgErrors.Wrap(err, "unable to list objects")
@@ -145,7 +161,19 @@ func (r *Service) ListItems(gvk schema.GroupVersionKind, scope v1.ResourceScope)
 			items[i] = item.Object
 		}
 
-		return items, nil
+		var ric any
+		if v := list.GetRemainingItemCount(); v != nil {
+			ric = *v
+		} else {
+			ric = nil
+		}
+
+		return map[string]any{
+			"resourceVersion":    list.GetResourceVersion(),
+			"items":              items,
+			"continue":           list.GetContinue(),
+			"remainingItemCount": ric,
+		}, nil
 	}
 }
 
