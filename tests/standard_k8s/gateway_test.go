@@ -20,11 +20,13 @@ func (s *IntegrationTestSuite) TestConfigMapCRUD() {
 			Query: `
 				query {
 					core {
-						ConfigMaps {
-							items {
-								metadata {
-									name
-									namespace
+						v1 {
+							ConfigMaps {
+								items {
+									metadata {
+										name
+										namespace
+									}
 								}
 							}
 						}
@@ -42,12 +44,14 @@ func (s *IntegrationTestSuite) TestConfigMapCRUD() {
 			Query: `
 				mutation CreateConfigMap($namespace: String!, $object: ConfigMapInput!) {
 					core {
-						createConfigMap(namespace: $namespace, object: $object) {
-							metadata {
-								name
-								namespace
+						v1 {
+							createConfigMap(namespace: $namespace, object: $object) {
+								metadata {
+									name
+									namespace
+								}
+								data
 							}
-							data
 						}
 					}
 				}
@@ -92,13 +96,15 @@ func (s *IntegrationTestSuite) TestConfigMapCRUD() {
 			Query: `
 				query GetConfigMap($name: String!, $namespace: String!) {
 					core {
-						ConfigMap(name: $name, namespace: $namespace) {
-							metadata {
-								name
-								namespace
-								labels
+						v1 {
+							ConfigMap(name: $name, namespace: $namespace) {
+								metadata {
+									name
+									namespace
+									labels
+								}
+								data
 							}
-							data
 						}
 					}
 				}
@@ -118,11 +124,13 @@ func (s *IntegrationTestSuite) TestConfigMapCRUD() {
 			Query: `
 				query ListConfigMaps($namespace: String!, $labelselector: String!) {
 					core {
-						ConfigMaps(namespace: $namespace, labelselector: $labelselector) {
-							items {
-								metadata {
-									name
-									labels
+						v1 {
+							ConfigMaps(namespace: $namespace, labelselector: $labelselector) {
+								items {
+									metadata {
+										name
+										labels
+									}
 								}
 							}
 						}
@@ -144,12 +152,14 @@ func (s *IntegrationTestSuite) TestConfigMapCRUD() {
 			Query: `
 				mutation UpdateConfigMap($name: String!, $namespace: String!, $object: ConfigMapInput!) {
 					core {
-						updateConfigMap(name: $name, namespace: $namespace, object: $object) {
-							metadata {
-								name
-								namespace
+						v1 {
+							updateConfigMap(name: $name, namespace: $namespace, object: $object) {
+								metadata {
+									name
+									namespace
+								}
+								data
 							}
-							data
 						}
 					}
 				}
@@ -195,7 +205,9 @@ func (s *IntegrationTestSuite) TestConfigMapCRUD() {
 			Query: `
 				mutation DeleteConfigMap($name: String!, $namespace: String!) {
 					core {
-						deleteConfigMap(name: $name, namespace: $namespace)
+						v1 {
+							deleteConfigMap(name: $name, namespace: $namespace)
+						}
 					}
 				}
 			`,

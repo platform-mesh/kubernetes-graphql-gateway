@@ -1,7 +1,7 @@
 # Subscriptions
 
 To subscribe to events, you should use the SSE (Server-Sent Events) protocol.
-Since GraphQL playground doesn't support SSE (see [Quick Start Guide](./quickstart.md)), we won't use the GraphQL playground to execute the queries.
+Since GraphiQL doesn't support SSE (see [Quick Start Guide](./quickstart.md)), we won't use the GraphQL playground to execute the queries.
 Instead, we use the `curl` command line tool to execute the queries.
 
 ## Prerequisites
@@ -16,7 +16,26 @@ Otherwise, only fields defined within the `{}` brackets will be listened to.
 
 **Note:** Only fields specified in `{}` brackets will be returned, even if `subscribeToAll: true`.
 
-### Event Envelope
+## Naming scheme (subscriptions)
+
+Subscriptions are flat but versioned: `<group>_<version>_<resource>`.
+
+- Core group examples:
+  - All ConfigMaps (core/v1): `core_v1_configmaps`
+  - Single ConfigMap: `core_v1_configmap`
+- Non-core group examples (dots replaced with underscores):
+  - Accounts (openmfp.org/v1alpha1): `openmfp_org_v1alpha1_accounts` and `openmfp_org_v1alpha1_account`
+
+Group and version match the hierarchical query/mutation path:
+```
+query {
+  core {
+    v1 { ConfigMaps { resourceVersion items { metadata { name } } } }
+  }
+}
+```
+
+## Event Envelope
 
 Subscriptions stream only changes as events. Each event is an object with:
 
@@ -48,7 +67,7 @@ curl \
   -H "Accept: text/event-stream" \
   -H "Content-Type: application/json" \
   -H "Authorization: $AUTHORIZATION_TOKEN" \
-  -d '{"query": "subscription { core_configmaps { type object { metadata { name resourceVersion } data } } }"}' \
+  -d '{"query": "subscription { core_v1_configmaps { type object { metadata { name resourceVersion } data } } }"}' \
   $GRAPHQL_URL
 ```
 ### Subscribe to a Change of a Data Field in a Specific ConfigMap
@@ -58,7 +77,7 @@ curl \
   -H "Accept: text/event-stream" \
   -H "Content-Type: application/json" \
   -H "Authorization: $AUTHORIZATION_TOKEN" \
-  -d '{"query": "subscription { core_configmap(name: \"example-config\", namespace: \"default\") { type object { metadata { name resourceVersion } data } } }"}' \
+  -d '{"query": "subscription { core_v1_configmap(name: \"example-config\", namespace: \"default\") { type object { metadata { name resourceVersion } data } } }"}' \
   $GRAPHQL_URL
 ```
 
@@ -69,7 +88,7 @@ curl \
   -H "Accept: text/event-stream" \
   -H "Content-Type: application/json" \
   -H "Authorization: $AUTHORIZATION_TOKEN" \
-  -d '{"query": "subscription { core_configmap(name: \"example-config\", namespace: \"default\", subscribeToAll: true) { type object { metadata { name resourceVersion } } } }"}' \
+  -d '{"query": "subscription { core_v1_configmap(name: \"example-config\", namespace: \"default\", subscribeToAll: true) { type object { metadata { name resourceVersion } } } }"}' \
   $GRAPHQL_URL
 ```
 
@@ -85,7 +104,7 @@ curl \
   -H "Accept: text/event-stream" \
   -H "Content-Type: application/json" \
   -H "Authorization: $AUTHORIZATION_TOKEN" \
-  -d '{"query": "subscription { core_openmfp_org_accounts { type object { spec { displayName } metadata { resourceVersion } } } }"}' \
+  -d '{"query": "subscription { openmfp_org_v1alpha1_accounts { type object { spec { displayName } metadata { resourceVersion } } } }"}' \
   $GRAPHQL_URL
 ```
 
@@ -95,7 +114,7 @@ curl \
   -H "Accept: text/event-stream" \
   -H "Content-Type: application/json" \
   -H "Authorization: $AUTHORIZATION_TOKEN" \
-  -d '{"query": "subscription { core_openmfp_org_account(name: \"root-account\") { type object { spec { displayName } metadata { resourceVersion } } } }"}' \
+  -d '{"query": "subscription { openmfp_org_v1alpha1_account(name: \"root-account\") { type object { spec { displayName } metadata { resourceVersion } } } }"}' \
   $GRAPHQL_URL
 ```
 
@@ -105,7 +124,7 @@ curl \
   -H "Accept: text/event-stream" \
   -H "Content-Type: application/json" \
   -H "Authorization: $AUTHORIZATION_TOKEN" \
-  -d '{"query": "subscription { core_openmfp_org_account(name: \"root-account\", subscribeToAll: true) { type object { metadata { name resourceVersion } } } }"}' \
+  -d '{"query": "subscription { openmfp_org_v1alpha1_account(name: \"root-account\", subscribeToAll: true) { type object { metadata { name resourceVersion } } } }"}' \
   $GRAPHQL_URL
 ```
 
@@ -118,7 +137,7 @@ curl \
   -H "Accept: text/event-stream" \
   -H "Content-Type: application/json" \
   -H "Authorization: $AUTHORIZATION_TOKEN" \
-  -d '{"query": "subscription ($rv: String) { core_configmaps(resourceVersion: $rv) { type object { metadata { name resourceVersion } } } }", "variables": {"rv":"12345"}}' \
+  -d '{"query": "subscription ($rv: String) { core_v1_configmaps(resourceVersion: $rv) { type object { metadata { name resourceVersion } } } }", "variables": {"rv":"12345"}}' \
   $GRAPHQL_URL
 ```
 
@@ -138,7 +157,7 @@ curl \
   -H "Content-Type: application/json" \
   -H "Authorization: $AUTHORIZATION_TOKEN" \
   -d '{
-    "query": "query { core { ConfigMaps { resourceVersion continue remainingItemCount items { metadata { name resourceVersion } data } } } }"
+    "query": "query { core { v1 { ConfigMaps { resourceVersion continue remainingItemCount items { metadata { name resourceVersion } data } } } } }"
   }' \
   $GRAPHQL_URL
 ```
@@ -159,7 +178,7 @@ curl \
   -H "Content-Type: application/json" \
   -H "Authorization: $AUTHORIZATION_TOKEN" \
   -d '{
-    "query": "query { core { ConfigMaps(limit: 10) { continue items { metadata { name } } } } }"
+    "query": "query { core { v1 { ConfigMaps(limit: 10) { continue items { metadata { name } } } } } }"
   }' \
   $GRAPHQL_URL
 ```
@@ -171,7 +190,7 @@ curl \
   -H "Content-Type: application/json" \
   -H "Authorization: $AUTHORIZATION_TOKEN" \
   -d '{
-    "query": "query($tok: String) { core { ConfigMaps(limit: 10, continue: $tok) { continue remainingItemCount items { metadata { name } } } } }",
+    "query": "query($tok: String) { core { v1 { ConfigMaps(limit: 10, continue: $tok) { continue remainingItemCount items { metadata { name } } } } } }",
     "variables": {"tok": "<token-from-previous-response>"}
   }' \
   $GRAPHQL_URL

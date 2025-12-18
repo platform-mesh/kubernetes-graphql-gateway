@@ -36,6 +36,12 @@ All information about authorization can be found in the [authorization](./docs/a
 
 If you want to get started quickly, you can follow the [quickstart guide](./docs/quickstart.md).
 
+## Breaking changes and migration
+
+The list of recent breaking changes and how to migrate can be found in the dedicated document:
+
+- [Breaking Changes and Migration Guide](./docs/breaking-changes.md)
+
 ## Contributing
 Please refer to the [contributing](./docs/contributing.md) section for instructions on how to contribute to platform-mesh.
 

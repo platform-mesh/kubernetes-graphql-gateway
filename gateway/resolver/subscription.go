@@ -242,7 +242,24 @@ func (r *Service) runWatch(
 			}
 
 			if sendUpdate {
+				// Safety: ensure eventType is always set to a known value
+				if eventType == "" {
+					eventType = EventTypeModified
+				}
+
 				var payload any = obj.Object
+
+				// Ensure payload is a non-nil map; if not, provide minimal metadata so
+				// clients can reconcile caches
+				if m, ok := payload.(map[string]any); !ok || m == nil {
+					payload = map[string]any{
+						"metadata": map[string]any{
+							"name":            obj.GetName(),
+							"namespace":       obj.GetNamespace(),
+							"resourceVersion": obj.GetResourceVersion(),
+						},
+					}
+				}
 
 				envelope := map[string]any{
 					"type":   eventType,

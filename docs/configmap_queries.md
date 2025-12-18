@@ -7,7 +7,8 @@ For questions on how to execute them, please find our [Quick Start Guide](./quic
 ```shell
 mutation {
   core {
-    createConfigMap(
+    v1 {
+      createConfigMap(
       namespace: "default",
       object: {
         metadata: {
@@ -15,11 +16,12 @@ mutation {
         },
         data: { key: "val" }
       }
-    ) {
-      metadata {
-        name
+      ) {
+        metadata {
+          name
+        }
+        data
       }
-      data
     }
   }
 }
@@ -27,13 +29,22 @@ mutation {
 
 ## List ConfigMaps:
 ```shell
-{
+query {
   core {
-    ConfigMaps {
-      metadata {
-        name
+    v1 {
+      ConfigMaps {
+        resourceVersion
+        continue
+        remainingItemCount
+        items {
+          metadata {
+            name
+            namespace
+            resourceVersion
+          }
+          data
+        }
       }
-      data
     }
   }
 }
@@ -43,11 +54,13 @@ mutation {
 ```shell
 {
   core {
-    ConfigMap(name: "example-config", namespace: "default") {
-      metadata {
-        name
+    v1 {
+      ConfigMap(name: "example-config", namespace: "default") {
+        metadata {
+          name
+        }
+        data
       }
-      data
     }
   }
 }
@@ -57,18 +70,20 @@ mutation {
 ```shell
 mutation {
   core {
-    updateConfigMap(
-      name:"example-config"
-      namespace: "default",
-      object: {
-        data: { key: "new-value" }
+    v1 {
+      updateConfigMap(
+        name:"example-config"
+        namespace: "default",
+        object: {
+          data: { key: "new-value" }
+        }
+      ) {
+        metadata {
+          name
+          namespace
+        }
+        data
       }
-    ) {
-      metadata {
-        name
-        namespace
-      }
-      data
     }
   }
 }
@@ -78,10 +93,12 @@ mutation {
 ```shell
 mutation {
   core {
-    deleteConfigMap(
-      name: "example-config", 
-      namespace: "default"
-    )
+    v1 {
+      deleteConfigMap(
+        name: "example-config", 
+        namespace: "default"
+      )
+    }
   }
 }
 ```

@@ -7,48 +7,50 @@ For questions on how to execute them, please find our [Quick Start Guide](./quic
 ```shell
 mutation {
   core {
-    createPod(
-      namespace: "default",
-      object: {
-        metadata: {
-          name: "my-new-pod",
-          labels: {
-            app: "my-app"
-          }
-        }
-        spec: {
-          containers: [
-            {
-              name: "nginx-container"
-              image: "nginx:latest"
-              ports: [
-                {
-                  containerPort: 80
-                }
-              ]
+    v1 {
+      createPod(
+        namespace: "default",
+        object: {
+          metadata: {
+            name: "my-new-pod",
+            labels: {
+              app: "my-app"
             }
-          ]
-          restartPolicy: "Always"
-        }
-      }
-    ) {
-      metadata {
-        name
-        namespace
-        labels
-      }
-      spec {
-        containers {
-          name
-          image
-          ports {
-            containerPort
+          }
+          spec: {
+            containers: [
+              {
+                name: "nginx-container"
+                image: "nginx:latest"
+                ports: [
+                  {
+                    containerPort: 80
+                  }
+                ]
+              }
+            ]
+            restartPolicy: "Always"
           }
         }
-        restartPolicy
-      }
-      status {
-        phase
+      ) {
+        metadata {
+          name
+          namespace
+          labels
+        }
+        spec {
+          containers {
+            name
+            image
+            ports {
+              containerPort
+            }
+          }
+          restartPolicy
+        }
+        status {
+          phase
+        }
       }
     }
   }
@@ -59,15 +61,17 @@ mutation {
 ```shell
 query {
   core {
-    Pod(name:"my-new-pod", namespace:"default") {
-      metadata {
-        name
-      }
-      spec{
-        containers {
-          image
-          ports {
-            containerPort
+    v1 {
+      Pod(name:"my-new-pod", namespace:"default") {
+        metadata {
+          name
+        }
+        spec{
+          containers {
+            image
+            ports {
+              containerPort
+            }
           }
         }
       }
@@ -80,10 +84,12 @@ query {
 ```shell
 mutation {
   core {
-    deletePod(
-      namespace: "default",
-      name: "my-new-pod"
-    )
+    v1 {
+      deletePod(
+        namespace: "default",
+        name: "my-new-pod"
+      )
+    }
   }
 }
 ```
