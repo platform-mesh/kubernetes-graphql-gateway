@@ -242,11 +242,6 @@ func (r *Service) runWatch(
 			}
 
 			if sendUpdate {
-				// Safety: ensure eventType is always set to a known value
-				if eventType == "" {
-					eventType = EventTypeModified
-				}
-
 				var payload any = obj.Object
 
 				// Ensure payload is a non-nil map; if not, provide minimal metadata so
