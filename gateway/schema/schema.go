@@ -90,15 +90,15 @@ func (g *Gateway) generateGraphqlSchema() error {
 
 	newSchema, err := graphql.NewSchema(graphql.SchemaConfig{
 		Query: graphql.NewObject(graphql.ObjectConfig{
-			Name:   "PrivateNameForQuery",
+			Name:   "Query",
 			Fields: rootQueryFields,
 		}),
 		Mutation: graphql.NewObject(graphql.ObjectConfig{
-			Name:   "PrivateNameForMutation",
+			Name:   "Mutation",
 			Fields: rootMutationFields,
 		}),
 		Subscription: graphql.NewObject(graphql.ObjectConfig{
-			Name:   "PrivateNameForSubscription",
+			Name:   "Subscription",
 			Fields: rootSubscriptionFields,
 		}),
 	})
@@ -214,7 +214,6 @@ func (g *Gateway) processGroupedResources(
 		versions[gvk.Version][resourceKey] = resourceScheme
 	}
 
-	// For each version, create a nested object under the group
 	for versionStr, resources := range versions {
 		// Version objects
 		queryVersionType := graphql.NewObject(graphql.ObjectConfig{
@@ -237,32 +236,50 @@ func (g *Gateway) processGroupedResources(
 			)
 		}
 
-		// Attach version objects under the group only if they have fields
-		if len(queryVersionType.Fields()) > 0 {
-			queryGroupType.AddFieldConfig(versionStr, &graphql.Field{
-				Type:    queryVersionType,
-				Resolve: g.resolver.CommonResolver(),
-			})
-		}
-		if len(mutationVersionType.Fields()) > 0 {
-			mutationGroupType.AddFieldConfig(versionStr, &graphql.Field{
-				Type:    mutationVersionType,
-				Resolve: g.resolver.CommonResolver(),
-			})
+		// Attach version objects
+		if group == "core" {
+			// Target: expose core versions (e.g., v1) directly at root
+			if len(queryVersionType.Fields()) > 0 {
+				rootQueryFields[versionStr] = &graphql.Field{
+					Type:    queryVersionType,
+					Resolve: g.resolver.CommonResolver(),
+				}
+			}
+			if len(mutationVersionType.Fields()) > 0 {
+				rootMutationFields[versionStr] = &graphql.Field{
+					Type:    mutationVersionType,
+					Resolve: g.resolver.CommonResolver(),
+				}
+			}
+		} else {
+			// Default: attach version under the API group
+			if len(queryVersionType.Fields()) > 0 {
+				queryGroupType.AddFieldConfig(versionStr, &graphql.Field{
+					Type:    queryVersionType,
+					Resolve: g.resolver.CommonResolver(),
+				})
+			}
+			if len(mutationVersionType.Fields()) > 0 {
+				mutationGroupType.AddFieldConfig(versionStr, &graphql.Field{
+					Type:    mutationVersionType,
+					Resolve: g.resolver.CommonResolver(),
+				})
+			}
 		}
 	}
 
-	// Attach group objects at root
-	if len(queryGroupType.Fields()) > 0 {
-		rootQueryFields[group] = &graphql.Field{
-			Type:    queryGroupType,
-			Resolve: g.resolver.CommonResolver(),
+	if group != "core" {
+		if len(queryGroupType.Fields()) > 0 {
+			rootQueryFields[group] = &graphql.Field{
+				Type:    queryGroupType,
+				Resolve: g.resolver.CommonResolver(),
+			}
 		}
-	}
-	if len(mutationGroupType.Fields()) > 0 {
-		rootMutationFields[group] = &graphql.Field{
-			Type:    mutationGroupType,
-			Resolve: g.resolver.CommonResolver(),
+		if len(mutationGroupType.Fields()) > 0 {
+			rootMutationFields[group] = &graphql.Field{
+				Type:    mutationGroupType,
+				Resolve: g.resolver.CommonResolver(),
+			}
 		}
 	}
 }
@@ -395,8 +412,13 @@ func (g *Gateway) processSingleResource(
 		},
 	})
 
-	// Subscription field names are flat but versioned: <group>_<version>_<resource>
-	subscriptionSingular := strings.ToLower(fmt.Sprintf("%s_%s_%s", gvk.Group, gvk.Version, singular))
+	// Subscription field names are flat but versioned.
+	var subscriptionSingular string
+	if gvk.Group == "core" {
+		subscriptionSingular = strings.ToLower(fmt.Sprintf("%s_%s", gvk.Version, singular))
+	} else {
+		subscriptionSingular = strings.ToLower(fmt.Sprintf("%s_%s_%s", gvk.Group, gvk.Version, singular))
+	}
 	rootSubscriptionFields[subscriptionSingular] = &graphql.Field{
 		Type: eventType,
 		Args: itemArgsBuilder.
@@ -408,7 +430,12 @@ func (g *Gateway) processSingleResource(
 		Description: fmt.Sprintf("Subscribe to changes of %s", singular),
 	}
 
-	subscriptionPlural := strings.ToLower(fmt.Sprintf("%s_%s_%s", gvk.Group, gvk.Version, plural))
+	var subscriptionPlural string
+	if gvk.Group == "core" {
+		subscriptionPlural = strings.ToLower(fmt.Sprintf("%s_%s", gvk.Version, plural))
+	} else {
+		subscriptionPlural = strings.ToLower(fmt.Sprintf("%s_%s_%s", gvk.Group, gvk.Version, plural))
+	}
 	rootSubscriptionFields[subscriptionPlural] = &graphql.Field{
 		Type: eventType,
 		Args: listArgsBuilder.

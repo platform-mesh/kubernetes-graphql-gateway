@@ -18,20 +18,18 @@ Otherwise, only fields defined within the `{}` brackets will be listened to.
 
 ## Naming scheme (subscriptions)
 
-Subscriptions are flat but versioned: `<group>_<version>_<resource>`.
+Subscriptions are flat but versioned. To align with the removal of the artificial core group:
 
-- Core group examples:
-  - All ConfigMaps (core/v1): `core_v1_configmaps`
-  - Single ConfigMap: `core_v1_configmap`
-- Non-core group examples (dots replaced with underscores):
+- Core resources use `v<version>_<resource>`.
+  - All ConfigMaps (core/v1): `v1_configmaps`
+  - Single ConfigMap: `v1_configmap`
+- Non‑core (CRDs) remain `<group>_<version>_<resource>` (dots in group replaced with underscores):
   - Accounts (openmfp.org/v1alpha1): `openmfp_org_v1alpha1_accounts` and `openmfp_org_v1alpha1_account`
 
-Group and version match the hierarchical query/mutation path:
+Group and version match the hierarchical query/mutation path. For example, the corresponding list query is:
 ```
 query {
-  core {
-    v1 { ConfigMaps { resourceVersion items { metadata { name } } } }
-  }
+  v1 { ConfigMaps { resourceVersion items { metadata { name } } } }
 }
 ```
 
@@ -67,7 +65,7 @@ curl \
   -H "Accept: text/event-stream" \
   -H "Content-Type: application/json" \
   -H "Authorization: $AUTHORIZATION_TOKEN" \
-  -d '{"query": "subscription { core_v1_configmaps { type object { metadata { name resourceVersion } data } } }"}' \
+  -d '{"query": "subscription { v1_configmaps { type object { metadata { name resourceVersion } data } } }"}' \
   $GRAPHQL_URL
 ```
 ### Subscribe to a Change of a Data Field in a Specific ConfigMap
@@ -77,7 +75,7 @@ curl \
   -H "Accept: text/event-stream" \
   -H "Content-Type: application/json" \
   -H "Authorization: $AUTHORIZATION_TOKEN" \
-  -d '{"query": "subscription { core_v1_configmap(name: \"example-config\", namespace: \"default\") { type object { metadata { name resourceVersion } data } } }"}' \
+  -d '{"query": "subscription { v1_configmap(name: \"example-config\", namespace: \"default\") { type object { metadata { name resourceVersion } data } } }"}' \
   $GRAPHQL_URL
 ```
 
@@ -88,7 +86,7 @@ curl \
   -H "Accept: text/event-stream" \
   -H "Content-Type: application/json" \
   -H "Authorization: $AUTHORIZATION_TOKEN" \
-  -d '{"query": "subscription { core_v1_configmap(name: \"example-config\", namespace: \"default\", subscribeToAll: true) { type object { metadata { name resourceVersion } } } }"}' \
+  -d '{"query": "subscription { v1_configmap(name: \"example-config\", namespace: \"default\", subscribeToAll: true) { type object { metadata { name resourceVersion } } } }"}' \
   $GRAPHQL_URL
 ```
 
@@ -137,7 +135,7 @@ curl \
   -H "Accept: text/event-stream" \
   -H "Content-Type: application/json" \
   -H "Authorization: $AUTHORIZATION_TOKEN" \
-  -d '{"query": "subscription ($rv: String) { core_v1_configmaps(resourceVersion: $rv) { type object { metadata { name resourceVersion } } } }", "variables": {"rv":"12345"}}' \
+  -d '{"query": "subscription ($rv: String) { v1_configmaps(resourceVersion: $rv) { type object { metadata { name resourceVersion } } } }", "variables": {"rv":"12345"}}' \
   $GRAPHQL_URL
 ```
 
@@ -157,7 +155,7 @@ curl \
   -H "Content-Type: application/json" \
   -H "Authorization: $AUTHORIZATION_TOKEN" \
   -d '{
-    "query": "query { core { v1 { ConfigMaps { resourceVersion continue remainingItemCount items { metadata { name resourceVersion } data } } } } }"
+    "query": "query { v1 { ConfigMaps { resourceVersion continue remainingItemCount items { metadata { name resourceVersion } data } } } }"
   }' \
   $GRAPHQL_URL
 ```
@@ -178,7 +176,7 @@ curl \
   -H "Content-Type: application/json" \
   -H "Authorization: $AUTHORIZATION_TOKEN" \
   -d '{
-    "query": "query { core { v1 { ConfigMaps(limit: 10) { continue items { metadata { name } } } } } }"
+    "query": "query { v1 { ConfigMaps(limit: 10) { continue items { metadata { name } } } } }"
   }' \
   $GRAPHQL_URL
 ```
@@ -190,7 +188,7 @@ curl \
   -H "Content-Type: application/json" \
   -H "Authorization: $AUTHORIZATION_TOKEN" \
   -d '{
-    "query": "query($tok: String) { core { v1 { ConfigMaps(limit: 10, continue: $tok) { continue remainingItemCount items { metadata { name } } } } } }",
+    "query": "query($tok: String) { v1 { ConfigMaps(limit: 10, continue: $tok) { continue remainingItemCount items { metadata { name } } } } }",
     "variables": {"tok": "<token-from-previous-response>"}
   }' \
   $GRAPHQL_URL

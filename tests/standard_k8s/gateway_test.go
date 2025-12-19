@@ -18,21 +18,19 @@ func (s *IntegrationTestSuite) TestConfigMapCRUD() {
 	s.Run("List ConfigMaps", func() {
 		result := s.executeGraphQL(clusterName, GraphQLRequest{
 			Query: `
-				query {
-					core {
-						v1 {
-							ConfigMaps {
-								items {
-									metadata {
-										name
-										namespace
-									}
-								}
-							}
-						}
-					}
-				}
-			`,
+                query {
+                    v1 {
+                        ConfigMaps {
+                            items {
+                                metadata {
+                                    name
+                                    namespace
+                                }
+                            }
+                        }
+                    }
+                }
+            `,
 		})
 
 		s.Require().Empty(result.Errors)
@@ -42,20 +40,18 @@ func (s *IntegrationTestSuite) TestConfigMapCRUD() {
 	s.Run("Create ConfigMap", func() {
 		result := s.executeGraphQL(clusterName, GraphQLRequest{
 			Query: `
-				mutation CreateConfigMap($namespace: String!, $object: ConfigMapInput!) {
-					core {
-						v1 {
-							createConfigMap(namespace: $namespace, object: $object) {
-								metadata {
-									name
-									namespace
-								}
-								data
-							}
-						}
-					}
-				}
-			`,
+                mutation CreateConfigMap($namespace: String!, $object: ConfigMapInput!) {
+                    v1 {
+                        createConfigMap(namespace: $namespace, object: $object) {
+                            metadata {
+                                name
+                                namespace
+                            }
+                            data
+                        }
+                    }
+                }
+            `,
 			Variables: map[string]any{
 				"namespace": "default",
 				"object": map[string]any{
@@ -94,21 +90,19 @@ func (s *IntegrationTestSuite) TestConfigMapCRUD() {
 	s.Run("Get ConfigMap", func() {
 		result := s.executeGraphQL(clusterName, GraphQLRequest{
 			Query: `
-				query GetConfigMap($name: String!, $namespace: String!) {
-					core {
-						v1 {
-							ConfigMap(name: $name, namespace: $namespace) {
-								metadata {
-									name
-									namespace
-									labels
-								}
-								data
-							}
-						}
-					}
-				}
-			`,
+                query GetConfigMap($name: String!, $namespace: String!) {
+                    v1 {
+                        ConfigMap(name: $name, namespace: $namespace) {
+                            metadata {
+                                name
+                                namespace
+                                labels
+                            }
+                            data
+                        }
+                    }
+                }
+            `,
 			Variables: map[string]any{
 				"name":      configMapName,
 				"namespace": "default",
@@ -122,21 +116,19 @@ func (s *IntegrationTestSuite) TestConfigMapCRUD() {
 	s.Run("Query by label selector", func() {
 		result := s.executeGraphQL(clusterName, GraphQLRequest{
 			Query: `
-				query ListConfigMaps($namespace: String!, $labelselector: String!) {
-					core {
-						v1 {
-							ConfigMaps(namespace: $namespace, labelselector: $labelselector) {
-								items {
-									metadata {
-										name
-										labels
-									}
-								}
-							}
-						}
-					}
-				}
-			`,
+                query ListConfigMaps($namespace: String!, $labelselector: String!) {
+                    v1 {
+                        ConfigMaps(namespace: $namespace, labelselector: $labelselector) {
+                            items {
+                                metadata {
+                                    name
+                                    labels
+                                }
+                            }
+                        }
+                    }
+                }
+            `,
 			Variables: map[string]any{
 				"namespace":     "default",
 				"labelselector": "app=myapp",
@@ -150,20 +142,18 @@ func (s *IntegrationTestSuite) TestConfigMapCRUD() {
 	s.Run("Update ConfigMap", func() {
 		result := s.executeGraphQL(clusterName, GraphQLRequest{
 			Query: `
-				mutation UpdateConfigMap($name: String!, $namespace: String!, $object: ConfigMapInput!) {
-					core {
-						v1 {
-							updateConfigMap(name: $name, namespace: $namespace, object: $object) {
-								metadata {
-									name
-									namespace
-								}
-								data
-							}
-						}
-					}
-				}
-			`,
+                mutation UpdateConfigMap($name: String!, $namespace: String!, $object: ConfigMapInput!) {
+                    v1 {
+                        updateConfigMap(name: $name, namespace: $namespace, object: $object) {
+                            metadata {
+                                name
+                                namespace
+                            }
+                            data
+                        }
+                    }
+                }
+            `,
 			Variables: map[string]any{
 				"name":      configMapName,
 				"namespace": "default",
@@ -203,14 +193,12 @@ func (s *IntegrationTestSuite) TestConfigMapCRUD() {
 	s.Run("Delete ConfigMap", func() {
 		result := s.executeGraphQL(clusterName, GraphQLRequest{
 			Query: `
-				mutation DeleteConfigMap($name: String!, $namespace: String!) {
-					core {
-						v1 {
-							deleteConfigMap(name: $name, namespace: $namespace)
-						}
-					}
-				}
-			`,
+                mutation DeleteConfigMap($name: String!, $namespace: String!) {
+                    v1 {
+                        deleteConfigMap(name: $name, namespace: $namespace)
+                    }
+                }
+            `,
 			Variables: map[string]any{
 				"name":      configMapName,
 				"namespace": "default",
