@@ -75,8 +75,6 @@ func (g *Gateway) generateGraphqlSchema() error {
 	rootSubscriptionFields := graphql.Fields{}
 
 	for group, groupedResources := range g.getDefinitionsByGroup(g.definitions) {
-		// Breaking change: do NOT filter by a single active version anymore.
-		// Expose all versions under a version namespace inside each API group.
 		g.processGroupedResources(
 			group,
 			groupedResources,
@@ -189,7 +187,6 @@ func (g *Gateway) processGroupedResources(
 	rootMutationFields,
 	rootSubscriptionFields graphql.Fields,
 ) {
-	// Create group-level containers for Query and Mutation
 	queryGroupType := graphql.NewObject(graphql.ObjectConfig{
 		Name:   group + "Query",
 		Fields: graphql.Fields{},
@@ -200,7 +197,6 @@ func (g *Gateway) processGroupedResources(
 		Fields: graphql.Fields{},
 	})
 
-	// Build: group -> version -> resources
 	versions := map[string]map[string]*spec.Schema{}
 	for resourceKey, resourceScheme := range groupedResources {
 		gvk, err := g.getGroupVersionKind(resourceKey)

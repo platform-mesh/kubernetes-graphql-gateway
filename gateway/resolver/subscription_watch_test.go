@@ -62,9 +62,9 @@ func TestSubscribeItems_NoResourceVersion_EmitsInitialAddedAndWatchesFromListRV(
 	ch := chAny.(chan any)
 
 	for _, name := range []string{"cm-a", "cm-b"} {
-		evt := receiveEvent[map[string]any](t, ctx, ch)
-		require.Equal(t, resolver.EventTypeAdded, evt["type"])
-		obj := evt["object"].(map[string]any)
+		evt := receiveEvent[resolver.SubscriptionEnvelope](t, ctx, ch)
+		require.Equal(t, resolver.EventTypeAdded, evt.Type)
+		obj := evt.Object.(map[string]any)
 		md := obj["metadata"].(map[string]any)
 		require.Equal(t, name, md["name"])
 	}
@@ -72,9 +72,9 @@ func TestSubscribeItems_NoResourceVersion_EmitsInitialAddedAndWatchesFromListRV(
 	modified := makeObject("default", "cm-a", "12", gvk)
 	fakeWatcher.Modify(modified)
 
-	evt := receiveEvent[map[string]any](t, ctx, ch)
-	require.Equal(t, resolver.EventTypeModified, evt["type"])
-	obj := evt["object"].(map[string]any)
+	evt := receiveEvent[resolver.SubscriptionEnvelope](t, ctx, ch)
+	require.Equal(t, resolver.EventTypeModified, evt.Type)
+	obj := evt.Object.(map[string]any)
 	md := obj["metadata"].(map[string]any)
 	require.Equal(t, "cm-a", md["name"])
 
@@ -113,9 +113,9 @@ func TestSubscribeItems_WithResourceVersion_SkipsList_WatchesFromProvidedRV(t *t
 	added := makeObject("default", "cm-x", "1000", gvk)
 	fakeWatcher.Add(added)
 
-	evt := receiveEvent[map[string]any](t, ctx, ch)
-	require.Equal(t, resolver.EventTypeAdded, evt["type"])
-	obj := evt["object"].(map[string]any)
+	evt := receiveEvent[resolver.SubscriptionEnvelope](t, ctx, ch)
+	require.Equal(t, resolver.EventTypeAdded, evt.Type)
+	obj := evt.Object.(map[string]any)
 	md := obj["metadata"].(map[string]any)
 	require.Equal(t, "cm-x", md["name"])
 
@@ -161,9 +161,9 @@ func TestSubscribeItems_DeletedEvent_CarriesObject(t *testing.T) {
 	deleted := makeObject("default", "cm-del", "101", gvk)
 	fakeWatcher.Delete(deleted)
 
-	evt := receiveEvent[map[string]any](t, ctx, ch)
-	require.Equal(t, resolver.EventTypeDeleted, evt["type"])
-	obj := evt["object"].(map[string]any)
+	evt := receiveEvent[resolver.SubscriptionEnvelope](t, ctx, ch)
+	require.Equal(t, resolver.EventTypeDeleted, evt.Type)
+	obj := evt.Object.(map[string]any)
 	md := obj["metadata"].(map[string]any)
 	require.Equal(t, "cm-del", md["name"])
 	require.NotEmpty(t, md["resourceVersion"])
