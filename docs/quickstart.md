@@ -72,23 +72,31 @@ Kubernetes extensively uses dotted keys (e.g., `app.kubernetes.io/name`) in labe
 - **Supported fields**: `metadata.labels`, `metadata.annotations`, `spec.nodeSelector`, `spec.selector.matchLabels`, and their nested equivalents in templates
 
 **Quick Example:**
-```graphql
+```shell
 mutation createPodWithLabels($labels: StringMapInput) {
   core {
-    createPod(
-      namespace: "default"
-      object: {
-        metadata: {
-          name: "my-pod"
-          labels: $labels
+    v1 {
+      createPod(
+        namespace: "default"
+        object: {
+          metadata: {
+            name: "my-pod"
+            labels: $labels
+          }
+          spec: {
+            containers: [
+              {
+                name: "nginx"
+                image: "nginx:latest"
+                ports: [{ containerPort: 80 }]
+              }
+            ]
+          }
         }
-        spec: {
-          containers: [...]
+      ) {
+        metadata {
+          labels  # Returns: {"app.kubernetes.io/name": "my-app"}
         }
-      }
-    ) {
-      metadata {
-        labels  # Returns: {"app.kubernetes.io/name": "my-app"}
       }
     }
   }

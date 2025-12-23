@@ -75,10 +75,9 @@ func (g *Gateway) generateGraphqlSchema() error {
 	rootSubscriptionFields := graphql.Fields{}
 
 	for group, groupedResources := range g.getDefinitionsByGroup(g.definitions) {
-		filteredResources := g.filterOutNotActiveVersions(groupedResources)
 		g.processGroupedResources(
 			group,
-			filteredResources,
+			groupedResources,
 			rootQueryFields,
 			rootMutationFields,
 			rootSubscriptionFields,
@@ -110,51 +109,6 @@ func (g *Gateway) generateGraphqlSchema() error {
 	g.graphqlSchema = newSchema
 
 	return nil
-}
-
-func (g *Gateway) filterOutNotActiveVersions(allKinds map[string]*spec.Schema) map[string]*spec.Schema {
-	filteredSchema := map[string]*spec.Schema{}
-	processedResources := make(map[string]bool)
-
-	for resourceKey, resourceScheme := range allKinds {
-		// Skip if we've already processed this resource as part of another version group
-		if processedResources[resourceKey] {
-			continue
-		}
-
-		hasOtherVersions, otherVersions := hasAnotherVersion(resourceKey, allKinds, g.definitions)
-		if hasOtherVersions {
-			// Filter out non-active versions
-			highestSemver := highestSemverVersion(resourceKey, otherVersions, g.definitions)
-			filteredSchema[highestSemver] = allKinds[highestSemver]
-
-			if resourceKey != highestSemver {
-				g.log.Debug().
-					Str("filtered", resourceKey).
-					Str("kept", highestSemver).
-					Msg("Filtered out non-active version")
-			}
-			for otherVersion := range otherVersions {
-				if otherVersion != highestSemver {
-					g.log.Debug().
-						Str("filtered", otherVersion).
-						Str("kept", highestSemver).
-						Msg("Filtered out non-active version")
-				}
-			}
-
-			// Mark the current resource and all other versions as processed
-			processedResources[resourceKey] = true
-			for otherVersion := range otherVersions {
-				processedResources[otherVersion] = true
-			}
-		} else {
-			// No other versions, keep this resource
-			filteredSchema[resourceKey] = resourceScheme
-			processedResources[resourceKey] = true
-		}
-	}
-	return filteredSchema
 }
 
 // highestSemverVersion finds the highest semantic version among a group of resources with the same Kind.
@@ -243,23 +197,64 @@ func (g *Gateway) processGroupedResources(
 		Fields: graphql.Fields{},
 	})
 
+	versions := map[string]map[string]*spec.Schema{}
 	for resourceKey, resourceScheme := range groupedResources {
-		g.processSingleResource(
-			resourceKey,
-			resourceScheme,
-			queryGroupType,
-			mutationGroupType,
-			rootSubscriptionFields,
-		)
+		gvk, err := g.getGroupVersionKind(resourceKey)
+		if err != nil {
+			g.log.Debug().Err(err).Str("resourceKey", resourceKey).Msg("Failed to get GVK while grouping by version")
+			continue
+		}
+		if _, ok := versions[gvk.Version]; !ok {
+			versions[gvk.Version] = map[string]*spec.Schema{}
+		}
+		versions[gvk.Version][resourceKey] = resourceScheme
 	}
 
+	// For each version, create a nested object under the group
+	for versionStr, resources := range versions {
+		// Version objects
+		queryVersionType := graphql.NewObject(graphql.ObjectConfig{
+			Name:   group + "_" + versionStr + "Query",
+			Fields: graphql.Fields{},
+		})
+		mutationVersionType := graphql.NewObject(graphql.ObjectConfig{
+			Name:   group + "_" + versionStr + "Mutation",
+			Fields: graphql.Fields{},
+		})
+
+		// Add all resources into the version objects
+		for resourceKey, resourceScheme := range resources {
+			g.processSingleResource(
+				resourceKey,
+				resourceScheme,
+				queryVersionType,
+				mutationVersionType,
+				rootSubscriptionFields,
+			)
+		}
+
+		// Attach version objects under the group only if they have fields
+		if len(queryVersionType.Fields()) > 0 {
+			queryGroupType.AddFieldConfig(versionStr, &graphql.Field{
+				Type:    queryVersionType,
+				Resolve: g.resolver.CommonResolver(),
+			})
+		}
+		if len(mutationVersionType.Fields()) > 0 {
+			mutationGroupType.AddFieldConfig(versionStr, &graphql.Field{
+				Type:    mutationVersionType,
+				Resolve: g.resolver.CommonResolver(),
+			})
+		}
+	}
+
+	// Attach group objects at root
 	if len(queryGroupType.Fields()) > 0 {
 		rootQueryFields[group] = &graphql.Field{
 			Type:    queryGroupType,
 			Resolve: g.resolver.CommonResolver(),
 		}
 	}
-
 	if len(mutationGroupType.Fields()) > 0 {
 		rootMutationFields[group] = &graphql.Field{
 			Type:    mutationGroupType,
@@ -396,7 +391,8 @@ func (g *Gateway) processSingleResource(
 		},
 	})
 
-	subscriptionSingular := strings.ToLower(fmt.Sprintf("%s_%s", gvk.Group, singular))
+	// Subscription field names are flat but versioned: <group>_<version>_<resource>
+	subscriptionSingular := strings.ToLower(fmt.Sprintf("%s_%s_%s", gvk.Group, gvk.Version, singular))
 	rootSubscriptionFields[subscriptionSingular] = &graphql.Field{
 		Type: eventType,
 		Args: itemArgsBuilder.
@@ -408,7 +404,7 @@ func (g *Gateway) processSingleResource(
 		Description: fmt.Sprintf("Subscribe to changes of %s", singular),
 	}
 
-	subscriptionPlural := strings.ToLower(fmt.Sprintf("%s_%s", gvk.Group, plural))
+	subscriptionPlural := strings.ToLower(fmt.Sprintf("%s_%s_%s", gvk.Group, gvk.Version, plural))
 	rootSubscriptionFields[subscriptionPlural] = &graphql.Field{
 		Type: eventType,
 		Args: listArgsBuilder.
