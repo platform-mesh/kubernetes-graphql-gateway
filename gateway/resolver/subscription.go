@@ -33,6 +33,24 @@ const (
 	EventTypeDeleted  = "DELETED"
 )
 
+// SubscriptionEnvelope represents the envelope for a subscription update
+type SubscriptionEnvelope struct {
+	Type   string `json:"type"`
+	Object any    `json:"object"`
+}
+
+// SubscriptionObject represents an object with only minimal metadata
+type SubscriptionObject struct {
+	Metadata SubscriptionMetadata `json:"metadata"`
+}
+
+// SubscriptionMetadata represents minimal metadata for an object
+type SubscriptionMetadata struct {
+	Name            string `json:"name"`
+	Namespace       string `json:"namespace,omitempty"`
+	ResourceVersion string `json:"resourceVersion,omitempty"`
+}
+
 func (r *Service) SubscribeItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
 	return func(p graphql.ResolveParams) (any, error) {
 		_, span := otel.Tracer("").Start(p.Context, "SubscribeItem", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
@@ -157,9 +175,9 @@ func (r *Service) runWatch(
 			key := item.GetNamespace() + "/" + item.GetName()
 			previousObjects[key] = item.DeepCopy()
 
-			envelope := map[string]any{
-				"type":   EventTypeAdded,
-				"object": item.Object,
+			envelope := SubscriptionEnvelope{
+				Type:   EventTypeAdded,
+				Object: item.Object,
 			}
 			select {
 			case <-ctx.Done():
@@ -247,18 +265,18 @@ func (r *Service) runWatch(
 				// Ensure payload is a non-nil map; if not, provide minimal metadata so
 				// clients can reconcile caches
 				if m, ok := payload.(map[string]any); !ok || m == nil {
-					payload = map[string]any{
-						"metadata": map[string]any{
-							"name":            obj.GetName(),
-							"namespace":       obj.GetNamespace(),
-							"resourceVersion": obj.GetResourceVersion(),
+					payload = SubscriptionObject{
+						Metadata: SubscriptionMetadata{
+							Name:            obj.GetName(),
+							Namespace:       obj.GetNamespace(),
+							ResourceVersion: obj.GetResourceVersion(),
 						},
 					}
 				}
 
-				envelope := map[string]any{
-					"type":   eventType,
-					"object": payload,
+				envelope := SubscriptionEnvelope{
+					Type:   eventType,
+					Object: payload,
 				}
 
 				select {
