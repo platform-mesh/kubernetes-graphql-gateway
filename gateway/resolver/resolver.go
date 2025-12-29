@@ -411,14 +411,10 @@ func (r *Service) CommonResolver() graphql.FieldResolveFn {
 func (r *Service) SanitizeGroupName(groupName string) string {
 	originalGroupName := groupName
 
-	if groupName == "" {
-		groupName = "core"
-	} else {
-		groupName = regexp.MustCompile(`[^_a-zA-Z0-9]`).ReplaceAllString(groupName, "_")
-		// If the name doesn't start with a letter or underscore, prepend '_'
-		if !regexp.MustCompile(`^[_a-zA-Z]`).MatchString(groupName) {
-			groupName = "_" + groupName
-		}
+	groupName = regexp.MustCompile(`[^_a-zA-Z0-9]`).ReplaceAllString(groupName, "_")
+	// If the name doesn't start with a letter or underscore, prepend '_'
+	if groupName != "" && !regexp.MustCompile(`^[_a-zA-Z]`).MatchString(groupName) {
+		groupName = "_" + groupName
 	}
 
 	r.storeOriginalGroupName(groupName, originalGroupName)
