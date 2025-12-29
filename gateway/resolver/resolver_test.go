@@ -715,7 +715,7 @@ func TestSanitizeGroupName(t *testing.T) {
 		input    string
 		expected string
 	}{
-		{"empty_string", "", "core"},
+		{"empty_string", "", ""},
 		{"valid_group_name", "validName", "validName"},
 		{"hyphen_to_underscore", "group-name", "group_name"},
 		{"special_char_to_underscore", "group@name", "group_name"},
