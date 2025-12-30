@@ -13,11 +13,13 @@ import (
 	kcpctrl "sigs.k8s.io/controller-runtime/pkg/kcp"
 
 	kcpapis "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
+	kcpcore "github.com/kcp-dev/kcp/sdk/apis/core/v1alpha1"
 )
 
 type KCPReconciler struct {
 	mgr                        ctrl.Manager
 	apiBindingReconciler       *APIBindingReconciler
+	logicalClusterReconciler   *LogicalClusterReconciler
 	virtualWorkspaceReconciler *VirtualWorkspaceReconciler
 	configWatcher              *ConfigWatcher
 	log                        *logger.Logger
@@ -73,6 +75,13 @@ func NewKCPReconciler(
 		Log:                 log,
 	}
 
+	// Create LogicalCluster reconciler
+	logicalClusterReconciler := &LogicalClusterReconciler{
+		Client:              mgr.GetClient(),
+		ClusterPathResolver: clusterPathResolver,
+		Log:                 log,
+	}
+
 	// Setup virtual workspace components
 	virtualWSManager := NewVirtualWorkspaceManager(appCfg)
 	virtualWorkspaceReconciler := NewVirtualWorkspaceReconciler(
@@ -91,6 +100,7 @@ func NewKCPReconciler(
 	reconcilerInstance := &KCPReconciler{
 		mgr:                        mgr,
 		apiBindingReconciler:       apiBindingReconciler,
+		logicalClusterReconciler:   logicalClusterReconciler,
 		virtualWorkspaceReconciler: virtualWorkspaceReconciler,
 		configWatcher:              configWatcher,
 		log:                        log,
@@ -126,6 +136,16 @@ func (r *KCPReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 
 	r.log.Info().Msg("Successfully set up APIBinding controller")
+	// Setup the LogicalCluster controller
+	if err := ctrl.NewControllerManagedBy(mgr).
+		For(&kcpcore.LogicalCluster{}).
+		Complete(kcpctrl.WithClusterInContext(r.logicalClusterReconciler)); err != nil {
+		r.log.Error().Err(err).Msg("failed to setup LogicalCluster controller")
+		return err
+	}
+
+	r.log.Info().Msg("Successfully set up LogicalCluster controller")
+
 	return nil
 }
 

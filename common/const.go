@@ -11,4 +11,6 @@ const (
 	// Timeout constants for different test scenarios
 	ShortTimeout = 100 * time.Millisecond // Short timeout for quick operations
 	LongTimeout  = 2 * time.Second        // Longer timeout for file system operations
+
+	GatewayInitializer = "gateway.platform-mesh.io/initializer"
 )
