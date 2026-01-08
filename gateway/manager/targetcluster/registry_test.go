@@ -18,7 +18,7 @@ func TestExtractClusterNameWithKCPWorkspace(t *testing.T) {
 	appCfg.Url.DefaultKcpWorkspace = "root"
 	appCfg.Url.GraphqlSuffix = "graphql"
 
-	registry := NewClusterRegistry(log, appCfg, nil)
+	registry := NewClusterRegistry(log, appCfg)
 
 	tests := []struct {
 		name                 string
