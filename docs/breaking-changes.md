@@ -8,7 +8,7 @@ GraphQL queries and mutations are now organized under `group → version → res
 
 - Core group examples:
   - Before: `core { ConfigMaps { ... } }`
-  - Now: `core { v1 { ConfigMaps { ... } } }`
+  - Now: `v1 { ConfigMaps { ... } }`
 
 - Non-core groups (dots replaced by underscores):
   - Before: `openmfp_org { Accounts { ... } }`
@@ -18,14 +18,12 @@ Plural list fields now return a wrapper object with pagination metadata:
 
 ```graphql
 query {
-  core {
-    v1 {
-      ConfigMaps {
-        resourceVersion
-        continue
-        remainingItemCount
-        items { metadata { name namespace resourceVersion } }
-      }
+  v1 {
+    ConfigMaps {
+      resourceVersion
+      continue
+      remainingItemCount
+      items { metadata { name namespace resourceVersion } }
     }
   }
 }
@@ -33,21 +31,21 @@ query {
 
 ## Subscriptions: flat and versioned field names
 
-Subscriptions remain flat but now include the version in the field name: `<group>_<version>_<resource>`.
+Subscriptions remain flat and versioned. Core resources no longer include the artificial `core` group in the flattened name.
 
-- Core examples: `core_v1_configmaps`, `core_v1_configmap`
+- Core examples: `v1_configmaps`, `v1_configmap`
 - Non-core examples: `openmfp_org_v1alpha1_accounts`, `openmfp_org_v1alpha1_account`
 
 Subscriptions use Server‑Sent Events (SSE). GraphiQL/Playground typically do not support SSE subscriptions. Use curl/Postman/Insomnia or a custom EventSource client.
 
-Example:
+Example (core):
 
 ```sh
 curl \
   -H "Accept: text/event-stream" \
   -H "Content-Type: application/json" \
   -d '{
-    "query": "subscription { core_v1_configmaps { type object { metadata { name namespace resourceVersion } } } }"
+    "query": "subscription { v1_configmaps { type object { metadata { name namespace resourceVersion } } } }"
   }' \
   $GRAPHQL_URL
 ```
@@ -58,6 +56,7 @@ To start from a known list `resourceVersion`, fetch it via a list query and pass
 
 - Legacy flat query/mutation names have been removed.
 - Old unversioned subscription names have been removed.
+- Core flattened subscription names changed from `core_v1_*` to `v1_*`.
 
 Please update your client queries accordingly. See detailed examples:
 

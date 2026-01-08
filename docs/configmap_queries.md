@@ -6,22 +6,20 @@ For questions on how to execute them, please find our [Quick Start Guide](./quic
 ## Create a ConfigMap:
 ```shell
 mutation {
-  core {
-    v1 {
-      createConfigMap(
-      namespace: "default",
-      object: {
-        metadata: {
-          name: "example-config"
-        },
-        data: { key: "val" }
+  v1 {
+    createConfigMap(
+    namespace: "default",
+    object: {
+      metadata: {
+        name: "example-config"
+      },
+      data: { key: "val" }
+    }
+    ) {
+      metadata {
+        name
       }
-      ) {
-        metadata {
-          name
-        }
-        data
-      }
+      data
     }
   }
 }
@@ -30,20 +28,18 @@ mutation {
 ## List ConfigMaps:
 ```shell
 query {
-  core {
-    v1 {
-      ConfigMaps {
-        resourceVersion
-        continue
-        remainingItemCount
-        items {
-          metadata {
-            name
-            namespace
-            resourceVersion
-          }
-          data
+  v1 {
+    ConfigMaps {
+      resourceVersion
+      continue
+      remainingItemCount
+      items {
+        metadata {
+          name
+          namespace
+          resourceVersion
         }
+        data
       }
     }
   }
@@ -53,14 +49,12 @@ query {
 ## Get a ConfigMap:
 ```shell
 {
-  core {
-    v1 {
-      ConfigMap(name: "example-config", namespace: "default") {
-        metadata {
-          name
-        }
-        data
+  v1 {
+    ConfigMap(name: "example-config", namespace: "default") {
+      metadata {
+        name
       }
+      data
     }
   }
 }
@@ -69,21 +63,19 @@ query {
 ## Update a ConfigMap:
 ```shell
 mutation {
-  core {
-    v1 {
-      updateConfigMap(
-        name:"example-config"
-        namespace: "default",
-        object: {
-          data: { key: "new-value" }
-        }
-      ) {
-        metadata {
-          name
-          namespace
-        }
-        data
+  v1 {
+    updateConfigMap(
+      name:"example-config"
+      namespace: "default",
+      object: {
+        data: { key: "new-value" }
       }
+    ) {
+      metadata {
+        name
+        namespace
+      }
+      data
     }
   }
 }
@@ -92,13 +84,11 @@ mutation {
 ## Delete a ConfigMap:
 ```shell
 mutation {
-  core {
-    v1 {
-      deleteConfigMap(
-        name: "example-config", 
-        namespace: "default"
-      )
-    }
+  v1 {
+    deleteConfigMap(
+      name: "example-config", 
+      namespace: "default"
+    )
   }
 }
 ```

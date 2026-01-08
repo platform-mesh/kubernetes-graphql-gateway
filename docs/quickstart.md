@@ -74,29 +74,27 @@ Kubernetes extensively uses dotted keys (e.g., `app.kubernetes.io/name`) in labe
 **Quick Example:**
 ```shell
 mutation createPodWithLabels($labels: StringMapInput) {
-  core {
-    v1 {
-      createPod(
-        namespace: "default"
-        object: {
-          metadata: {
-            name: "my-pod"
-            labels: $labels
-          }
-          spec: {
-            containers: [
-              {
-                name: "nginx"
-                image: "nginx:latest"
-                ports: [{ containerPort: 80 }]
-              }
-            ]
-          }
+  v1 {
+    createPod(
+      namespace: "default"
+      object: {
+        metadata: {
+          name: "my-pod"
+          labels: $labels
         }
-      ) {
-        metadata {
-          labels  # Returns: {"app.kubernetes.io/name": "my-app"}
+        spec: {
+          containers: [
+            {
+              name: "nginx"
+              image: "nginx:latest"
+              ports: [{ containerPort: 80 }]
+            }
+          ]
         }
+      }
+    ) {
+      metadata {
+        labels  # Returns: {"app.kubernetes.io/name": "my-app"}
       }
     }
   }

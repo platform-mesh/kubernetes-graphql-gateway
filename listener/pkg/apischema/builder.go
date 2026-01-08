@@ -167,6 +167,10 @@ func (b *SchemaBuilder) WithScope(rm meta.RESTMapper) *SchemaBuilder {
 		} else {
 			schema.AddExtension(common.ScopeExtensionKey, apiextensionsv1.ClusterScoped)
 		}
+
+		if gvks[0].Group == "" {
+			schema.AddExtension(common.ExposeAtRootExtensionKey, true)
+		}
 	}
 	return b
 }
