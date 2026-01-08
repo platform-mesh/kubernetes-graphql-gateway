@@ -31,7 +31,6 @@ type FileData struct {
 // ClusterMetadata represents the cluster connection metadata stored in schema files
 type ClusterMetadata struct {
 	Host string        `json:"host"`
-	Path string        `json:"path,omitempty"`
 	Auth *AuthMetadata `json:"auth,omitempty"`
 	CA   *CAMetadata   `json:"ca,omitempty"`
 }

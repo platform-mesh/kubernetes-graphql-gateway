@@ -11,16 +11,9 @@ import (
 )
 
 func injectClusterMetadata(ctx context.Context, schemaJSON []byte, clusterAccess gatewayv1alpha1.ClusterAccess, k8sClient client.Client, log *logger.Logger) ([]byte, error) {
-	// Determine the path
-	path := clusterAccess.Spec.Path
-	if path == "" {
-		path = clusterAccess.GetName()
-	}
-
 	// Create metadata injection config
 	config := auth.MetadataInjectionConfig{
 		Host: clusterAccess.Spec.Host,
-		Path: path,
 		Auth: clusterAccess.Spec.Auth,
 		CA:   clusterAccess.Spec.CA,
 	}
