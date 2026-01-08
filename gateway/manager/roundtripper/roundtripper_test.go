@@ -557,7 +557,8 @@ func TestRoundTripper_ExistingAuthHeadersAreCleanedBeforeTokenAuth(t *testing.T)
 
 func TestRoundTripper_ExistingAuthHeadersAreCleanedBeforeImpersonation(t *testing.T) {
 	// This test verifies that existing Authorization headers are properly cleaned
-	// before setting the bearer token in impersonation mode
+	// in impersonation mode. In impersonation mode, cert-based auth is used via adminRT,
+	// so no bearer token should be present in the Authorization header.
 
 	mockAdmin := &mocks.MockRoundTripper{}
 	mockBase := &mocks.MockRoundTripper{}
@@ -594,13 +595,11 @@ func TestRoundTripper_ExistingAuthHeadersAreCleanedBeforeImpersonation(t *testin
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	// Verify that the captured request has the correct Authorization header
+	// Verify that the captured request has no Authorization header
+	// In impersonation mode, cert-based auth is used, not bearer tokens
 	require.NotNil(t, capturedRequest)
 	authHeader := capturedRequest.Header.Get("Authorization")
-	assert.Equal(t, "Bearer "+tokenString, authHeader)
-
-	// Verify that the original admin token was removed
-	assert.NotContains(t, authHeader, "admin-token-that-should-be-removed")
+	assert.Empty(t, authHeader, "Authorization header should be empty in impersonation mode")
 
 	// Verify that the impersonation header is set
 	impersonateHeader := capturedRequest.Header.Get("Impersonate-User")
