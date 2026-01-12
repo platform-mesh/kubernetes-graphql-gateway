@@ -3,10 +3,9 @@ package common
 import "time"
 
 const (
-	CategoriesExtensionKey   = "x-kubernetes-categories"
-	GVKExtensionKey          = "x-kubernetes-group-version-kind"
-	ScopeExtensionKey        = "x-kubernetes-scope"
-	ExposeAtRootExtensionKey = "x-gateway-expose-at-root"
+	CategoriesExtensionKey = "x-kubernetes-categories"
+	GVKExtensionKey        = "x-kubernetes-group-version-kind"
+	ScopeExtensionKey      = "x-kubernetes-scope"
 
 	// Timeout constants for different test scenarios
 	ShortTimeout = 100 * time.Millisecond // Short timeout for quick operations
