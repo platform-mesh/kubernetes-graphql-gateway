@@ -8,8 +8,10 @@ import (
 	"strings"
 
 	"github.com/platform-mesh/golang-commons/logger"
+
 	"github.com/platform-mesh/kubernetes-graphql-gateway/common/auth"
 	appConfig "github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/roundtripper"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/resolver"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/schema"
 
@@ -65,7 +67,6 @@ func NewTargetCluster(
 	schemaFilePath string,
 	log *logger.Logger,
 	appCfg appConfig.Config,
-	roundTripperFactory func(http.RoundTripper, rest.TLSClientConfig) http.RoundTripper,
 ) (*TargetCluster, error) {
 	fileData, err := readSchemaFile(schemaFilePath)
 	if err != nil {
@@ -79,7 +80,7 @@ func NewTargetCluster(
 	}
 
 	// Connect to cluster - use metadata if available, otherwise fall back to standard config
-	if err := cluster.connect(appCfg, fileData.ClusterMetadata, roundTripperFactory); err != nil {
+	if err := cluster.connect(appCfg, fileData.ClusterMetadata); err != nil {
 		return nil, fmt.Errorf("failed to connect to cluster: %w", err)
 	}
 
@@ -97,7 +98,7 @@ func NewTargetCluster(
 }
 
 // connect establishes connection to the target cluster
-func (tc *TargetCluster) connect(appCfg appConfig.Config, metadata *ClusterMetadata, roundTripperFactory func(http.RoundTripper, rest.TLSClientConfig) http.RoundTripper) error {
+func (tc *TargetCluster) connect(appCfg appConfig.Config, metadata *ClusterMetadata) error {
 	// All clusters now use metadata from schema files to get kubeconfig
 	if metadata == nil {
 		return fmt.Errorf("cluster %s requires cluster metadata in schema file", tc.name)
@@ -115,11 +116,20 @@ func (tc *TargetCluster) connect(appCfg appConfig.Config, metadata *ClusterMetad
 		return fmt.Errorf("failed to build config from metadata: %w", err)
 	}
 
-	if roundTripperFactory != nil {
-		tc.restCfg.Wrap(func(rt http.RoundTripper) http.RoundTripper {
-			return roundTripperFactory(rt, tc.restCfg.TLSClientConfig)
-		})
+	baseRT, err := roundtripper.NewBaseRoundTripper(tc.restCfg.TLSClientConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create base transport: %w", err)
 	}
+
+	tc.restCfg.Wrap(func(adminRT http.RoundTripper) http.RoundTripper {
+		return roundtripper.New(
+			tc.log,
+			tc.appCfg,
+			adminRT,
+			baseRT,
+			roundtripper.NewUnauthorizedRoundTripper(),
+		)
+	})
 
 	// Create client - use KCP-aware client only for KCP mode, standard client otherwise
 	if appCfg.EnableKcp {
