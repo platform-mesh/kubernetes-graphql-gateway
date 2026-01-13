@@ -36,6 +36,11 @@ const (
 	SUBSCRIBE_ITEMS  = "SubscribeItems"
 )
 
+var (
+	invalidGroupCharRegex = regexp.MustCompile(`[^_a-zA-Z0-9]`)
+	validGroupStartRegex  = regexp.MustCompile(`^[_a-zA-Z]`)
+)
+
 type Provider interface {
 	CrudProvider
 	CustomQueriesProvider
@@ -411,9 +416,9 @@ func (r *Service) CommonResolver() graphql.FieldResolveFn {
 func (r *Service) SanitizeGroupName(groupName string) string {
 	originalGroupName := groupName
 
-	groupName = regexp.MustCompile(`[^_a-zA-Z0-9]`).ReplaceAllString(groupName, "_")
+	groupName = invalidGroupCharRegex.ReplaceAllString(groupName, "_")
 	// If the name doesn't start with a letter or underscore, prepend '_'
-	if groupName != "" && !regexp.MustCompile(`^[_a-zA-Z]`).MatchString(groupName) {
+	if groupName != "" && !validGroupStartRegex.MatchString(groupName) {
 		groupName = "_" + groupName
 	}
 

@@ -6,11 +6,10 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/platform-mesh/golang-commons/logger"
-	"k8s.io/client-go/rest"
-
 	"github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
-	utilnet "k8s.io/apimachinery/pkg/util/net"
 
+	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
 )
 

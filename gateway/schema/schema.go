@@ -282,10 +282,6 @@ func (g *Gateway) processGroupedResources(
 	}
 }
 
-func (g *Gateway) isRootResource(gvk *schema.GroupVersionKind) bool {
-	return gvk.Group == ""
-}
-
 func (g *Gateway) processSingleResource(
 	resourceKey string,
 	resourceScheme *spec.Schema,
@@ -415,7 +411,7 @@ func (g *Gateway) processSingleResource(
 	})
 
 	var subscriptionSingular string
-	if g.isRootResource(gvk) {
+	if g.isRootGroup(gvk.Group) {
 		subscriptionSingular = strings.ToLower(fmt.Sprintf("%s_%s", gvk.Version, singular))
 	} else {
 		subscriptionSingular = strings.ToLower(fmt.Sprintf("%s_%s_%s", gvk.Group, gvk.Version, singular))
@@ -432,7 +428,7 @@ func (g *Gateway) processSingleResource(
 	}
 
 	var subscriptionPlural string
-	if g.isRootResource(gvk) {
+	if g.isRootGroup(gvk.Group) {
 		subscriptionPlural = strings.ToLower(fmt.Sprintf("%s_%s", gvk.Version, plural))
 	} else {
 		subscriptionPlural = strings.ToLower(fmt.Sprintf("%s_%s_%s", gvk.Group, gvk.Version, plural))

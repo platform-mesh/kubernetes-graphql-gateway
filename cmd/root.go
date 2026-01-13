@@ -3,10 +3,9 @@ package cmd
 import (
 	pmconfig "github.com/platform-mesh/golang-commons/config"
 	"github.com/platform-mesh/golang-commons/logger"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-
-	"github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
 )
 
 var (

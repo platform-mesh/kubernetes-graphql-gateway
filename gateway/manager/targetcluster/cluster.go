@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/platform-mesh/golang-commons/logger"
-
 	"github.com/platform-mesh/kubernetes-graphql-gateway/common/auth"
 	appConfig "github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/roundtripper"
