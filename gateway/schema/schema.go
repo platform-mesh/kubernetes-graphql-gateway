@@ -180,6 +180,10 @@ func hasAnotherVersion(groupVersionKind string, allKinds map[string]*spec.Schema
 	return hasOtherVersion, otherVersions
 }
 
+func (g *Gateway) isRootGroup(group string) bool {
+	return group == ""
+}
+
 func (g *Gateway) processGroupedResources(
 	group string,
 	groupedResources map[string]*spec.Schema,
@@ -232,8 +236,7 @@ func (g *Gateway) processGroupedResources(
 			)
 		}
 
-		if group == "core" {
-			// Target: expose core versions (e.g., v1) directly at root
+		if g.isRootGroup(group) {
 			if len(queryVersionType.Fields()) > 0 {
 				rootQueryFields[versionStr] = &graphql.Field{
 					Type:    queryVersionType,
@@ -263,7 +266,7 @@ func (g *Gateway) processGroupedResources(
 		}
 	}
 
-	if group != "core" {
+	if !g.isRootGroup(group) {
 		if len(queryGroupType.Fields()) > 0 {
 			rootQueryFields[group] = &graphql.Field{
 				Type:    queryGroupType,
@@ -408,7 +411,7 @@ func (g *Gateway) processSingleResource(
 	})
 
 	var subscriptionSingular string
-	if gvk.Group == "core" {
+	if g.isRootGroup(gvk.Group) {
 		subscriptionSingular = strings.ToLower(fmt.Sprintf("%s_%s", gvk.Version, singular))
 	} else {
 		subscriptionSingular = strings.ToLower(fmt.Sprintf("%s_%s_%s", gvk.Group, gvk.Version, singular))
@@ -425,7 +428,7 @@ func (g *Gateway) processSingleResource(
 	}
 
 	var subscriptionPlural string
-	if gvk.Group == "core" {
+	if g.isRootGroup(gvk.Group) {
 		subscriptionPlural = strings.ToLower(fmt.Sprintf("%s_%s", gvk.Version, plural))
 	} else {
 		subscriptionPlural = strings.ToLower(fmt.Sprintf("%s_%s_%s", gvk.Group, gvk.Version, plural))

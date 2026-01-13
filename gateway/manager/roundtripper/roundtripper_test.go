@@ -23,13 +23,13 @@ func TestRoundTripper_RoundTrip(t *testing.T) {
 		localDevelopment   bool
 		shouldImpersonate  bool
 		expectedStatusCode int
-		setupMocks         func(*mocks.MockRoundTripper, *mocks.MockRoundTripper)
+		setupMocks         func(*mocks.MockRoundTripper, *mocks.MockRoundTripper, *mocks.MockRoundTripper)
 	}{
 		{
 			name:               "local_development_uses_admin",
 			localDevelopment:   true,
 			expectedStatusCode: http.StatusOK,
-			setupMocks: func(admin, unauthorized *mocks.MockRoundTripper) {
+			setupMocks: func(admin, base, unauthorized *mocks.MockRoundTripper) {
 				admin.EXPECT().RoundTrip(mock.Anything).Return(&http.Response{StatusCode: http.StatusOK}, nil)
 			},
 		},
@@ -37,7 +37,7 @@ func TestRoundTripper_RoundTrip(t *testing.T) {
 			name:               "no_token_returns_unauthorized",
 			localDevelopment:   false,
 			expectedStatusCode: http.StatusUnauthorized,
-			setupMocks: func(admin, unauthorized *mocks.MockRoundTripper) {
+			setupMocks: func(admin, base, unauthorized *mocks.MockRoundTripper) {
 				unauthorized.EXPECT().RoundTrip(mock.Anything).Return(&http.Response{StatusCode: http.StatusUnauthorized}, nil)
 			},
 		},
@@ -47,8 +47,8 @@ func TestRoundTripper_RoundTrip(t *testing.T) {
 			localDevelopment:   false,
 			shouldImpersonate:  false,
 			expectedStatusCode: http.StatusOK,
-			setupMocks: func(admin, unauthorized *mocks.MockRoundTripper) {
-				admin.EXPECT().RoundTrip(mock.Anything).Return(&http.Response{StatusCode: http.StatusOK}, nil)
+			setupMocks: func(admin, base, unauthorized *mocks.MockRoundTripper) {
+				base.EXPECT().RoundTrip(mock.Anything).Return(&http.Response{StatusCode: http.StatusOK}, nil)
 			},
 		},
 		{
@@ -57,7 +57,7 @@ func TestRoundTripper_RoundTrip(t *testing.T) {
 			localDevelopment:   false,
 			shouldImpersonate:  true,
 			expectedStatusCode: http.StatusOK,
-			setupMocks: func(admin, unauthorized *mocks.MockRoundTripper) {
+			setupMocks: func(admin, base, unauthorized *mocks.MockRoundTripper) {
 				admin.EXPECT().RoundTrip(mock.Anything).Return(&http.Response{StatusCode: http.StatusOK}, nil)
 			},
 		},
@@ -66,9 +66,10 @@ func TestRoundTripper_RoundTrip(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockAdmin := &mocks.MockRoundTripper{}
+			mockBase := &mocks.MockRoundTripper{}
 			mockUnauthorized := &mocks.MockRoundTripper{}
 
-			tt.setupMocks(mockAdmin, mockUnauthorized)
+			tt.setupMocks(mockAdmin, mockBase, mockUnauthorized)
 
 			appCfg := appConfig.Config{
 				LocalDevelopment: tt.localDevelopment,
@@ -76,7 +77,7 @@ func TestRoundTripper_RoundTrip(t *testing.T) {
 			appCfg.Gateway.ShouldImpersonate = tt.shouldImpersonate
 			appCfg.Gateway.UsernameClaim = "sub"
 
-			rt := roundtripper.New(testlogger.New().Logger, appCfg, mockAdmin, mockUnauthorized)
+			rt := roundtripper.New(testlogger.New().Logger, appCfg, mockAdmin, mockBase, mockUnauthorized)
 
 			req := httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/pods", nil)
 			if tt.token != "" {
@@ -247,6 +248,7 @@ func TestRoundTripper_DiscoveryRequests(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockAdmin := &mocks.MockRoundTripper{}
+			mockBase := &mocks.MockRoundTripper{}
 			mockUnauthorized := &mocks.MockRoundTripper{}
 
 			if tt.isDiscovery {
@@ -261,7 +263,7 @@ func TestRoundTripper_DiscoveryRequests(t *testing.T) {
 			appCfg.Gateway.ShouldImpersonate = false
 			appCfg.Gateway.UsernameClaim = "sub"
 
-			rt := roundtripper.New(testlogger.New().Logger, appCfg, mockAdmin, mockUnauthorized)
+			rt := roundtripper.New(testlogger.New().Logger, appCfg, mockAdmin, mockBase, mockUnauthorized)
 
 			req := httptest.NewRequest(tt.method, "http://example.com"+tt.path, nil)
 
@@ -290,7 +292,7 @@ func TestRoundTripper_ComprehensiveFunctionality(t *testing.T) {
 		usernameClaim         string
 		expectedStatusCode    int
 		expectedImpersonation string
-		setupMocks            func(*mocks.MockRoundTripper, *mocks.MockRoundTripper)
+		setupMocks            func(*mocks.MockRoundTripper, *mocks.MockRoundTripper, *mocks.MockRoundTripper)
 	}{
 		{
 			name:                  "impersonation_with_custom_claim",
@@ -300,7 +302,7 @@ func TestRoundTripper_ComprehensiveFunctionality(t *testing.T) {
 			usernameClaim:         "email",
 			expectedStatusCode:    http.StatusOK,
 			expectedImpersonation: "user@example.com",
-			setupMocks: func(admin, unauthorized *mocks.MockRoundTripper) {
+			setupMocks: func(admin, base, unauthorized *mocks.MockRoundTripper) {
 				admin.EXPECT().RoundTrip(mock.Anything).Return(&http.Response{StatusCode: http.StatusOK}, nil)
 			},
 		},
@@ -312,7 +314,7 @@ func TestRoundTripper_ComprehensiveFunctionality(t *testing.T) {
 			usernameClaim:         "sub",
 			expectedStatusCode:    http.StatusOK,
 			expectedImpersonation: "test-user-123",
-			setupMocks: func(admin, unauthorized *mocks.MockRoundTripper) {
+			setupMocks: func(admin, base, unauthorized *mocks.MockRoundTripper) {
 				admin.EXPECT().RoundTrip(mock.Anything).Return(&http.Response{StatusCode: http.StatusOK}, nil)
 			},
 		},
@@ -323,7 +325,7 @@ func TestRoundTripper_ComprehensiveFunctionality(t *testing.T) {
 			shouldImpersonate:  true,
 			usernameClaim:      "sub",
 			expectedStatusCode: http.StatusUnauthorized,
-			setupMocks: func(admin, unauthorized *mocks.MockRoundTripper) {
+			setupMocks: func(admin, base, unauthorized *mocks.MockRoundTripper) {
 				unauthorized.EXPECT().RoundTrip(mock.Anything).Return(&http.Response{StatusCode: http.StatusUnauthorized}, nil)
 			},
 		},
@@ -334,7 +336,7 @@ func TestRoundTripper_ComprehensiveFunctionality(t *testing.T) {
 			shouldImpersonate:  true,
 			usernameClaim:      "sub",
 			expectedStatusCode: http.StatusUnauthorized,
-			setupMocks: func(admin, unauthorized *mocks.MockRoundTripper) {
+			setupMocks: func(admin, base, unauthorized *mocks.MockRoundTripper) {
 				unauthorized.EXPECT().RoundTrip(mock.Anything).Return(&http.Response{StatusCode: http.StatusUnauthorized}, nil)
 			},
 		},
@@ -345,7 +347,7 @@ func TestRoundTripper_ComprehensiveFunctionality(t *testing.T) {
 			shouldImpersonate:  true,
 			usernameClaim:      "sub",
 			expectedStatusCode: http.StatusUnauthorized,
-			setupMocks: func(admin, unauthorized *mocks.MockRoundTripper) {
+			setupMocks: func(admin, base, unauthorized *mocks.MockRoundTripper) {
 				unauthorized.EXPECT().RoundTrip(mock.Anything).Return(&http.Response{StatusCode: http.StatusUnauthorized}, nil)
 			},
 		},
@@ -356,7 +358,7 @@ func TestRoundTripper_ComprehensiveFunctionality(t *testing.T) {
 			shouldImpersonate:  true,
 			usernameClaim:      "sub",
 			expectedStatusCode: http.StatusUnauthorized,
-			setupMocks: func(admin, unauthorized *mocks.MockRoundTripper) {
+			setupMocks: func(admin, base, unauthorized *mocks.MockRoundTripper) {
 				unauthorized.EXPECT().RoundTrip(mock.Anything).Return(&http.Response{StatusCode: http.StatusUnauthorized}, nil)
 			},
 		},
@@ -365,9 +367,10 @@ func TestRoundTripper_ComprehensiveFunctionality(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockAdmin := &mocks.MockRoundTripper{}
+			mockBase := &mocks.MockRoundTripper{}
 			mockUnauthorized := &mocks.MockRoundTripper{}
 
-			tt.setupMocks(mockAdmin, mockUnauthorized)
+			tt.setupMocks(mockAdmin, mockBase, mockUnauthorized)
 
 			appCfg := appConfig.Config{
 				LocalDevelopment: tt.localDevelopment,
@@ -375,7 +378,7 @@ func TestRoundTripper_ComprehensiveFunctionality(t *testing.T) {
 			appCfg.Gateway.ShouldImpersonate = tt.shouldImpersonate
 			appCfg.Gateway.UsernameClaim = tt.usernameClaim
 
-			rt := roundtripper.New(testlogger.New().Logger, appCfg, mockAdmin, mockUnauthorized)
+			rt := roundtripper.New(testlogger.New().Logger, appCfg, mockAdmin, mockBase, mockUnauthorized)
 
 			req := httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/pods", nil)
 			if tt.token != "" {
@@ -436,6 +439,7 @@ func TestRoundTripper_KCPDiscoveryRequests(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockAdmin := &mocks.MockRoundTripper{}
+			mockBase := &mocks.MockRoundTripper{}
 			mockUnauthorized := &mocks.MockRoundTripper{}
 
 			if tt.isDiscovery {
@@ -450,7 +454,7 @@ func TestRoundTripper_KCPDiscoveryRequests(t *testing.T) {
 			appCfg.Gateway.ShouldImpersonate = false
 			appCfg.Gateway.UsernameClaim = "sub"
 
-			rt := roundtripper.New(testlogger.New().Logger, appCfg, mockAdmin, mockUnauthorized)
+			rt := roundtripper.New(testlogger.New().Logger, appCfg, mockAdmin, mockBase, mockUnauthorized)
 
 			req := httptest.NewRequest(http.MethodGet, "http://example.com"+tt.path, nil)
 
@@ -490,6 +494,7 @@ func TestRoundTripper_InvalidTokenSecurityFix(t *testing.T) {
 	// by the Kubernetes cluster itself, not by falling back to admin credentials
 
 	mockAdmin := &mocks.MockRoundTripper{}
+	mockBase := &mocks.MockRoundTripper{}
 	mockUnauthorized := &mocks.MockRoundTripper{}
 
 	// The unauthorizedRT should be called since we have no token
@@ -499,7 +504,7 @@ func TestRoundTripper_InvalidTokenSecurityFix(t *testing.T) {
 	appCfg.Gateway.ShouldImpersonate = false
 	appCfg.Gateway.UsernameClaim = "sub"
 
-	rt := roundtripper.New(testlogger.New().Logger, appCfg, mockAdmin, mockUnauthorized)
+	rt := roundtripper.New(testlogger.New().Logger, appCfg, mockAdmin, mockBase, mockUnauthorized)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/pods", nil)
 	// Don't set a token to simulate the invalid token case
@@ -514,11 +519,12 @@ func TestRoundTripper_ExistingAuthHeadersAreCleanedBeforeTokenAuth(t *testing.T)
 	// before setting the bearer token, preventing admin credentials from leaking through
 
 	mockAdmin := &mocks.MockRoundTripper{}
+	mockBase := &mocks.MockRoundTripper{}
 	mockUnauthorized := &mocks.MockRoundTripper{}
 
-	// Capture the request that gets sent to adminRT
+	// Capture the request that gets sent to baseRT
 	var capturedRequest *http.Request
-	mockAdmin.EXPECT().RoundTrip(mock.Anything).Return(&http.Response{StatusCode: http.StatusOK}, nil).Run(func(req *http.Request) {
+	mockBase.EXPECT().RoundTrip(mock.Anything).Return(&http.Response{StatusCode: http.StatusOK}, nil).Run(func(req *http.Request) {
 		capturedRequest = req
 	})
 
@@ -526,7 +532,7 @@ func TestRoundTripper_ExistingAuthHeadersAreCleanedBeforeTokenAuth(t *testing.T)
 	appCfg.Gateway.ShouldImpersonate = false
 	appCfg.Gateway.UsernameClaim = "sub"
 
-	rt := roundtripper.New(testlogger.New().Logger, appCfg, mockAdmin, mockUnauthorized)
+	rt := roundtripper.New(testlogger.New().Logger, appCfg, mockAdmin, mockBase, mockUnauthorized)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/pods", nil)
 
@@ -551,9 +557,11 @@ func TestRoundTripper_ExistingAuthHeadersAreCleanedBeforeTokenAuth(t *testing.T)
 
 func TestRoundTripper_ExistingAuthHeadersAreCleanedBeforeImpersonation(t *testing.T) {
 	// This test verifies that existing Authorization headers are properly cleaned
-	// before setting the bearer token in impersonation mode
+	// in impersonation mode. In impersonation mode, cert-based auth is used via adminRT,
+	// so no bearer token should be present in the Authorization header.
 
 	mockAdmin := &mocks.MockRoundTripper{}
+	mockBase := &mocks.MockRoundTripper{}
 	mockUnauthorized := &mocks.MockRoundTripper{}
 
 	// Capture the request that gets sent to the impersonation round tripper (which uses adminRT)
@@ -566,7 +574,7 @@ func TestRoundTripper_ExistingAuthHeadersAreCleanedBeforeImpersonation(t *testin
 	appCfg.Gateway.ShouldImpersonate = true
 	appCfg.Gateway.UsernameClaim = "sub"
 
-	rt := roundtripper.New(testlogger.New().Logger, appCfg, mockAdmin, mockUnauthorized)
+	rt := roundtripper.New(testlogger.New().Logger, appCfg, mockAdmin, mockBase, mockUnauthorized)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/pods", nil)
 
@@ -587,13 +595,11 @@ func TestRoundTripper_ExistingAuthHeadersAreCleanedBeforeImpersonation(t *testin
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	// Verify that the captured request has the correct Authorization header
+	// Verify that the captured request has no Authorization header
+	// In impersonation mode, cert-based auth is used, not bearer tokens
 	require.NotNil(t, capturedRequest)
 	authHeader := capturedRequest.Header.Get("Authorization")
-	assert.Equal(t, "Bearer "+tokenString, authHeader)
-
-	// Verify that the original admin token was removed
-	assert.NotContains(t, authHeader, "admin-token-that-should-be-removed")
+	assert.Empty(t, authHeader, "Authorization header should be empty in impersonation mode")
 
 	// Verify that the impersonation header is set
 	impersonateHeader := capturedRequest.Header.Get("Impersonate-User")

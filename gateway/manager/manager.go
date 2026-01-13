@@ -8,11 +8,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/platform-mesh/golang-commons/logger"
 	appConfig "github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/roundtripper"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/targetcluster"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/watcher"
-
-	"k8s.io/client-go/rest"
 )
 
 // Service orchestrates the domain-driven architecture with target clusters
@@ -24,12 +21,7 @@ type Service struct {
 
 // NewGateway creates a new domain-driven Gateway instance
 func NewGateway(ctx context.Context, log *logger.Logger, appCfg appConfig.Config) (*Service, error) {
-	// Create round tripper factory
-	roundTripperFactory := targetcluster.RoundTripperFactory(func(adminRT http.RoundTripper, tlsConfig rest.TLSClientConfig) http.RoundTripper {
-		return roundtripper.New(log, appCfg, adminRT, roundtripper.NewUnauthorizedRoundTripper())
-	})
-
-	clusterRegistry := targetcluster.NewClusterRegistry(log, appCfg, roundTripperFactory)
+	clusterRegistry := targetcluster.NewClusterRegistry(log, appCfg)
 
 	schemaWatcher, err := watcher.NewFileWatcher(log, clusterRegistry)
 	if err != nil {

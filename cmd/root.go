@@ -65,7 +65,7 @@ func initConfig() {
 	v.SetDefault("gateway-port", "8080")
 
 	v.SetDefault("gateway-username-claim", "email")
-	v.SetDefault("gateway-should-impersonate", true)
+	v.SetDefault("gateway-should-impersonate", false)
 	// Gateway Handler config
 	v.SetDefault("gateway-handler-pretty", true)
 	v.SetDefault("gateway-handler-playground", true)
