@@ -7,7 +7,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/platform-mesh/golang-commons/logger"
-
 	appConfig "github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/targetcluster"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/watcher"
