@@ -191,13 +191,18 @@ func (g *Gateway) processGroupedResources(
 	rootMutationFields,
 	rootSubscriptionFields graphql.Fields,
 ) {
+	sanitizedGroup := group
+	if !g.isRootGroup(group) {
+		sanitizedGroup = g.resolver.SanitizeGroupName(group)
+	}
+
 	queryGroupType := graphql.NewObject(graphql.ObjectConfig{
-		Name:   group + "Query",
+		Name:   flect.Pascalize(sanitizedGroup) + "Query",
 		Fields: graphql.Fields{},
 	})
 
 	mutationGroupType := graphql.NewObject(graphql.ObjectConfig{
-		Name:   group + "Mutation",
+		Name:   flect.Pascalize(sanitizedGroup) + "Mutation",
 		Fields: graphql.Fields{},
 	})
 
@@ -217,11 +222,11 @@ func (g *Gateway) processGroupedResources(
 	for versionStr, resources := range versions {
 		// Version objects
 		queryVersionType := graphql.NewObject(graphql.ObjectConfig{
-			Name:   group + "_" + versionStr + "Query",
+			Name:   flect.Pascalize(sanitizedGroup) + "_" + versionStr + "Query",
 			Fields: graphql.Fields{},
 		})
 		mutationVersionType := graphql.NewObject(graphql.ObjectConfig{
-			Name:   group + "_" + versionStr + "Mutation",
+			Name:   flect.Pascalize(sanitizedGroup) + "_" + versionStr + "Mutation",
 			Fields: graphql.Fields{},
 		})
 
@@ -268,13 +273,13 @@ func (g *Gateway) processGroupedResources(
 
 	if !g.isRootGroup(group) {
 		if len(queryGroupType.Fields()) > 0 {
-			rootQueryFields[group] = &graphql.Field{
+			rootQueryFields[sanitizedGroup] = &graphql.Field{
 				Type:    queryGroupType,
 				Resolve: g.resolver.CommonResolver(),
 			}
 		}
 		if len(mutationGroupType.Fields()) > 0 {
-			rootMutationFields[group] = &graphql.Field{
+			rootMutationFields[sanitizedGroup] = &graphql.Field{
 				Type:    mutationGroupType,
 				Resolve: g.resolver.CommonResolver(),
 			}
@@ -455,7 +460,7 @@ func (g *Gateway) getNames(gvk *schema.GroupVersionKind) (singular string, plura
 		if existingGroupVersion != gvk.GroupVersion().String() {
 			// Conflict detected, append group and version to the kind for uniqueness
 			// we don't add new entry to the registry, because we already have one with the same kind
-			group := strings.ReplaceAll(gvk.Group, ".", "") // dots are allowed in k8s group, but not in graphql
+			group := g.resolver.SanitizeGroupName(gvk.Group)
 			singular = strings.Join([]string{kind, group, gvk.Version}, "_")
 			plural = strings.Join([]string{plural, group, gvk.Version}, "_")
 		}
