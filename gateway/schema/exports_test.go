@@ -1,8 +1,6 @@
 package schema
 
-import (
-	"k8s.io/apimachinery/pkg/runtime/schema"
-)
+import "k8s.io/apimachinery/pkg/runtime/schema"
 
 var StringMapScalarForTest = stringMapScalar
 var JSONStringScalarForTest = jsonStringScalar
