@@ -8,13 +8,13 @@ For questions on how to execute them, please find our [Quick Start Guide](./quic
 mutation {
   v1 {
     createConfigMap(
-    namespace: "default",
-    object: {
-      metadata: {
-        name: "example-config"
-      },
-      data: { key: "val" }
-    }
+      namespace: "default",
+      object: {
+        metadata: {
+          name: "example-config"
+        },
+        data: { key: "val" }
+      }
     ) {
       metadata {
         name

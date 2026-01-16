@@ -191,20 +191,24 @@ func (g *Gateway) processGroupedResources(
 	rootMutationFields,
 	rootSubscriptionFields graphql.Fields,
 ) {
-	sanitizedGroup := group
-	if !g.isRootGroup(group) {
+	isRoot := g.isRootGroup(group)
+	sanitizedGroup := ""
+	if !isRoot {
 		sanitizedGroup = g.resolver.SanitizeGroupName(group)
 	}
 
-	queryGroupType := graphql.NewObject(graphql.ObjectConfig{
-		Name:   flect.Pascalize(sanitizedGroup) + "Query",
-		Fields: graphql.Fields{},
-	})
+	var queryGroupType, mutationGroupType *graphql.Object
+	if !isRoot {
+		queryGroupType = graphql.NewObject(graphql.ObjectConfig{
+			Name:   flect.Pascalize(sanitizedGroup) + "Query",
+			Fields: graphql.Fields{},
+		})
 
-	mutationGroupType := graphql.NewObject(graphql.ObjectConfig{
-		Name:   flect.Pascalize(sanitizedGroup) + "Mutation",
-		Fields: graphql.Fields{},
-	})
+		mutationGroupType = graphql.NewObject(graphql.ObjectConfig{
+			Name:   flect.Pascalize(sanitizedGroup) + "Mutation",
+			Fields: graphql.Fields{},
+		})
+	}
 
 	versions := map[string]map[string]*spec.Schema{}
 	for resourceKey, resourceScheme := range groupedResources {
@@ -222,11 +226,11 @@ func (g *Gateway) processGroupedResources(
 	for versionStr, resources := range versions {
 		// Version objects
 		queryVersionType := graphql.NewObject(graphql.ObjectConfig{
-			Name:   flect.Pascalize(sanitizedGroup) + "_" + versionStr + "Query",
+			Name:   flect.Pascalize(sanitizedGroup+"_"+versionStr) + "Query",
 			Fields: graphql.Fields{},
 		})
 		mutationVersionType := graphql.NewObject(graphql.ObjectConfig{
-			Name:   flect.Pascalize(sanitizedGroup) + "_" + versionStr + "Mutation",
+			Name:   flect.Pascalize(sanitizedGroup+"_"+versionStr) + "Mutation",
 			Fields: graphql.Fields{},
 		})
 
@@ -241,28 +245,26 @@ func (g *Gateway) processGroupedResources(
 			)
 		}
 
-		if g.isRootGroup(group) {
-			if len(queryVersionType.Fields()) > 0 {
+		if len(queryVersionType.Fields()) > 0 {
+			if isRoot {
 				rootQueryFields[versionStr] = &graphql.Field{
 					Type:    queryVersionType,
 					Resolve: g.resolver.CommonResolver(),
 				}
-			}
-			if len(mutationVersionType.Fields()) > 0 {
-				rootMutationFields[versionStr] = &graphql.Field{
-					Type:    mutationVersionType,
-					Resolve: g.resolver.CommonResolver(),
-				}
-			}
-		} else {
-			// Default: attach version under the API group
-			if len(queryVersionType.Fields()) > 0 {
+			} else {
 				queryGroupType.AddFieldConfig(versionStr, &graphql.Field{
 					Type:    queryVersionType,
 					Resolve: g.resolver.CommonResolver(),
 				})
 			}
-			if len(mutationVersionType.Fields()) > 0 {
+		}
+		if len(mutationVersionType.Fields()) > 0 {
+			if isRoot {
+				rootMutationFields[versionStr] = &graphql.Field{
+					Type:    mutationVersionType,
+					Resolve: g.resolver.CommonResolver(),
+				}
+			} else {
 				mutationGroupType.AddFieldConfig(versionStr, &graphql.Field{
 					Type:    mutationVersionType,
 					Resolve: g.resolver.CommonResolver(),
@@ -271,7 +273,7 @@ func (g *Gateway) processGroupedResources(
 		}
 	}
 
-	if !g.isRootGroup(group) {
+	if !isRoot {
 		if len(queryGroupType.Fields()) > 0 {
 			rootQueryFields[sanitizedGroup] = &graphql.Field{
 				Type:    queryGroupType,
@@ -316,9 +318,10 @@ func (g *Gateway) processSingleResource(
 	}
 
 	singular, plural := g.getNames(gvk)
+	uniqueTypeName := g.getUniqueTypeName(gvk)
 
 	// Generate both fields and inputFields
-	fields, inputFields, err := g.generateGraphQLFields(resourceScheme, singular, []string{}, make(map[string]bool))
+	fields, inputFields, err := g.generateGraphQLFields(resourceScheme, uniqueTypeName, []string{}, make(map[string]bool))
 	if err != nil {
 		g.log.Error().Err(err).Str("resource", singular).Msg("Error generating fields")
 		return
@@ -330,12 +333,12 @@ func (g *Gateway) processSingleResource(
 	}
 
 	resourceType := graphql.NewObject(graphql.ObjectConfig{
-		Name:   singular,
+		Name:   uniqueTypeName,
 		Fields: fields,
 	})
 
 	resourceInputType := graphql.NewInputObject(graphql.InputObjectConfig{
-		Name:   singular + "Input",
+		Name:   uniqueTypeName + "Input",
 		Fields: inputFields,
 	})
 
@@ -360,7 +363,7 @@ func (g *Gateway) processSingleResource(
 	creationMutationArgs := creationMutationArgsBuilder.Complete()
 
 	listWrapperType := graphql.NewObject(graphql.ObjectConfig{
-		Name: singular + "List",
+		Name: uniqueTypeName + "List",
 		Fields: graphql.Fields{
 			"resourceVersion":    &graphql.Field{Type: graphql.String},
 			"items":              &graphql.Field{Type: graphql.NewNonNull(graphql.NewList(graphql.NewNonNull(resourceType)))},
@@ -408,7 +411,7 @@ func (g *Gateway) processSingleResource(
 
 	// Define an event envelope type for subscriptions
 	eventType := graphql.NewObject(graphql.ObjectConfig{
-		Name: singular + "Event",
+		Name: uniqueTypeName + "Event",
 		Fields: graphql.Fields{
 			"type":   &graphql.Field{Type: graphql.NewNonNull(watchEventTypeEnum)},
 			"object": &graphql.Field{Type: resourceType},
@@ -416,11 +419,17 @@ func (g *Gateway) processSingleResource(
 	})
 
 	var subscriptionSingular string
-	if g.isRootGroup(gvk.Group) {
+	sanitizedGroup := ""
+	if !g.isRootGroup(gvk.Group) {
+		sanitizedGroup = g.resolver.SanitizeGroupName(gvk.Group)
+	}
+
+	if sanitizedGroup == "" {
 		subscriptionSingular = strings.ToLower(fmt.Sprintf("%s_%s", gvk.Version, singular))
 	} else {
-		subscriptionSingular = strings.ToLower(fmt.Sprintf("%s_%s_%s", gvk.Group, gvk.Version, singular))
+		subscriptionSingular = strings.ToLower(fmt.Sprintf("%s_%s_%s", sanitizedGroup, gvk.Version, singular))
 	}
+
 	rootSubscriptionFields[subscriptionSingular] = &graphql.Field{
 		Type: eventType,
 		Args: itemArgsBuilder.
@@ -433,10 +442,10 @@ func (g *Gateway) processSingleResource(
 	}
 
 	var subscriptionPlural string
-	if g.isRootGroup(gvk.Group) {
+	if sanitizedGroup == "" {
 		subscriptionPlural = strings.ToLower(fmt.Sprintf("%s_%s", gvk.Version, plural))
 	} else {
-		subscriptionPlural = strings.ToLower(fmt.Sprintf("%s_%s_%s", gvk.Group, gvk.Version, plural))
+		subscriptionPlural = strings.ToLower(fmt.Sprintf("%s_%s_%s", sanitizedGroup, gvk.Version, plural))
 	}
 	rootSubscriptionFields[subscriptionPlural] = &graphql.Field{
 		Type: eventType,
@@ -450,24 +459,30 @@ func (g *Gateway) processSingleResource(
 	}
 }
 
-func (g *Gateway) getNames(gvk *schema.GroupVersionKind) (singular string, plural string) {
+func (g *Gateway) getUniqueTypeName(gvk *schema.GroupVersionKind) string {
 	kind := gvk.Kind
-	singular = kind
-	plural = flect.Pluralize(singular)
-
 	// Check if the kind name has already been used for a different group/version
 	if existingGroupVersion, exists := g.typeNameRegistry[kind]; exists {
 		if existingGroupVersion != gvk.GroupVersion().String() {
 			// Conflict detected, append group and version to the kind for uniqueness
-			// we don't add new entry to the registry, because we already have one with the same kind
-			group := g.resolver.SanitizeGroupName(gvk.Group)
-			singular = strings.Join([]string{kind, group, gvk.Version}, "_")
-			plural = strings.Join([]string{plural, group, gvk.Version}, "_")
+			sanitizedGroup := ""
+			if !g.isRootGroup(gvk.Group) {
+				sanitizedGroup = g.resolver.SanitizeGroupName(gvk.Group)
+			}
+			return flect.Pascalize(sanitizedGroup+"_"+gvk.Version) + kind
 		}
 	} else {
 		// No conflict, register the kind with its group and version
 		g.typeNameRegistry[kind] = gvk.GroupVersion().String()
 	}
+
+	return kind
+}
+
+func (g *Gateway) getNames(gvk *schema.GroupVersionKind) (singular string, plural string) {
+	kind := gvk.Kind
+	singular = kind
+	plural = flect.Pluralize(singular)
 
 	return singular, plural
 }

@@ -147,7 +147,6 @@ func (s *IntegrationTestSuite) TestConfigMapCRUD() {
                         updateConfigMap(name: $name, namespace: $namespace, object: $object) {
                             metadata {
                                 name
-                                namespace
                             }
                             data
                         }
