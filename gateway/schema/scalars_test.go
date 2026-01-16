@@ -116,7 +116,7 @@ func TestSanitizeFieldNameUtil(t *testing.T) {
 }
 
 func TestGenerateTypeName(t *testing.T) {
-	g := schema.GetGatewayForTest(map[string]string{}, nil)
+	g := schema.GetGatewayForTest(map[string]string{})
 
 	tests := []struct {
 		name       string
