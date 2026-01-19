@@ -18,7 +18,7 @@ Otherwise, only fields defined within the `{}` brackets will be listened to.
 
 ## Naming scheme (subscriptions)
 
-Subscriptions are flat but versioned. To align with the removal of the artificial core group:
+Subscriptions are flat but versioned:
 
 - Core resources use `v<version>_<resource>`.
   - All ConfigMaps (core/v1): `v1_configmaps`
