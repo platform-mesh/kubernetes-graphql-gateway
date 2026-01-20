@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/platform-mesh/golang-commons/logger"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/common"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/workspacefile"
 
@@ -45,6 +46,15 @@ func (r *APIBindingReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if err != nil {
 		logger.Error().Err(err).Msg("failed to get cluster client")
 		return ctrl.Result{}, err
+	}
+
+	apiBinding := &kcpapis.APIBinding{}
+	if err := clusterClt.Get(ctx, client.ObjectKey{Name: req.Name}, apiBinding); err != nil {
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	if apiBinding.DeletionTimestamp != nil {
+		return ctrl.Result{}, nil
 	}
 
 	clusterPath, err := PathForCluster(req.ClusterName, clusterClt)
@@ -96,6 +106,23 @@ func (r *APIBindingReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			return ctrl.Result{}, err
 		}
 		logger.Info().Msg("schema file updated")
+	}
+
+	found := false
+	for i, annotation := range apiBinding.Annotations {
+		if annotation == common.GatewayInitializer {
+			delete(apiBinding.Annotations, i)
+			found = true
+			break
+		}
+	}
+
+	if found {
+		logger.Info().Msg("removing gateway initializer from APIBinding")
+		if err := clusterClt.Update(ctx, apiBinding); err != nil {
+			logger.Error().Err(err).Msg("failed to update APIBinding")
+			return ctrl.Result{}, err
+		}
 	}
 
 	return ctrl.Result{}, nil

@@ -11,6 +11,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kcpcore "github.com/kcp-dev/kcp/sdk/apis/core/v1alpha1"
+	kcptenancy "github.com/kcp-dev/kcp/sdk/apis/tenancy/v1alpha1"
 )
 
 // LogicalClusterReconciler reconciles a LogicalCluster object
@@ -39,6 +40,16 @@ func (r *LogicalClusterReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	if lc.DeletionTimestamp != nil {
+		return ctrl.Result{}, nil
+	}
+
+	workspace := &kcptenancy.Workspace{}
+	if err := clusterClt.Get(ctx, client.ObjectKey{Name: req.Name}, workspace); err != nil {
+		logger.Error().Err(err).Msg("failed to get workspace resource")
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	if workspace.Spec.Type.Name != "account" {
 		return ctrl.Result{}, nil
 	}
 
