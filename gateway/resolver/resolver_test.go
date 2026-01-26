@@ -726,6 +726,8 @@ func TestSanitizeGroupName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			r := &resolver.Service{}
+			r.SetGroupNames(make(map[string]string))
 			result := r.SanitizeGroupName(tt.input)
 			assert.Equal(t, tt.expected, result)
 			assert.Equal(t, tt.input, r.GetGroupName(result), "The original group name should be stored correctly")
