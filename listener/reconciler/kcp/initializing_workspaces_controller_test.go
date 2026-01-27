@@ -25,6 +25,41 @@ import (
 )
 
 func TestInitializingWorkspacesReconciler_Reconcile(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "kcp-test-")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir) //nolint:errcheck
+
+	kubeconfigContent := `apiVersion: v1
+kind: Config
+current-context: test
+contexts:
+- context: {cluster: test, user: test}
+  name: test
+clusters:
+- cluster: {server: 'https://test.example.com'}
+  name: test
+users:
+- name: test
+  user: {token: test-token}
+`
+	kubeconfigPath := filepath.Join(tempDir, "config")
+	err = os.WriteFile(kubeconfigPath, []byte(kubeconfigContent), 0600)
+	if err != nil {
+		t.Fatalf("Failed to write kubeconfig: %v", err)
+	}
+
+	originalKubeconfig := os.Getenv("KUBECONFIG")
+	os.Setenv("KUBECONFIG", kubeconfigPath) //nolint:errcheck
+	defer func() {
+		if originalKubeconfig != "" {
+			os.Setenv("KUBECONFIG", originalKubeconfig) //nolint:errcheck
+		} else {
+			os.Unsetenv("KUBECONFIG") //nolint:errcheck
+		}
+	}()
+
 	mockLogger, _ := logger.New(logger.DefaultConfig())
 
 	tests := []struct {
@@ -123,7 +158,9 @@ func TestInitializingWorkspacesReconciler_Reconcile(t *testing.T) {
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				if !assert.NoError(t, err) {
+					t.FailNow()
+				}
 			}
 			assert.Equal(t, tt.wantResult, result)
 
