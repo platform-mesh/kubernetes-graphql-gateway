@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/platform-mesh/golang-commons/logger"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/common"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/common/mocks"
 	apschemamocks "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema/mocks"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/workspacefile"
@@ -615,7 +614,7 @@ users:
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "test-binding",
 						Annotations: map[string]string{
-							"gateway-initializer-key": common.GatewayInitializer,
+							"initializer.apis.kcp.io/gateway": "true",
 						},
 					},
 				}
@@ -652,7 +651,7 @@ users:
 					Return(schemaJSON, nil).Once()
 
 				mockClusterClient.EXPECT().Update(mock.Anything, mock.MatchedBy(func(obj *kcpapis.APIBinding) bool {
-					_, exists := obj.Annotations["gateway-initializer-key"]
+					_, exists := obj.Annotations["initializer.apis.kcp.io/gateway"]
 					return !exists
 				})).Return(nil).Once()
 			},

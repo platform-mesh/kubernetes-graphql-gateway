@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/platform-mesh/golang-commons/logger"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/common"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/workspacefile"
 
@@ -33,6 +32,8 @@ type APIBindingReconciler struct {
 	ClusterPathResolver ClusterPathResolver
 	Log                 *logger.Logger
 }
+
+const apiBindingInitializerAnnotation = "initializer.apis.kcp.io/gateway"
 
 func (r *APIBindingReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	// ignore system workspaces (e.g. system:shard)
@@ -109,12 +110,18 @@ func (r *APIBindingReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	found := false
-	for i, annotation := range apiBinding.Annotations {
-		if annotation == common.GatewayInitializer {
-			delete(apiBinding.Annotations, i)
-			found = true
-			break
+	if _, ok := apiBinding.Annotations[apiBindingInitializerAnnotation]; ok {
+		if _, err := r.IOHandler.Read(clusterPath); err != nil {
+			if errors.Is(err, fs.ErrNotExist) || errors.Is(err, workspacefile.ErrReadJSONFile) {
+				logger.Debug().Msg("schema not yet generated, skipping APIBinding initializer removal")
+				return ctrl.Result{}, nil
+			}
+			logger.Error().Err(err).Msg("failed to read schema file")
+			return ctrl.Result{}, err
 		}
+
+		delete(apiBinding.Annotations, apiBindingInitializerAnnotation)
+		found = true
 	}
 
 	if found {
