@@ -111,10 +111,26 @@ func (r *InitializingWorkspacesReconciler) Reconcile(ctx context.Context, req ct
 	}
 
 	if found {
-		logger.Info().Msg("removing gateway initializer from LogicalCluster")
+		logger.Info().Msg("removing gateway initializer from LogicalCluster spec")
 		if err := parentClusterClt.Update(ctx, lcToUpdate); err != nil {
 			logger.Error().Err(err).Msg("failed to update LogicalCluster in parent cluster")
 			return ctrl.Result{}, err
+		}
+	}
+
+	foundInStatus := false
+	for i, initializer := range lcToUpdate.Status.Initializers {
+		if string(initializer) == common.GatewayInitializer {
+			lcToUpdate.Status.Initializers = append(lcToUpdate.Status.Initializers[:i], lcToUpdate.Status.Initializers[i+1:]...)
+			foundInStatus = true
+			break
+		}
+	}
+
+	if foundInStatus {
+		logger.Info().Msg("removing gateway initializer from LogicalCluster status")
+		if err := parentClusterClt.Status().Update(ctx, lcToUpdate); err != nil {
+			logger.Warn().Err(err).Msg("failed to update LogicalCluster status in parent cluster (best effort)")
 		}
 	}
 
