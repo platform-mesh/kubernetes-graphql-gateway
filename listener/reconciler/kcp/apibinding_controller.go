@@ -33,6 +33,8 @@ type APIBindingReconciler struct {
 	Log                 *logger.Logger
 }
 
+const apiBindingInitializerAnnotation = "initializer.apis.kcp.io/gateway"
+
 func (r *APIBindingReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	// ignore system workspaces (e.g. system:shard)
 	if strings.HasPrefix(req.ClusterName, "system") {
@@ -45,6 +47,15 @@ func (r *APIBindingReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if err != nil {
 		logger.Error().Err(err).Msg("failed to get cluster client")
 		return ctrl.Result{}, err
+	}
+
+	apiBinding := &kcpapis.APIBinding{}
+	if err := clusterClt.Get(ctx, client.ObjectKey{Name: req.Name}, apiBinding); err != nil {
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	if apiBinding.DeletionTimestamp != nil {
+		return ctrl.Result{}, nil
 	}
 
 	clusterPath, err := PathForCluster(req.ClusterName, clusterClt)
@@ -96,6 +107,29 @@ func (r *APIBindingReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			return ctrl.Result{}, err
 		}
 		logger.Info().Msg("schema file updated")
+	}
+
+	found := false
+	if _, ok := apiBinding.Annotations[apiBindingInitializerAnnotation]; ok {
+		if _, err := r.IOHandler.Read(clusterPath); err != nil {
+			if errors.Is(err, fs.ErrNotExist) || errors.Is(err, workspacefile.ErrReadJSONFile) {
+				logger.Debug().Msg("schema not yet generated, skipping APIBinding initializer removal")
+				return ctrl.Result{}, nil
+			}
+			logger.Error().Err(err).Msg("failed to read schema file")
+			return ctrl.Result{}, err
+		}
+
+		delete(apiBinding.Annotations, apiBindingInitializerAnnotation)
+		found = true
+	}
+
+	if found {
+		logger.Info().Msg("removing gateway initializer from APIBinding")
+		if err := clusterClt.Update(ctx, apiBinding); err != nil {
+			logger.Error().Err(err).Msg("failed to update APIBinding")
+			return ctrl.Result{}, err
+		}
 	}
 
 	return ctrl.Result{}, nil

@@ -13,7 +13,8 @@ type Config struct {
 	} `mapstructure:",squash"`
 
 	Listener struct {
-		VirtualWorkspacesConfigPath string `mapstructure:"virtual-workspaces-config-path"`
+		VirtualWorkspacesConfigPath    string `mapstructure:"virtual-workspaces-config-path"`
+		InitializingWorkspacesQueueURL string `mapstructure:"initializing-workspaces-queue-url"`
 	} `mapstructure:",squash"`
 
 	Gateway struct {

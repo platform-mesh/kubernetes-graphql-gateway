@@ -22,6 +22,7 @@ var rootCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(gatewayCmd)
 	rootCmd.AddCommand(listenCmd)
+	rootCmd.AddCommand(initializerCmd)
 
 	var err error
 	v, defaultCfg, err = pmconfig.NewDefaultConfig(rootCmd)
@@ -45,6 +46,11 @@ func init() {
 	}
 
 	err = pmconfig.BindConfigToFlags(v, listenCmd, &appCfg)
+	if err != nil {
+		panic(err)
+	}
+
+	err = pmconfig.BindConfigToFlags(v, initializerCmd, &appCfg)
 	if err != nil {
 		panic(err)
 	}

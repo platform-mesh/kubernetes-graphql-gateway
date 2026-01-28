@@ -23,6 +23,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	kcpapis "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
 	kcpcore "github.com/kcp-dev/kcp/sdk/apis/core/v1alpha1"
 )
 
@@ -82,6 +83,9 @@ users:
 				ClusterName:    "system:shard",
 			},
 			mockSetup: func(mc *mocks.MockClient, mdf *kcpmocks.MockDiscoveryFactory, mar *apschemamocks.MockResolver, mcpr *kcpmocks.MockClusterPathResolver) {
+				mockClusterClient := mocks.NewMockClient(t)
+				mcpr.EXPECT().ClientForCluster("system:shard").
+					Return(mockClusterClient, nil).Maybe()
 				// No expectations set as system workspaces should be ignored
 			},
 			wantResult: ctrl.Result{},
@@ -111,6 +115,17 @@ users:
 				mockClusterClient := mocks.NewMockClient(t)
 				mcpr.EXPECT().ClientForCluster("deleted-cluster").
 					Return(mockClusterClient, nil).Once()
+
+				ab := &kcpapis.APIBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-binding",
+					},
+				}
+				mockClusterClient.EXPECT().Get(mock.Anything, client.ObjectKey{Name: "test-binding"}, mock.AnythingOfType("*v1alpha1.APIBinding")).
+					RunAndReturn(func(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+						*obj.(*kcpapis.APIBinding) = *ab
+						return nil
+					}).Once()
 
 				// Mock the client.Get call that happens in PathForCluster
 				// Create a deleted LogicalCluster (with DeletionTimestamp set)
@@ -154,6 +169,17 @@ users:
 				mcpr.EXPECT().ClientForCluster("error-cluster").
 					Return(mockClusterClient, nil).Once()
 
+				ab := &kcpapis.APIBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-binding",
+					},
+				}
+				mockClusterClient.EXPECT().Get(mock.Anything, client.ObjectKey{Name: "test-binding"}, mock.AnythingOfType("*v1alpha1.APIBinding")).
+					RunAndReturn(func(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+						*obj.(*kcpapis.APIBinding) = *ab
+						return nil
+					}).Once()
+
 				// Mock the Get call that PathForCluster makes internally
 				mockClusterClient.EXPECT().Get(
 					mock.Anything,
@@ -175,6 +201,17 @@ users:
 				mockClusterClient := mocks.NewMockClient(t)
 				mcpr.EXPECT().ClientForCluster("test-cluster").
 					Return(mockClusterClient, nil).Once()
+
+				ab := &kcpapis.APIBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-binding",
+					},
+				}
+				mockClusterClient.EXPECT().Get(mock.Anything, client.ObjectKey{Name: "test-binding"}, mock.AnythingOfType("*v1alpha1.APIBinding")).
+					RunAndReturn(func(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+						*obj.(*kcpapis.APIBinding) = *ab
+						return nil
+					}).Once()
 
 				// Mock successful LogicalCluster get
 				lc := &kcpcore.LogicalCluster{
@@ -211,6 +248,17 @@ users:
 
 				mcpr.EXPECT().ClientForCluster("test-cluster").
 					Return(mockClusterClient, nil).Once()
+
+				ab := &kcpapis.APIBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-binding",
+					},
+				}
+				mockClusterClient.EXPECT().Get(mock.Anything, client.ObjectKey{Name: "test-binding"}, mock.AnythingOfType("*v1alpha1.APIBinding")).
+					RunAndReturn(func(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+						*obj.(*kcpapis.APIBinding) = *ab
+						return nil
+					}).Once()
 
 				// Mock successful LogicalCluster get
 				lc := &kcpcore.LogicalCluster{
@@ -251,6 +299,17 @@ users:
 
 				mcpr.EXPECT().ClientForCluster("new-cluster").
 					Return(mockClusterClient, nil).Once()
+
+				ab := &kcpapis.APIBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-binding",
+					},
+				}
+				mockClusterClient.EXPECT().Get(mock.Anything, client.ObjectKey{Name: "test-binding"}, mock.AnythingOfType("*v1alpha1.APIBinding")).
+					RunAndReturn(func(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+						*obj.(*kcpapis.APIBinding) = *ab
+						return nil
+					}).Once()
 
 				// Mock successful LogicalCluster get
 				lc := &kcpcore.LogicalCluster{
@@ -304,6 +363,17 @@ users:
 				mcpr.EXPECT().ClientForCluster("schema-error-cluster").
 					Return(mockClusterClient, nil).Once()
 
+				ab := &kcpapis.APIBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-binding",
+					},
+				}
+				mockClusterClient.EXPECT().Get(mock.Anything, client.ObjectKey{Name: "test-binding"}, mock.AnythingOfType("*v1alpha1.APIBinding")).
+					RunAndReturn(func(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+						*obj.(*kcpapis.APIBinding) = *ab
+						return nil
+					}).Once()
+
 				// Mock successful LogicalCluster get
 				lc := &kcpcore.LogicalCluster{
 					ObjectMeta: metav1.ObjectMeta{
@@ -348,6 +418,17 @@ users:
 
 				mcpr.EXPECT().ClientForCluster("read-error-cluster").
 					Return(mockClusterClient, nil).Once()
+
+				ab := &kcpapis.APIBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-binding",
+					},
+				}
+				mockClusterClient.EXPECT().Get(mock.Anything, client.ObjectKey{Name: "test-binding"}, mock.AnythingOfType("*v1alpha1.APIBinding")).
+					RunAndReturn(func(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+						*obj.(*kcpapis.APIBinding) = *ab
+						return nil
+					}).Once()
 
 				// Mock successful LogicalCluster get
 				lc := &kcpcore.LogicalCluster{
@@ -397,6 +478,17 @@ users:
 
 				mcpr.EXPECT().ClientForCluster("unchanged-cluster").
 					Return(mockClusterClient, nil).Once()
+
+				ab := &kcpapis.APIBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-binding",
+					},
+				}
+				mockClusterClient.EXPECT().Get(mock.Anything, client.ObjectKey{Name: "test-binding"}, mock.AnythingOfType("*v1alpha1.APIBinding")).
+					RunAndReturn(func(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+						*obj.(*kcpapis.APIBinding) = *ab
+						return nil
+					}).Once()
 
 				// Mock successful LogicalCluster get
 				lc := &kcpcore.LogicalCluster{
@@ -453,6 +545,17 @@ users:
 				mcpr.EXPECT().ClientForCluster("changed-cluster").
 					Return(mockClusterClient, nil).Once()
 
+				ab := &kcpapis.APIBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-binding",
+					},
+				}
+				mockClusterClient.EXPECT().Get(mock.Anything, client.ObjectKey{Name: "test-binding"}, mock.AnythingOfType("*v1alpha1.APIBinding")).
+					RunAndReturn(func(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+						*obj.(*kcpapis.APIBinding) = *ab
+						return nil
+					}).Once()
+
 				// Mock successful LogicalCluster get
 				lc := &kcpcore.LogicalCluster{
 					ObjectMeta: metav1.ObjectMeta{
@@ -489,6 +592,68 @@ users:
 				assert.Contains(t, s, `"schema":"new"`)
 				assert.Contains(t, s, `"x-cluster-metadata"`)
 				assert.Contains(t, s, `"path":"root:org:changed-cluster"`)
+			},
+			wantResult: ctrl.Result{},
+			wantErr:    false,
+		},
+		{
+			name: "remove_initializer_from_apibinding",
+			req: ctrl.Request{
+				NamespacedName: types.NamespacedName{Name: "test-binding"},
+				ClusterName:    "new-cluster",
+			},
+			mockSetup: func(mc *mocks.MockClient, mdf *kcpmocks.MockDiscoveryFactory, mar *apschemamocks.MockResolver, mcpr *kcpmocks.MockClusterPathResolver) {
+				mockClusterClient := mocks.NewMockClient(t)
+				mockDiscoveryClient := kcpmocks.NewMockDiscoveryInterface(t)
+				mockRestMapper := kcpmocks.NewMockRESTMapper(t)
+
+				mcpr.EXPECT().ClientForCluster("new-cluster").
+					Return(mockClusterClient, nil).Once()
+
+				ab := &kcpapis.APIBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-binding",
+						Annotations: map[string]string{
+							"initializer.apis.kcp.io/gateway": "true",
+						},
+					},
+				}
+				mockClusterClient.EXPECT().Get(mock.Anything, client.ObjectKey{Name: "test-binding"}, mock.AnythingOfType("*v1alpha1.APIBinding")).
+					RunAndReturn(func(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+						abObj := obj.(*kcpapis.APIBinding)
+						*abObj = *ab
+						return nil
+					}).Once()
+
+				lc := &kcpcore.LogicalCluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "cluster",
+						Annotations: map[string]string{
+							"kcp.io/path": "root:org:new-cluster",
+						},
+					},
+				}
+				mockClusterClient.EXPECT().Get(mock.Anything, client.ObjectKey{Name: "cluster"}, mock.AnythingOfType("*v1alpha1.LogicalCluster")).
+					RunAndReturn(func(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+						lcObj := obj.(*kcpcore.LogicalCluster)
+						*lcObj = *lc
+						return nil
+					}).Once()
+
+				mdf.EXPECT().ClientForCluster("root:org:new-cluster").
+					Return(mockDiscoveryClient, nil).Once()
+
+				mdf.EXPECT().RestMapperForCluster("root:org:new-cluster").
+					Return(mockRestMapper, nil).Once()
+
+				schemaJSON := []byte(`{"schema": "test"}`)
+				mar.EXPECT().Resolve(mockDiscoveryClient, mockRestMapper).
+					Return(schemaJSON, nil).Once()
+
+				mockClusterClient.EXPECT().Update(mock.Anything, mock.MatchedBy(func(obj *kcpapis.APIBinding) bool {
+					_, exists := obj.Annotations["initializer.apis.kcp.io/gateway"]
+					return !exists
+				})).Return(nil).Once()
 			},
 			wantResult: ctrl.Result{},
 			wantErr:    false,

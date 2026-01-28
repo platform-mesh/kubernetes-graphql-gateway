@@ -126,6 +126,7 @@ func (r *KCPReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 
 	r.log.Info().Msg("Successfully set up APIBinding controller")
+
 	return nil
 }
 
