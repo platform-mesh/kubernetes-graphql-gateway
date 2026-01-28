@@ -13,14 +13,11 @@ import (
 	kcpctrl "sigs.k8s.io/controller-runtime/pkg/kcp"
 
 	kcpapis "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
-	kcpcore "github.com/kcp-dev/kcp/sdk/apis/core/v1alpha1"
 )
 
 type KCPReconciler struct {
 	mgr                        ctrl.Manager
 	apiBindingReconciler       *APIBindingReconciler
-	initializingWSReconciler   *InitializingWorkspacesReconciler
-	initializingWSMgr          ctrl.Manager
 	virtualWorkspaceReconciler *VirtualWorkspaceReconciler
 	configWatcher              *ConfigWatcher
 	log                        *logger.Logger
@@ -76,28 +73,6 @@ func NewKCPReconciler(
 		Log:                 log,
 	}
 
-	// Create InitializingWorkspaces reconciler
-	initializingWSReconciler := &InitializingWorkspacesReconciler{
-		Client:              nil,
-		DiscoveryFactory:    discoveryFactory,
-		APISchemaResolver:   schemaResolver,
-		ClusterPathResolver: clusterPathResolver,
-		IOHandler:           ioHandler,
-		Log:                 log,
-	}
-
-	var initializingWSMgr ctrl.Manager
-	if appCfg.Listener.InitializingWorkspacesQueueURL != "" {
-		initializingWSMgr, err = NewInitializingWorkspacesManager(appCfg.Listener.InitializingWorkspacesQueueURL, opts.Config, opts.Scheme)
-		if err != nil {
-			log.Error().Err(err).Msg("failed to create initializing workspaces manager")
-			return nil, err
-		}
-		initializingWSReconciler.Client = initializingWSMgr.GetClient()
-	} else {
-		initializingWSReconciler.Client = mgr.GetClient()
-	}
-
 	// Setup virtual workspace components
 	virtualWSManager := NewVirtualWorkspaceManager(appCfg)
 	virtualWorkspaceReconciler := NewVirtualWorkspaceReconciler(
@@ -116,8 +91,6 @@ func NewKCPReconciler(
 	reconcilerInstance := &KCPReconciler{
 		mgr:                        mgr,
 		apiBindingReconciler:       apiBindingReconciler,
-		initializingWSReconciler:   initializingWSReconciler,
-		initializingWSMgr:          initializingWSMgr,
 		virtualWorkspaceReconciler: virtualWorkspaceReconciler,
 		configWatcher:              configWatcher,
 		log:                        log,
@@ -153,29 +126,6 @@ func (r *KCPReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 
 	r.log.Info().Msg("Successfully set up APIBinding controller")
-
-	setupMgr := mgr
-	if r.initializingWSMgr != nil {
-		setupMgr = r.initializingWSMgr
-	}
-
-	if err := ctrl.NewControllerManagedBy(setupMgr).
-		For(&kcpcore.LogicalCluster{}).
-		Complete(kcpctrl.WithClusterInContext(r.initializingWSReconciler)); err != nil {
-		r.log.Error().Err(err).Msg("failed to setup InitializingWorkspaces controller")
-		return err
-	}
-
-	if r.initializingWSMgr != nil {
-		go func() {
-			r.log.Info().Msg("starting initializing workspaces manager")
-			if err := r.initializingWSMgr.Start(context.Background()); err != nil {
-				r.log.Error().Err(err).Msg("problem running initializing workspaces manager")
-			}
-		}()
-	}
-
-	r.log.Info().Msg("Successfully set up InitializingWorkspaces controller")
 
 	return nil
 }
