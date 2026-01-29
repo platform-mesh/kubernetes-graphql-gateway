@@ -121,10 +121,19 @@ func (rt *serviceAccountRoundTripper) generateToken(ctx context.Context) (string
 		return "", time.Time{}, fmt.Errorf("received empty token from TokenRequest API")
 	}
 
-	// Calculate expiration time with a buffer to refresh before actual expiration
-	// Refresh 30 seconds before expiration or 10% of token lifetime, whichever is smaller
-	buffer := min(time.Duration(expirationSeconds/10)*time.Second, 30*time.Second)
-	expiresAt := time.Now().Add(time.Duration(expirationSeconds)*time.Second - buffer)
+	// Use the API server's actual expiration timestamp (it may differ from requested)
+	// Fall back to calculated expiration if ExpirationTimestamp is not set
+	var expiresAt time.Time
+	if !tokenRequest.Status.ExpirationTimestamp.IsZero() {
+		actualLifetime := time.Until(tokenRequest.Status.ExpirationTimestamp.Time)
+		// Refresh 30 seconds before expiration or 10% of token lifetime, whichever is smaller
+		buffer := min(actualLifetime/10, 30*time.Second)
+		expiresAt = tokenRequest.Status.ExpirationTimestamp.Add(-buffer)
+	} else {
+		// Fallback: use requested expiration if API didn't return timestamp
+		buffer := min(time.Duration(expirationSeconds/10)*time.Second, 30*time.Second)
+		expiresAt = time.Now().Add(time.Duration(expirationSeconds)*time.Second - buffer)
+	}
 
 	return tokenRequest.Status.Token, expiresAt, nil
 }

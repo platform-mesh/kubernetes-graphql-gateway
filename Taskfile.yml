@@ -62,7 +62,7 @@ tasks:
         # Workaround for setup-envtest bug: it doesn't verify binaries exist if directory is present
         sh: |
           ASSETS_PATH=$(pwd)/{{.LOCAL_BIN}}/k8s/{{.ENVTEST_K8S_VERSION}}-$(go env GOOS)-$(go env GOARCH)
-          if [ ! -f "$ASSETS_PATH/etcd" ]; then
+          if [ ! -x "$ASSETS_PATH/etcd" ] || [ ! -x "$ASSETS_PATH/kube-apiserver" ]; then
             $(pwd)/{{.LOCAL_BIN}}/setup-envtest use {{.ENVTEST_K8S_VERSION}} --bin-dir $(pwd)/{{.LOCAL_BIN}} --force -p path
           else
             echo "$ASSETS_PATH"
