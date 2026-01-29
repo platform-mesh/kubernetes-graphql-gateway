@@ -91,8 +91,8 @@ type ClusterAccessStatus struct {
 }
 
 type ServiceAccountRef struct {
-	Name            string           `json:"name,omitempty"`
-	Namespace       string           `json:"namespace,omitempty"`
+	Name            string           `json:"name"`
+	Namespace       string           `json:"namespace"`
 	Audience        []string         `json:"audience,omitempty"`
 	TokenExpiration *metav1.Duration `json:"token_expiration,omitempty"`
 }

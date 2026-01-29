@@ -146,6 +146,10 @@ func (m *MetadataInjector) extractAuthDataForMetadata(ctx context.Context, auth 
 		return m.extractKubeconfigAuth(ctx, auth.KubeconfigSecretRef)
 	}
 
+	if auth.ServiceAccount != nil {
+		return m.extractServiceAccountAuth(ctx, auth.ServiceAccount)
+	}
+
 	if auth.ClientCertificateRef != nil {
 		return m.extractClientCertAuth(ctx, auth.ClientCertificateRef)
 	}
@@ -208,6 +212,31 @@ func (m *MetadataInjector) extractClientCertAuth(ctx context.Context, certRef *g
 		"certData": base64.StdEncoding.EncodeToString(certData),
 		"keyData":  base64.StdEncoding.EncodeToString(keyData),
 	}, nil
+}
+
+// extractServiceAccountAuth stores service account reference info for dynamic token generation
+// The actual token generation happens at request time in the gateway's roundtripper
+func (m *MetadataInjector) extractServiceAccountAuth(_ context.Context, saRef *gatewayv1alpha1.ServiceAccountRef) (map[string]any, error) {
+	namespace := saRef.Namespace
+
+	// Determine token expiration (default 1 hour)
+	var expirationSeconds int64 = 3600
+	if saRef.TokenExpiration != nil {
+		expirationSeconds = int64(saRef.TokenExpiration.Seconds())
+	}
+
+	result := map[string]any{
+		"type":                    "serviceAccount",
+		"serviceAccountName":      saRef.Name,
+		"serviceAccountNamespace": namespace,
+		"tokenExpirationSeconds":  expirationSeconds,
+	}
+
+	if len(saRef.Audience) > 0 {
+		result["audience"] = saRef.Audience
+	}
+
+	return result, nil
 }
 
 // getSecret is a helper function to retrieve secrets with namespace defaulting
