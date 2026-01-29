@@ -13,7 +13,8 @@ type Config struct {
 	} `mapstructure:",squash"`
 
 	Listener struct {
-		VirtualWorkspacesConfigPath string `mapstructure:"virtual-workspaces-config-path"`
+		VirtualWorkspacesConfigPath            string `mapstructure:"virtual-workspaces-config-path"`
+		DefaultServiceAccountExpirationSeconds int64  `mapstructure:"listener-default-sa-expiration-seconds"`
 	} `mapstructure:",squash"`
 
 	Gateway struct {

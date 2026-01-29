@@ -10,7 +10,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func injectClusterMetadata(ctx context.Context, schemaJSON []byte, clusterAccess gatewayv1alpha1.ClusterAccess, k8sClient client.Client, log *logger.Logger) ([]byte, error) {
+func injectClusterMetadata(ctx context.Context, schemaJSON []byte, clusterAccess gatewayv1alpha1.ClusterAccess, k8sClient client.Client, log *logger.Logger, defaultSAExpirationSeconds int64) ([]byte, error) {
 	// Determine the path
 	path := clusterAccess.Spec.Path
 	if path == "" {
@@ -19,10 +19,11 @@ func injectClusterMetadata(ctx context.Context, schemaJSON []byte, clusterAccess
 
 	// Create metadata injection config
 	config := auth.MetadataInjectionConfig{
-		Host: clusterAccess.Spec.Host,
-		Path: path,
-		Auth: clusterAccess.Spec.Auth,
-		CA:   clusterAccess.Spec.CA,
+		Host:                       clusterAccess.Spec.Host,
+		Path:                       path,
+		Auth:                       clusterAccess.Spec.Auth,
+		CA:                         clusterAccess.Spec.CA,
+		DefaultSAExpirationSeconds: defaultSAExpirationSeconds,
 	}
 
 	// Use the common metadata injection function

@@ -59,7 +59,7 @@ func NewClusterAccessReconciler(
 	}
 
 	log.Info().Msg("ClusterAccess CRD registered, creating ClusterAccess reconciler")
-	return NewReconciler(opts, ioHandler, schemaResolver, log)
+	return NewReconciler(opts, ioHandler, schemaResolver, log, appCfg.Listener.DefaultServiceAccountExpirationSeconds)
 }
 
 // CheckClusterAccessCRDStatus checks the availability and usage of ClusterAccess CRD
@@ -82,13 +82,14 @@ func CheckClusterAccessCRDStatus(ctx context.Context, k8sClient client.Client, l
 
 // ClusterAccessReconciler handles reconciliation for ClusterAccess resources
 type ClusterAccessReconciler struct {
-	restCfg          *rest.Config
-	ioHandler        *workspacefile.FileHandler
-	schemaResolver   apischema.Resolver
-	log              *logger.Logger
-	mgr              ctrl.Manager
-	opts             reconciler.ReconcilerOpts
-	lifecycleManager *controllerruntime.LifecycleManager
+	restCfg                    *rest.Config
+	ioHandler                  *workspacefile.FileHandler
+	schemaResolver             apischema.Resolver
+	log                        *logger.Logger
+	mgr                        ctrl.Manager
+	opts                       reconciler.ReconcilerOpts
+	lifecycleManager           *controllerruntime.LifecycleManager
+	defaultSAExpirationSeconds int64
 }
 
 func NewReconciler(
@@ -96,6 +97,7 @@ func NewReconciler(
 	ioHandler *workspacefile.FileHandler,
 	schemaResolver apischema.Resolver,
 	log *logger.Logger,
+	defaultSAExpirationSeconds int64,
 ) (reconciler.CustomReconciler, error) {
 	// Create standard manager
 	mgr, err := ctrl.NewManager(opts.Config, opts.ManagerOpts)
@@ -104,12 +106,13 @@ func NewReconciler(
 	}
 
 	r := &ClusterAccessReconciler{
-		opts:           opts,
-		restCfg:        opts.Config,
-		mgr:            mgr,
-		ioHandler:      ioHandler,
-		schemaResolver: schemaResolver,
-		log:            log,
+		opts:                       opts,
+		restCfg:                    opts.Config,
+		mgr:                        mgr,
+		ioHandler:                  ioHandler,
+		schemaResolver:             schemaResolver,
+		log:                        log,
+		defaultSAExpirationSeconds: defaultSAExpirationSeconds,
 	}
 
 	// Create lifecycle manager with subroutines and condition management

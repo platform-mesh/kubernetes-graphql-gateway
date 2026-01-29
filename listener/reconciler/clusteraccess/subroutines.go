@@ -71,7 +71,7 @@ func (s *generateSchemaSubroutine) Process(ctx context.Context, instance runtime
 	}
 
 	// Create the complete schema file with x-cluster-metadata
-	schemaWithMetadata, err := injectClusterMetadata(ctx, JSON, *clusterAccess, s.reconciler.opts.Client, s.reconciler.log)
+	schemaWithMetadata, err := injectClusterMetadata(ctx, JSON, *clusterAccess, s.reconciler.opts.Client, s.reconciler.log, s.reconciler.defaultSAExpirationSeconds)
 	if err != nil {
 		s.reconciler.log.Error().Err(err).Str("clusterAccess", clusterAccessName).Msg("failed to inject cluster metadata")
 		return ctrl.Result{}, commonserrors.NewOperatorError(err, false, false)
