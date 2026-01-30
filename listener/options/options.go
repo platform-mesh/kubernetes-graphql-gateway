@@ -33,6 +33,8 @@ type ExtraOptions struct {
 	// ClusterMetadataFunc allows to provide cluster metadata for a given cluster name
 	// when reconciling anchor namespaces.
 	ClusterMetadataFunc v1alpha1.ClusterMetadataFunc
+	// ClusterURLResolverFunc allows to provide cluster URL for a given cluster name
+	ClusterURLResolverFunc v1alpha1.ClusterURLResolver
 	// EnableHTTP2 indicates whether to enable HTTP/2 for controller-manager server
 	EnableHTTP2 bool
 	// MetricsBindAddress is the bind address for metrics server
@@ -64,12 +66,13 @@ func NewOptions() *Options {
 		ProviderKcp: providerkcp.NewOptions(),
 
 		ExtraOptions: ExtraOptions{
-			Provider:           "kubernetes",
-			SchemasDir:         "_output/schemas",
-			AnchorNamespace:    "default",
-			MetricsBindAddress: "0",
-			EnableHTTP2:        false,
-			MetricsSecureServe: false,
+			Provider:               "kubernetes",
+			SchemasDir:             "_output/schemas",
+			AnchorNamespace:        "default",
+			MetricsBindAddress:     "0",
+			EnableHTTP2:            false,
+			MetricsSecureServe:     false,
+			ClusterURLResolverFunc: v1alpha1.DefaultClusterURLResolverFunc,
 		},
 	}
 	return opts
@@ -115,6 +118,7 @@ func (options *Options) Complete() (*CompletedOptions, error) {
 		}
 		co.completedOptions.ProviderKcp = opts
 		co.completedOptions.ClusterMetadataFunc = opts.GetClusterMetadataOverrideFunc()
+		co.completedOptions.ClusterURLResolverFunc = opts.GetClusterURLResolverFunc()
 	}
 	return co, nil
 }

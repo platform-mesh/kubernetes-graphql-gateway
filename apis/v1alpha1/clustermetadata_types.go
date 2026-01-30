@@ -20,6 +20,14 @@ type Schema struct {
 // ClusterMetadataFunc is a function type that returns ClusterMetadata for a given cluster name
 type ClusterMetadataFunc func(clusterName string) (*ClusterMetadata, error)
 
+// ClusterURLResolver is function that will resolve cluster url for a given cluster name
+type ClusterURLResolver func(currentURL, clusterName string) (string, error)
+
+// DefaultClusterURLResolverFunc is the default implementation that returns the URL unchanged
+func DefaultClusterURLResolverFunc(url, clusterName string) (string, error) {
+	return url, nil
+}
+
 // These following types are used to store cluster connection metadata in schema files
 // They are not used directly in Kubernetes resources.
 

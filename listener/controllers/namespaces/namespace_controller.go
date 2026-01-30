@@ -49,7 +49,9 @@ type NamespaceReconciler struct {
 	reconciler      *reconciler.Reconciler
 	anchorNamespace string
 
-	clusterMetadataFunc v1alpha1.ClusterMetadataFunc
+	// Provider specific functions
+	clusterMetadataFunc    v1alpha1.ClusterMetadataFunc
+	clusterURLResolverFunc v1alpha1.ClusterURLResolver
 }
 
 // NewNamespaceReconciler returns a new NamespaceReconciler
@@ -61,6 +63,7 @@ func NewNamespaceReconciler(
 	schemaResolver apischema.Resolver,
 	anchorNamespace string,
 	clusterMetadataFunc v1alpha1.ClusterMetadataFunc,
+	clusterURLResolverFunc v1alpha1.ClusterURLResolver,
 ) (*NamespaceReconciler, error) {
 	r := &NamespaceReconciler{
 		manager:         mgr,
@@ -68,7 +71,8 @@ func NewNamespaceReconciler(
 		reconciler:      reconciler.NewReconciler(ioHandler, schemaResolver),
 		anchorNamespace: anchorNamespace,
 
-		clusterMetadataFunc: clusterMetadataFunc,
+		clusterMetadataFunc:    clusterMetadataFunc,
+		clusterURLResolverFunc: clusterURLResolverFunc,
 	}
 
 	return r, nil
@@ -87,6 +91,11 @@ func (r *NamespaceReconciler) Reconcile(ctx context.Context, req mcreconcile.Req
 
 	c := cl.GetClient()
 	config := cl.GetConfig()
+
+	config.Host, err = r.clusterURLResolverFunc(config.Host, req.ClusterName)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to resolve cluster URL: %w", err)
+	}
 
 	// If we are running in k8s mode, the cluster name might be empty.
 	paths := []string{}

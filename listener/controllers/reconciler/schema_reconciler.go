@@ -27,7 +27,10 @@ type Reconciler struct {
 	schemaResolver apischema.Resolver
 }
 
-func NewReconciler(ioHandler *workspacefile.FileHandler, schemaResolver apischema.Resolver) *Reconciler {
+func NewReconciler(
+	ioHandler *workspacefile.FileHandler,
+	schemaResolver apischema.Resolver,
+) *Reconciler {
 	return &Reconciler{
 		ioHandler:      ioHandler,
 		schemaResolver: schemaResolver,
@@ -48,7 +51,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, schemaPaths []string, cfg *r
 		return fmt.Errorf("failed to create discovery client: %w", err)
 	}
 
-	// Create REST mapper for the host cluster
+	// Create REST mapper for the host clusters
 	restMapper, err := r.restMapperFromConfig(cfg)
 	if err != nil {
 		logger.Error(err, "Failed to create REST mapper")

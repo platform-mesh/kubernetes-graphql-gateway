@@ -40,6 +40,7 @@ func NewServer(ctx context.Context, c *Config) (*Server, error) {
 		s.Config.SchemaResolver,
 		c.Options.AnchorNamespace,
 		c.Options.ClusterMetadataFunc,
+		c.Options.ClusterURLResolverFunc,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error setting up Namespace Controller: %w", err)

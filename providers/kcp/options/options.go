@@ -19,6 +19,7 @@ package options
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/platform-mesh/kubernetes-graphql-gateway/apis/v1alpha1"
 	"github.com/spf13/pflag"
@@ -108,5 +109,19 @@ func (options *CompletedOptions) GetClusterMetadataOverrideFunc() v1alpha1.Clust
 			return nil, fmt.Errorf("conversion from rest.Config to ClusterMetadata not implemented")
 		}
 		return metadata, nil
+	}
+}
+
+func (options *CompletedOptions) GetClusterURLResolverFunc() v1alpha1.ClusterURLResolver {
+	return func(currentURL string, clusterName string) (string, error) {
+		//if options.ExtraOptions.WorkspaceSchemaHostOverride != "" {
+		//	return options.ExtraOptions.WorkspaceSchemaHostOverride, nil
+		//}
+		parts := strings.Split(currentURL, "/services/")
+		if len(parts) != 2 {
+			return "", fmt.Errorf("invalid current URL format: %s", currentURL)
+		}
+		newURL := fmt.Sprintf("%s/services/%s", parts[0], clusterName)
+		return newURL, nil
 	}
 }
