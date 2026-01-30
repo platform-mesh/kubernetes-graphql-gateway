@@ -45,86 +45,81 @@ spec:
                 description: Auth configuration for the cluster
                 properties:
                   clientCertificateRef:
-                    description: ClientCertificateRef points to secrets containing
-                      client certificate and key for mTLS
+                    description: |-
+                      ClientCertificateRef points to secrets containing client certificate and key for mTLS
+                      Secret must contain tls.crt and tls.key keys.
                     properties:
                       name:
+                        description: name is unique within a namespace to reference
+                          a secret resource.
                         type: string
                       namespace:
+                        description: namespace defines the space within which the
+                          secret name must be unique.
                         type: string
-                    required:
-                    - name
                     type: object
+                    x-kubernetes-map-type: atomic
                   kubeconfigSecretRef:
                     description: KubeconfigSecretRef points to a secret containing
                       kubeconfig
                     properties:
+                      key:
+                        description: Key is the key in the secret data which contains
+                          the token
+                        type: string
                       name:
+                        description: name is unique within a namespace to reference
+                          a secret resource.
                         type: string
                       namespace:
+                        description: namespace defines the space within which the
+                          secret name must be unique.
                         type: string
-                    required:
-                    - name
                     type: object
-                  secretRef:
+                    x-kubernetes-map-type: atomic
+                  tokenSecretRef:
                     description: SecretRef points to a secret containing auth token
                     properties:
                       key:
+                        description: Key is the key in the secret data which contains
+                          the token
                         type: string
                       name:
+                        description: name is unique within a namespace to reference
+                          a secret resource.
                         type: string
                       namespace:
-                        type: string
-                    required:
-                    - key
-                    - name
-                    type: object
-                  serviceAccount:
-                    description: ServiceAccount is the name of the service account
-                      to use
-                    properties:
-                      audience:
-                        items:
-                          type: string
-                        type: array
-                      name:
-                        type: string
-                      namespace:
-                        type: string
-                      token_expiration:
+                        description: namespace defines the space within which the
+                          secret name must be unique.
                         type: string
                     type: object
+                    x-kubernetes-map-type: atomic
                 type: object
+                x-kubernetes-validations:
+                - message: only one of tokenSecretRef, kubeconfigSecretRef, or clientCertificateRef
+                    can be set
+                  rule: '(has(self.tokenSecretRef) ? 1 : 0) + (has(self.kubeconfigSecretRef)
+                    ? 1 : 0) + (has(self.clientCertificateRef) ? 1 : 0) <= 1'
               ca:
                 description: CA configuration for the cluster
                 properties:
-                  configMapRef:
-                    description: ConfigMapRef points to a config map containing CA
-                      data
-                    properties:
-                      key:
-                        type: string
-                      name:
-                        type: string
-                      namespace:
-                        type: string
-                    required:
-                    - key
-                    - name
-                    type: object
                   secretRef:
                     description: SecretRef points to a secret containing CA data
                     properties:
                       key:
+                        description: Key is the key in the secret data which contains
+                          the token
                         type: string
                       name:
+                        description: name is unique within a namespace to reference
+                          a secret resource.
                         type: string
                       namespace:
+                        description: namespace defines the space within which the
+                          secret name must be unique.
                         type: string
-                    required:
-                    - key
-                    - name
                     type: object
+                    x-kubernetes-map-type: atomic
                 type: object
               host:
                 description: Host is the URL for the cluster
@@ -137,7 +132,7 @@ spec:
             - host
             type: object
           status:
-            description: ClusterAccessStatus defines the observed state of ClusterAccess
+            description: ClusterAccessStatus defines the observed state of ClusterAccess.
             properties:
               conditions:
                 description: Conditions represent the latest available observations
@@ -197,11 +192,6 @@ spec:
                   - type
                   type: object
                 type: array
-              observedPath:
-                description: |-
-                  ObservedPath stores the actual path currently used to store the schema for this resource
-                  This is maintained by the controller and used for cleanup when .spec.path changes
-                type: string
             type: object
         type: object
     served: true

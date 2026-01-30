@@ -20,8 +20,8 @@ This repository contains two main components:
 
 The system supports two modes of operation:
 
-1. **KCP Mode** (`ENABLE_KCP=true`): Designed for KCP-based multi-cluster scenarios
-   - See [Virtual Workspaces](./docs/virtual-workspaces.md) for advanced KCP configuration
+1. **kcp Mode** (`ENABLE_KCP=true`): Designed for kcp-based multi-cluster scenarios
+   - See [Virtual Workspaces](./docs/virtual-workspaces.md) for advanced kcp configuration
 2. **ClusterAccess Mode** (`ENABLE_KCP=false`): Designed for support of multiple standard clusters.
 
 ## ClusterAccess

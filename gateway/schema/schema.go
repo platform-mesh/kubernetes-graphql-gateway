@@ -1,6 +1,7 @@
 package schema
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"regexp"
@@ -8,9 +9,10 @@ import (
 
 	"github.com/gobuffalo/flect"
 	"github.com/graphql-go/graphql"
-	"github.com/platform-mesh/golang-commons/logger"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/common"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/apis"
+	common "github.com/platform-mesh/kubernetes-graphql-gateway/apis"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/resolver"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -34,7 +36,6 @@ type Provider interface {
 }
 
 type Gateway struct {
-	log                *logger.Logger
 	resolver           resolver.Provider
 	graphqlSchema      graphql.Schema
 	definitions        map[string]*spec.Schema
@@ -48,9 +49,8 @@ type Gateway struct {
 	typeByCategory map[string][]resolver.TypeByCategory
 }
 
-func New(log *logger.Logger, definitions map[string]*spec.Schema, resolverProvider resolver.Provider) (*Gateway, error) {
+func New(definitions map[string]*spec.Schema, resolverProvider resolver.Provider) (*Gateway, error) {
 	g := &Gateway{
-		log:                log,
 		resolver:           resolverProvider,
 		definitions:        definitions,
 		typesCache:         make(map[string]*graphql.Object),
@@ -60,7 +60,7 @@ func New(log *logger.Logger, definitions map[string]*spec.Schema, resolverProvid
 		typeByCategory:     make(map[string][]resolver.TypeByCategory),
 	}
 
-	err := g.generateGraphqlSchema()
+	err := g.generateGraphqlSchema(context.TODO())
 
 	return g, err
 }
@@ -69,13 +69,20 @@ func (g *Gateway) GetSchema() *graphql.Schema {
 	return &g.graphqlSchema
 }
 
-func (g *Gateway) generateGraphqlSchema() error {
+func (g *Gateway) generateGraphqlSchema(ctx context.Context) error {
+	logger := log.FromContext(ctx)
 	rootQueryFields := graphql.Fields{}
 	rootMutationFields := graphql.Fields{}
 	rootSubscriptionFields := graphql.Fields{}
 
-	for group, groupedResources := range g.getDefinitionsByGroup(g.definitions) {
+	groups, err := g.getDefinitionsByGroup(g.definitions)
+	if err != nil {
+		return err
+	}
+
+	for group, groupedResources := range groups {
 		g.processGroupedResources(
+			ctx,
 			group,
 			groupedResources,
 			rootQueryFields,
@@ -102,7 +109,7 @@ func (g *Gateway) generateGraphqlSchema() error {
 	})
 
 	if err != nil {
-		g.log.Error().Err(err).Msg("Error creating GraphQL schema")
+		logger.Error(err, "Error creating GraphQL schema")
 		return err
 	}
 
@@ -185,12 +192,14 @@ func (g *Gateway) isRootGroup(group string) bool {
 }
 
 func (g *Gateway) processGroupedResources(
+	ctx context.Context,
 	group string,
 	groupedResources map[string]*spec.Schema,
 	rootQueryFields,
 	rootMutationFields,
 	rootSubscriptionFields graphql.Fields,
 ) {
+	logger := log.FromContext(ctx)
 	isRoot := g.isRootGroup(group)
 	sanitizedGroup := ""
 	if !isRoot {
@@ -214,7 +223,7 @@ func (g *Gateway) processGroupedResources(
 	for resourceKey, resourceScheme := range groupedResources {
 		gvk, err := g.getGroupVersionKind(resourceKey)
 		if err != nil {
-			g.log.Debug().Err(err).Str("resourceKey", resourceKey).Msg("Failed to get GVK while grouping by version")
+			logger.V(4).WithValues("resourceKey", resourceKey).Info("Failed to get GVK while grouping by version")
 			continue
 		}
 		if _, ok := versions[gvk.Version]; !ok {
@@ -237,6 +246,7 @@ func (g *Gateway) processGroupedResources(
 		// Add all resources into the version objects
 		for resourceKey, resourceScheme := range resources {
 			g.processSingleResource(
+				ctx,
 				resourceKey,
 				resourceScheme,
 				queryVersionType,
@@ -290,14 +300,16 @@ func (g *Gateway) processGroupedResources(
 }
 
 func (g *Gateway) processSingleResource(
+	ctx context.Context,
 	resourceKey string,
 	resourceScheme *spec.Schema,
 	queryGroupType, mutationGroupType *graphql.Object,
 	rootSubscriptionFields graphql.Fields,
 ) {
+	logger := log.FromContext(ctx)
 	gvk, err := g.getGroupVersionKind(resourceKey)
 	if err != nil {
-		g.log.Debug().Err(err).Msg("Failed to get group version kind")
+		logger.Error(err, "Error getting GVK", "resource", resourceKey)
 		return
 	}
 
@@ -308,13 +320,15 @@ func (g *Gateway) processSingleResource(
 
 	resourceScope, err := g.getScope(resourceKey)
 	if err != nil {
-		g.log.Error().Err(err).Str("resource", resourceKey).Msg("Error getting resourceScope")
+		logger.WithValues("resource", resourceKey).Error(err, "Error getting resourceScope")
 		return
 	}
 
 	err = g.storeCategory(resourceKey, gvk, resourceScope)
 	if err != nil {
-		g.log.Debug().Err(err).Str("resource", resourceKey).Msg("Error storing category")
+		// Not all resources have categories - this is expected and not an error
+		// Resources without categories won't appear in category-based queries
+		logger.V(4).WithValues("resource", resourceKey).Info("Resource has no categories", "reason", err.Error())
 	}
 
 	singular, plural := g.getNames(gvk)
@@ -323,12 +337,12 @@ func (g *Gateway) processSingleResource(
 	// Generate both fields and inputFields
 	fields, inputFields, err := g.generateGraphQLFields(resourceScheme, uniqueTypeName, []string{}, make(map[string]bool))
 	if err != nil {
-		g.log.Error().Err(err).Str("resource", singular).Msg("Error generating fields")
+		logger.WithValues("resource", singular).Error(err, "Error generating fields")
 		return
 	}
 
 	if len(fields) == 0 {
-		g.log.Debug().Str("resource", singular).Msg("No fields found")
+		logger.V(4).WithValues("resource", singular).Info("No fields found")
 		return
 	}
 
@@ -375,38 +389,38 @@ func (g *Gateway) processSingleResource(
 	queryGroupType.AddFieldConfig(plural, &graphql.Field{
 		Type:    graphql.NewNonNull(listWrapperType),
 		Args:    listArgs,
-		Resolve: g.resolver.ListItems(*gvk, resourceScope),
+		Resolve: g.resolver.ListItems(ctx, *gvk, resourceScope),
 	})
 
 	queryGroupType.AddFieldConfig(singular, &graphql.Field{
 		Type:    graphql.NewNonNull(resourceType),
 		Args:    itemArgs,
-		Resolve: g.resolver.GetItem(*gvk, resourceScope),
+		Resolve: g.resolver.GetItem(ctx, *gvk, resourceScope),
 	})
 
 	queryGroupType.AddFieldConfig(singular+"Yaml", &graphql.Field{
 		Type:    graphql.NewNonNull(graphql.String),
 		Args:    itemArgs,
-		Resolve: g.resolver.GetItemAsYAML(*gvk, resourceScope),
+		Resolve: g.resolver.GetItemAsYAML(ctx, *gvk, resourceScope),
 	})
 
 	// Mutation definitions
 	mutationGroupType.AddFieldConfig("create"+singular, &graphql.Field{
 		Type:    resourceType,
 		Args:    creationMutationArgs,
-		Resolve: g.resolver.CreateItem(*gvk, resourceScope),
+		Resolve: g.resolver.CreateItem(ctx, *gvk, resourceScope),
 	})
 
 	mutationGroupType.AddFieldConfig("update"+singular, &graphql.Field{
 		Type:    resourceType,
 		Args:    creationMutationArgsBuilder.WithName().Complete(),
-		Resolve: g.resolver.UpdateItem(*gvk, resourceScope),
+		Resolve: g.resolver.UpdateItem(ctx, *gvk, resourceScope),
 	})
 
 	mutationGroupType.AddFieldConfig("delete"+singular, &graphql.Field{
 		Type:    graphql.Boolean,
 		Args:    itemArgsBuilder.WithDryRun().Complete(),
-		Resolve: g.resolver.DeleteItem(*gvk, resourceScope),
+		Resolve: g.resolver.DeleteItem(ctx, *gvk, resourceScope),
 	})
 
 	// Define an event envelope type for subscriptions
@@ -437,7 +451,7 @@ func (g *Gateway) processSingleResource(
 			WithResourceVersion().
 			Complete(),
 		Resolve:     resolver.CreateSubscriptionResolver(true),
-		Subscribe:   g.resolver.SubscribeItem(*gvk, resourceScope),
+		Subscribe:   g.resolver.SubscribeItem(ctx, *gvk, resourceScope),
 		Description: fmt.Sprintf("Subscribe to changes of %s", singular),
 	}
 
@@ -454,7 +468,7 @@ func (g *Gateway) processSingleResource(
 			WithResourceVersion().
 			Complete(),
 		Resolve:     resolver.CreateSubscriptionResolver(false),
-		Subscribe:   g.resolver.SubscribeItems(*gvk, resourceScope),
+		Subscribe:   g.resolver.SubscribeItems(ctx, *gvk, resourceScope),
 		Description: fmt.Sprintf("Subscribe to changes of %s", plural),
 	}
 }
@@ -487,12 +501,25 @@ func (g *Gateway) getNames(gvk *schema.GroupVersionKind) (singular string, plura
 	return singular, plural
 }
 
-func (g *Gateway) getDefinitionsByGroup(filteredDefinitions map[string]*spec.Schema) map[string]map[string]*spec.Schema {
+func (g *Gateway) getDefinitionsByGroup(filteredDefinitions map[string]*spec.Schema) (map[string]map[string]*spec.Schema, error) {
 	groups := map[string]map[string]*spec.Schema{}
 	for key, definition := range filteredDefinitions {
 		gvk, err := g.getGroupVersionKind(key)
 		if err != nil {
-			g.log.Debug().Err(err).Str("resourceKey", key).Msg("Failed to get group version kind")
+			// Skip definitions without valid GVK - these are typically helper types
+			// (like ListMeta, ObjectMeta) or sub-resources that don't represent
+			// top-level Kubernetes resources
+			continue
+		}
+
+		// Skip definitions with empty Kind - these are invalid/corrupted entries
+		if gvk.Kind == "" {
+			continue
+		}
+
+		// Skip definitions without scope extension - these are helper types
+		// (like DeleteOptions, APIVersions) that aren't queryable resources
+		if _, err := g.getScope(key); err != nil {
 			continue
 		}
 
@@ -503,7 +530,7 @@ func (g *Gateway) getDefinitionsByGroup(filteredDefinitions map[string]*spec.Sch
 		groups[gvk.Group][key] = definition
 	}
 
-	return groups
+	return groups, nil
 }
 
 func (g *Gateway) generateGraphQLFields(resourceScheme *spec.Schema, typePrefix string, fieldPath []string, processingTypes map[string]bool) (graphql.Fields, graphql.InputObjectConfigFieldMap, error) {
@@ -664,7 +691,7 @@ func (g *Gateway) generateTypeName(typePrefix string, fieldPath []string) string
 
 // parseGVKExtension parses the x-kubernetes-group-version-kind extension from a resource schema.
 func parseGVKExtension(extensions map[string]any, resourceKey string) (*schema.GroupVersionKind, error) {
-	xkGvk, ok := extensions[common.GVKExtensionKey]
+	xkGvk, ok := extensions[apis.GVKExtensionKey]
 	if !ok {
 		return nil, errors.New("x-kubernetes-group-version-kind extension not found")
 	}
@@ -768,8 +795,7 @@ func (g *Gateway) getScope(resourceURI string) (apiextensionsv1.ResourceScope, e
 	}
 	scopeRaw, ok := resourceSpec.Extensions[common.ScopeExtensionKey]
 	if !ok {
-		g.log.Debug().Str("resource", resourceURI).Msg("scope extension not found")
-		return "", nil
+		return "", errors.New("scope extension not found")
 	}
 
 	scope, ok := scopeRaw.(string)

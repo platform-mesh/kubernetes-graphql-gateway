@@ -48,3 +48,4 @@ kubernetes-graphql-gateway
 .claude/
 CLAUDE.md
 CLAUDE.local.md
+_output/*
