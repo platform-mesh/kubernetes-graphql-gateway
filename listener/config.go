@@ -13,6 +13,7 @@ import (
 	"github.com/rs/zerolog/log"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -40,6 +41,8 @@ type Config struct {
 	Scheme  *runtime.Scheme
 
 	ClientConfig *rest.Config
+
+	ReconcilerGVK schema.GroupVersionKind
 
 	IOHandler      *workspacefile.FileHandler
 	SchemaResolver apischema.Resolver
@@ -110,12 +113,12 @@ func NewConfig(options *options.CompletedOptions) (*Config, error) {
 		config.Provider = nil
 	}
 
-	disableHTTP2 := func(c *tls.Config) {
-		log.Info().Msg("disabling http/2")
-		c.NextProtos = []string{"http/1.1"}
-	}
 	var tlsOpts []func(*tls.Config)
 	if !options.EnableHTTP2 {
+		disableHTTP2 := func(c *tls.Config) {
+			log.Info().Msg("disabling http/2")
+			c.NextProtos = []string{"http/1.1"}
+		}
 		tlsOpts = []func(c *tls.Config){disableHTTP2}
 	}
 

@@ -14,17 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package namespaces
+package resource
 
 import (
 	"context"
 	"fmt"
 
+	"github.com/google/cel-go/cel"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/controllers/reconciler"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/workspacefile"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -41,44 +45,61 @@ const (
 	controllerName = "namespace-schema-controller"
 )
 
-// NamespaceReconciler reconciles the anchor namespace to trigger schema generation
-type NamespaceReconciler struct {
-	manager         mcmanager.Manager
-	opts            controller.TypedOptions[mcreconcile.Request]
-	reconciler      *reconciler.Reconciler
-	anchorNamespace string
+// Reconciler reconciles the anchor namespace to trigger schema generation
+type Reconciler struct {
+	manager        mcmanager.Manager
+	opts           controller.TypedOptions[mcreconcile.Request]
+	reconciler     *reconciler.Reconciler
+	anchorResource string
+	resourceGVK    schema.GroupVersionKind
 
 	// Provider specific functions
 	clusterMetadataFunc    v1alpha1.ClusterMetadataFunc
 	clusterURLResolverFunc v1alpha1.ClusterURLResolver
 }
 
-// NewNamespaceReconciler returns a new NamespaceReconciler
-func NewNamespaceReconciler(
+// New returns a new ResourceReconciler
+func New(
 	_ context.Context,
 	mgr mcmanager.Manager,
 	opts controller.TypedOptions[mcreconcile.Request],
 	ioHandler *workspacefile.FileHandler,
 	schemaResolver apischema.Resolver,
-	anchorNamespace string,
+	anchorResource string,
+	resourceGVR string,
 	clusterMetadataFunc v1alpha1.ClusterMetadataFunc,
 	clusterURLResolverFunc v1alpha1.ClusterURLResolver,
-) (*NamespaceReconciler, error) {
-	r := &NamespaceReconciler{
-		manager:         mgr,
-		opts:            opts,
-		reconciler:      reconciler.NewReconciler(ioHandler, schemaResolver),
-		anchorNamespace: anchorNamespace,
+) (*Reconciler, error) {
+	r := &Reconciler{
+		manager:        mgr,
+		opts:           opts,
+		reconciler:     reconciler.NewReconciler(ioHandler, schemaResolver),
+		anchorResource: anchorResource,
 
 		clusterMetadataFunc:    clusterMetadataFunc,
 		clusterURLResolverFunc: clusterURLResolverFunc,
+	}
+
+	gvr, gr := schema.ParseResourceArg(resourceGVR)
+	if gvr == nil {
+		gvr = &schema.GroupVersionResource{
+			Group:    "",
+			Version:  gr.Group,
+			Resource: gr.Resource,
+		}
+	}
+
+	var err error
+	r.resourceGVK, err = mgr.GetLocalManager().GetRESTMapper().KindFor(*gvr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get GVK for GVR %q: %w", gvr.String(), err)
 	}
 
 	return r, nil
 }
 
 // Reconcile handles the namespace reconciliation
-func (r *NamespaceReconciler) Reconcile(ctx context.Context, req mcreconcile.Request) (ctrl.Result, error) {
+func (r *Reconciler) Reconcile(ctx context.Context, req mcreconcile.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
 	logger.Info("Reconciling anchor namespace", "namespace", req.Name, "cluster", req.ClusterName)
@@ -104,18 +125,20 @@ func (r *NamespaceReconciler) Reconcile(ctx context.Context, req mcreconcile.Req
 		paths = []string{req.ClusterName}
 	}
 
-	// Check if the anchor namespace exists
-	ns := &corev1.Namespace{}
-	if err := c.Get(ctx, client.ObjectKey{Name: r.anchorNamespace}, ns); err != nil {
+	us := unstructured.Unstructured{}
+	us.SetGroupVersionKind(r.resourceGVK)
+
+	// Check if the anchor resource exists
+	if err := c.Get(ctx, req.NamespacedName, &us); err != nil {
 		if errors.IsNotFound(err) {
-			logger.Info("Anchor namespace not found, cleaning up schema", "namespace", r.anchorNamespace)
+			logger.Info("Anchor resource not found, cleaning up schema", "resource", r.anchorResource)
 			// Delete the schema file if namespace is deleted
 			if err := r.reconciler.Cleanup(paths); err != nil {
 				logger.Error(err, "Failed to cleanup schema")
 			}
 			return ctrl.Result{}, nil
 		}
-		return ctrl.Result{}, fmt.Errorf("failed to get namespace: %w", err)
+		return ctrl.Result{}, fmt.Errorf("failed to get resource: %w", err)
 	}
 
 	// This is plugable function to get cluster metadata for the given cluster name.
@@ -140,14 +163,55 @@ func (r *NamespaceReconciler) Reconcile(ctx context.Context, req mcreconcile.Req
 }
 
 // SetupWithManager sets up the controller with the Manager
-func (r *NamespaceReconciler) SetupWithManager(mgr mcmanager.Manager) error {
-	// Create a predicate to only watch the anchor namespace
+func (r *Reconciler) SetupWithManager(mgr mcmanager.Manager) error {
+	env, err := cel.NewEnv(
+		cel.Variable("object", cel.MapType(cel.StringType, cel.DynType)),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create CEL environment: %w", err)
+	}
+
+	ast, issues := env.Compile(r.anchorResource)
+	if issues != nil && issues.Err() != nil {
+		return fmt.Errorf("failed to compile anchor resource CEL expression: %w", issues.Err())
+	}
+
+	if ast.OutputType() != cel.BoolType {
+		return fmt.Errorf("anchor resource CEL expression must return a boolean, got: %s", ast.OutputType().String())
+	}
+
+	prg, err := env.Program(ast,
+		cel.EvalOptions(cel.OptOptimize),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create CEL program for anchor resource: %w", err)
+	}
+
+	// Create a predicate to only watch the anchor resource
 	namespacePredicate := predicate.NewPredicateFuncs(func(object client.Object) bool {
-		return object.GetName() == r.anchorNamespace
+		us, err := runtime.DefaultUnstructuredConverter.ToUnstructured(object)
+		if err != nil {
+			klog.Error("failure converting object to unstructured", "err", err.Error())
+			return false
+		}
+
+		// For now I decided to give it the whole object, so that more complex expressions can be built.
+		out, _, err := prg.Eval(map[string]any{
+			"object": us,
+		})
+		if err != nil {
+			klog.Error("failure evaluating expression", "err", err.Error())
+			return false
+		}
+
+		return out.Value().(bool)
 	})
 
+	us := unstructured.Unstructured{}
+	us.SetGroupVersionKind(r.resourceGVK)
+
 	return mcbuilder.ControllerManagedBy(mgr).
-		For(&corev1.Namespace{}, mcbuilder.WithPredicates(namespacePredicate)).
+		For(&us, mcbuilder.WithPredicates(namespacePredicate)).
 		WithOptions(r.opts).
 		Named(controllerName).
 		Complete(r)
