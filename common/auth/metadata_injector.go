@@ -21,30 +21,40 @@ import (
 
 // MetadataInjectionConfig contains configuration for metadata injection
 type MetadataInjectionConfig struct {
-	Host         string
-	Path         string
-	Auth         *gatewayv1alpha1.AuthConfig
-	CA           *gatewayv1alpha1.CAConfig
-	HostOverride string // For virtual workspaces
+	Host                       string
+	Path                       string
+	Auth                       *gatewayv1alpha1.AuthConfig
+	CA                         *gatewayv1alpha1.CAConfig
+	HostOverride               string // For virtual workspaces
+	DefaultSAExpirationSeconds int64  // Default expiration for ServiceAccount tokens
 }
 
 // MetadataInjector provides metadata injection services with structured logging
 type MetadataInjector struct {
-	log    *logger.Logger
-	client client.Client
+	log                        *logger.Logger
+	client                     client.Client
+	defaultSAExpirationSeconds int64
 }
 
 // NewMetadataInjector creates a new MetadataInjector service
-func NewMetadataInjector(log *logger.Logger, client client.Client) *MetadataInjector {
+func NewMetadataInjector(log *logger.Logger, client client.Client, defaultSAExpirationSeconds int64) *MetadataInjector {
+	if defaultSAExpirationSeconds <= 0 {
+		defaultSAExpirationSeconds = 3600
+	}
 	return &MetadataInjector{
-		log:    log,
-		client: client,
+		log:                        log,
+		client:                     client,
+		defaultSAExpirationSeconds: defaultSAExpirationSeconds,
 	}
 }
 
 // InjectClusterMetadata injects cluster metadata into schema JSON
 // This unified function handles both KCP and ClusterAccess use cases
 func (m *MetadataInjector) InjectClusterMetadata(ctx context.Context, schemaJSON []byte, config MetadataInjectionConfig) ([]byte, error) {
+	if config.DefaultSAExpirationSeconds > 0 {
+		m.defaultSAExpirationSeconds = config.DefaultSAExpirationSeconds
+	}
+
 	// Parse the existing schema JSON
 	var schemaData map[string]any
 	if err := json.Unmarshal(schemaJSON, &schemaData); err != nil {
@@ -146,6 +156,10 @@ func (m *MetadataInjector) extractAuthDataForMetadata(ctx context.Context, auth 
 		return m.extractKubeconfigAuth(ctx, auth.KubeconfigSecretRef)
 	}
 
+	if auth.ServiceAccount != nil {
+		return m.extractServiceAccountAuth(ctx, auth.ServiceAccount)
+	}
+
 	if auth.ClientCertificateRef != nil {
 		return m.extractClientCertAuth(ctx, auth.ClientCertificateRef)
 	}
@@ -208,6 +222,30 @@ func (m *MetadataInjector) extractClientCertAuth(ctx context.Context, certRef *g
 		"certData": base64.StdEncoding.EncodeToString(certData),
 		"keyData":  base64.StdEncoding.EncodeToString(keyData),
 	}, nil
+}
+
+// extractServiceAccountAuth stores service account reference info for dynamic token generation
+// The actual token generation happens at request time in the gateway's roundtripper
+func (m *MetadataInjector) extractServiceAccountAuth(_ context.Context, saRef *gatewayv1alpha1.ServiceAccountRef) (map[string]any, error) {
+	namespace := saRef.Namespace
+
+	expirationSeconds := m.defaultSAExpirationSeconds
+	if saRef.TokenExpiration != nil {
+		expirationSeconds = int64(saRef.TokenExpiration.Seconds())
+	}
+
+	result := map[string]any{
+		"type":                    "serviceAccount",
+		"serviceAccountName":      saRef.Name,
+		"serviceAccountNamespace": namespace,
+		"tokenExpirationSeconds":  expirationSeconds,
+	}
+
+	if len(saRef.Audience) > 0 {
+		result["audience"] = saRef.Audience
+	}
+
+	return result, nil
 }
 
 // getSecret is a helper function to retrieve secrets with namespace defaulting
@@ -460,13 +498,13 @@ func (m *MetadataInjector) finalizeSchemaInjection(schemaData map[string]any, me
 
 // InjectClusterMetadata is a legacy wrapper for backward compatibility
 func InjectClusterMetadata(ctx context.Context, schemaJSON []byte, config MetadataInjectionConfig, k8sClient client.Client, log *logger.Logger) ([]byte, error) {
-	injector := NewMetadataInjector(log, k8sClient)
+	injector := NewMetadataInjector(log, k8sClient, config.DefaultSAExpirationSeconds)
 	return injector.InjectClusterMetadata(ctx, schemaJSON, config)
 }
 
 // InjectKCPMetadataFromEnv is a legacy wrapper for backward compatibility
 func InjectKCPMetadataFromEnv(schemaJSON []byte, clusterPath string, log *logger.Logger, hostOverride ...string) ([]byte, error) {
-	injector := NewMetadataInjector(log, nil)
+	injector := NewMetadataInjector(log, nil, 0)
 	return injector.InjectKCPMetadataFromEnv(schemaJSON, clusterPath, hostOverride...)
 }
 
@@ -474,12 +512,12 @@ func InjectKCPMetadataFromEnv(schemaJSON []byte, clusterPath string, log *logger
 
 // extractKubeconfigFromEnv is exported for testing
 func extractKubeconfigFromEnv(log *logger.Logger) ([]byte, string, error) {
-	injector := NewMetadataInjector(log, nil)
+	injector := NewMetadataInjector(log, nil, 0)
 	return injector.extractKubeconfigFromEnv()
 }
 
 // extractAuthDataForMetadata is exported for testing
 func extractAuthDataForMetadata(ctx context.Context, auth *gatewayv1alpha1.AuthConfig, k8sClient client.Client) (map[string]any, error) {
-	injector := NewMetadataInjector(nil, k8sClient)
+	injector := NewMetadataInjector(nil, k8sClient, 0)
 	return injector.extractAuthDataForMetadata(ctx, auth)
 }

@@ -15,6 +15,8 @@ import (
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/roundtripper"
 
 	"k8s.io/client-go/rest"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // contextKey is a custom type for context keys to avoid collisions
@@ -25,10 +27,11 @@ const kcpWorkspaceKey contextKey = "kcpWorkspace"
 
 // ClusterRegistry manages multiple target clusters and handles HTTP routing to them
 type ClusterRegistry struct {
-	mu       sync.RWMutex
-	clusters map[string]*TargetCluster
-	log      *logger.Logger
-	appCfg   appConfig.Config
+	mu          sync.RWMutex
+	clusters    map[string]*TargetCluster
+	log         *logger.Logger
+	appCfg      appConfig.Config
+	localClient client.Client // Client for the local cluster (used for service account token generation)
 }
 
 // NewClusterRegistry creates a new cluster registry
@@ -36,11 +39,28 @@ func NewClusterRegistry(
 	log *logger.Logger,
 	appCfg appConfig.Config,
 ) *ClusterRegistry {
-	return &ClusterRegistry{
+	registry := &ClusterRegistry{
 		clusters: make(map[string]*TargetCluster),
 		log:      log,
 		appCfg:   appCfg,
 	}
+
+	// Initialize local k8s client for service account token generation
+	// This client connects to the cluster where the gateway is running
+	localCfg, err := ctrl.GetConfig()
+	if err != nil {
+		log.Warn().Err(err).Msg("Failed to get local cluster config, service account auth will not work")
+	} else {
+		localClient, err := client.New(localCfg, client.Options{})
+		if err != nil {
+			log.Warn().Err(err).Msg("Failed to create local cluster client, service account auth will not work")
+		} else {
+			registry.localClient = localClient
+			log.Info().Msg("Local cluster client initialized for service account token generation")
+		}
+	}
+
+	return registry
 }
 
 // LoadCluster loads a target cluster from a schema file
@@ -57,7 +77,7 @@ func (cr *ClusterRegistry) LoadCluster(schemaFilePath string) error {
 		Msg("Loading target cluster")
 
 	// Create or update cluster
-	cluster, err := NewTargetCluster(name, schemaFilePath, cr.log, cr.appCfg)
+	cluster, err := NewTargetCluster(name, schemaFilePath, cr.log, cr.appCfg, cr.localClient)
 	if err != nil {
 		return fmt.Errorf("failed to create target cluster %s: %w", name, err)
 	}
@@ -166,6 +186,7 @@ func (cr *ClusterRegistry) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Extract and validate token for non-GET requests
 	token := GetToken(r)
+
 	if !cr.handleAuth(w, r, token, cluster) {
 		return
 	}

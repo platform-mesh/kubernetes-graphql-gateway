@@ -93,6 +93,9 @@ spec:
                         type: string
                       token_expiration:
                         type: string
+                    required:
+                    - name
+                    - namespace
                     type: object
                 type: object
               ca:

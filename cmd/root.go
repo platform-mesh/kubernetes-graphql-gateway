@@ -60,6 +60,7 @@ func initConfig() {
 	// Listener
 	v.SetDefault("listener-apiexport-workspace", ":root")
 	v.SetDefault("listener-apiexport-name", "kcp.io")
+	v.SetDefault("listener-default-sa-expiration-seconds", 3600)
 
 	// Gateway
 	v.SetDefault("gateway-port", "8080")

@@ -42,6 +42,11 @@ type AuthMetadata struct {
 	Kubeconfig string `json:"kubeconfig,omitempty"`
 	CertData   string `json:"certData,omitempty"`
 	KeyData    string `json:"keyData,omitempty"`
+	// ServiceAccount fields for dynamic token generation
+	ServiceAccountName      string   `json:"serviceAccountName,omitempty"`
+	ServiceAccountNamespace string   `json:"serviceAccountNamespace,omitempty"`
+	Audience                []string `json:"audience,omitempty"`
+	TokenExpirationSeconds  int64    `json:"tokenExpirationSeconds,omitempty"`
 }
 
 // CAMetadata represents CA certificate information
@@ -61,11 +66,13 @@ type TargetCluster struct {
 }
 
 // NewTargetCluster creates a new TargetCluster from a schema file
+// localClient is optional and used for service account token generation
 func NewTargetCluster(
 	name string,
 	schemaFilePath string,
 	log *logger.Logger,
 	appCfg appConfig.Config,
+	localClient client.Client,
 ) (*TargetCluster, error) {
 	fileData, err := readSchemaFile(schemaFilePath)
 	if err != nil {
@@ -79,7 +86,7 @@ func NewTargetCluster(
 	}
 
 	// Connect to cluster - use metadata if available, otherwise fall back to standard config
-	if err := cluster.connect(appCfg, fileData.ClusterMetadata); err != nil {
+	if err := cluster.connect(appCfg, fileData.ClusterMetadata, localClient); err != nil {
 		return nil, fmt.Errorf("failed to connect to cluster: %w", err)
 	}
 
@@ -97,7 +104,7 @@ func NewTargetCluster(
 }
 
 // connect establishes connection to the target cluster
-func (tc *TargetCluster) connect(appCfg appConfig.Config, metadata *ClusterMetadata) error {
+func (tc *TargetCluster) connect(appCfg appConfig.Config, metadata *ClusterMetadata, localClient client.Client) error {
 	// All clusters now use metadata from schema files to get kubeconfig
 	if metadata == nil {
 		return fmt.Errorf("cluster %s requires cluster metadata in schema file", tc.name)
@@ -120,7 +127,31 @@ func (tc *TargetCluster) connect(appCfg appConfig.Config, metadata *ClusterMetad
 		return fmt.Errorf("failed to create base transport: %w", err)
 	}
 
-	tc.restCfg.Wrap(func(adminRT http.RoundTripper) http.RoundTripper {
+	// Determine the admin roundtripper based on auth type
+	var adminRT http.RoundTripper
+	if metadata.Auth != nil && metadata.Auth.Type == "serviceAccount" {
+		// For service account auth, create a roundtripper that generates tokens dynamically
+		if localClient == nil {
+			return fmt.Errorf("service account auth requires a local k8s client for token generation")
+		}
+
+		saConfig := roundtripper.ServiceAccountConfig{
+			Name:                   metadata.Auth.ServiceAccountName,
+			Namespace:              metadata.Auth.ServiceAccountNamespace,
+			Audience:               metadata.Auth.Audience,
+			TokenExpirationSeconds: metadata.Auth.TokenExpirationSeconds,
+		}
+
+		adminRT = roundtripper.NewServiceAccountRoundTripper(baseRT, localClient, saConfig)
+	} else {
+		// For other auth types (token, kubeconfig, clientCert), use standard transport
+		adminRT, err = rest.TransportFor(tc.restCfg)
+		if err != nil {
+			return fmt.Errorf("failed to create admin transport: %w", err)
+		}
+	}
+
+	tc.restCfg.Wrap(func(_ http.RoundTripper) http.RoundTripper {
 		return roundtripper.New(
 			tc.log,
 			tc.appCfg,
