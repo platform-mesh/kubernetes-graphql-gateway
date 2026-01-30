@@ -92,6 +92,9 @@ spec:
                         description: namespace defines the space within which the
                           secret name must be unique.
                         type: string
+                    required:
+                    - name
+                    - namespace
                     type: object
                     x-kubernetes-map-type: atomic
                 type: object
