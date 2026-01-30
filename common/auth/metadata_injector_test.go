@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/platform-mesh/golang-commons/logger/testlogger"
 	gatewayv1alpha1 "github.com/platform-mesh/kubernetes-graphql-gateway/common/apis/v1alpha1"
@@ -621,4 +622,217 @@ users:
 		assert.Contains(t, err.Error(), "failed to get client certificate secret")
 		assert.Nil(t, result)
 	})
+}
+
+func TestExtractServiceAccountAuth(t *testing.T) {
+	ctx := t.Context()
+
+	tests := []struct {
+		name                           string
+		serviceAccountRef              *gatewayv1alpha1.ServiceAccountRef
+		defaultSAExpirationSeconds     int64
+		expectedType                   string
+		expectedName                   string
+		expectedNamespace              string
+		expectedTokenExpirationSeconds int64
+		expectedAudience               []string
+	}{
+		{
+			name: "basic_service_account_with_defaults",
+			serviceAccountRef: &gatewayv1alpha1.ServiceAccountRef{
+				Name:      "test-sa",
+				Namespace: "test-namespace",
+			},
+			defaultSAExpirationSeconds:     3600,
+			expectedType:                   "serviceAccount",
+			expectedName:                   "test-sa",
+			expectedNamespace:              "test-namespace",
+			expectedTokenExpirationSeconds: 3600,
+			expectedAudience:               nil,
+		},
+		{
+			name: "service_account_with_custom_expiration",
+			serviceAccountRef: &gatewayv1alpha1.ServiceAccountRef{
+				Name:            "custom-sa",
+				Namespace:       "custom-namespace",
+				TokenExpiration: &metav1.Duration{Duration: 7200 * time.Second},
+			},
+			defaultSAExpirationSeconds:     3600,
+			expectedType:                   "serviceAccount",
+			expectedName:                   "custom-sa",
+			expectedNamespace:              "custom-namespace",
+			expectedTokenExpirationSeconds: 7200,
+			expectedAudience:               nil,
+		},
+		{
+			name: "service_account_with_audience",
+			serviceAccountRef: &gatewayv1alpha1.ServiceAccountRef{
+				Name:      "audience-sa",
+				Namespace: "audience-namespace",
+				Audience:  []string{"api://default", "https://kubernetes.default.svc"},
+			},
+			defaultSAExpirationSeconds:     3600,
+			expectedType:                   "serviceAccount",
+			expectedName:                   "audience-sa",
+			expectedNamespace:              "audience-namespace",
+			expectedTokenExpirationSeconds: 3600,
+			expectedAudience:               []string{"api://default", "https://kubernetes.default.svc"},
+		},
+		{
+			name: "service_account_with_all_fields",
+			serviceAccountRef: &gatewayv1alpha1.ServiceAccountRef{
+				Name:            "full-sa",
+				Namespace:       "full-namespace",
+				Audience:        []string{"custom-audience"},
+				TokenExpiration: &metav1.Duration{Duration: 1800 * time.Second},
+			},
+			defaultSAExpirationSeconds:     3600,
+			expectedType:                   "serviceAccount",
+			expectedName:                   "full-sa",
+			expectedNamespace:              "full-namespace",
+			expectedTokenExpirationSeconds: 1800,
+			expectedAudience:               []string{"custom-audience"},
+		},
+		{
+			name: "service_account_uses_default_expiration_when_zero",
+			serviceAccountRef: &gatewayv1alpha1.ServiceAccountRef{
+				Name:      "zero-exp-sa",
+				Namespace: "test-namespace",
+			},
+			defaultSAExpirationSeconds:     7200,
+			expectedType:                   "serviceAccount",
+			expectedName:                   "zero-exp-sa",
+			expectedNamespace:              "test-namespace",
+			expectedTokenExpirationSeconds: 7200,
+			expectedAudience:               nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			log := testlogger.New().HideLogOutput().Logger
+			injector := NewMetadataInjector(log, nil, tt.defaultSAExpirationSeconds)
+
+			auth := &gatewayv1alpha1.AuthConfig{
+				ServiceAccount: tt.serviceAccountRef,
+			}
+
+			result, err := injector.extractAuthDataForMetadata(ctx, auth)
+			require.NoError(t, err)
+			require.NotNil(t, result)
+
+			assert.Equal(t, tt.expectedType, result["type"])
+			assert.Equal(t, tt.expectedName, result["serviceAccountName"])
+			assert.Equal(t, tt.expectedNamespace, result["serviceAccountNamespace"])
+			assert.Equal(t, tt.expectedTokenExpirationSeconds, result["tokenExpirationSeconds"])
+
+			if tt.expectedAudience != nil {
+				audience, ok := result["audience"].([]string)
+				require.True(t, ok, "audience should be []string")
+				assert.Equal(t, tt.expectedAudience, audience)
+			} else {
+				_, hasAudience := result["audience"]
+				assert.False(t, hasAudience, "audience should not be present when not specified")
+			}
+		})
+	}
+}
+
+func TestInjectClusterMetadata_WithServiceAccountAuth(t *testing.T) {
+	log := testlogger.New().HideLogOutput().Logger
+
+	tests := []struct {
+		name                           string
+		serviceAccountRef              *gatewayv1alpha1.ServiceAccountRef
+		defaultSAExpirationSeconds     int64
+		expectedTokenExpirationSeconds int64
+		expectedAudience               []string
+	}{
+		{
+			name: "metadata_injection_with_service_account",
+			serviceAccountRef: &gatewayv1alpha1.ServiceAccountRef{
+				Name:      "test-sa",
+				Namespace: "test-namespace",
+			},
+			defaultSAExpirationSeconds:     3600,
+			expectedTokenExpirationSeconds: 3600,
+		},
+		{
+			name: "metadata_injection_with_custom_expiration",
+			serviceAccountRef: &gatewayv1alpha1.ServiceAccountRef{
+				Name:            "test-sa",
+				Namespace:       "test-namespace",
+				TokenExpiration: &metav1.Duration{Duration: 7200 * time.Second},
+			},
+			defaultSAExpirationSeconds:     3600,
+			expectedTokenExpirationSeconds: 7200,
+		},
+		{
+			name: "metadata_injection_with_audience",
+			serviceAccountRef: &gatewayv1alpha1.ServiceAccountRef{
+				Name:      "test-sa",
+				Namespace: "test-namespace",
+				Audience:  []string{"api://test"},
+			},
+			defaultSAExpirationSeconds:     3600,
+			expectedTokenExpirationSeconds: 3600,
+			expectedAudience:               []string{"api://test"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			schemaJSON := []byte(`{
+				"definitions": {
+					"test.resource": {
+						"type": "object"
+					}
+				}
+			}`)
+
+			config := MetadataInjectionConfig{
+				Host: "https://test-cluster.example.com:6443",
+				Path: "test-cluster",
+				Auth: &gatewayv1alpha1.AuthConfig{
+					ServiceAccount: tt.serviceAccountRef,
+				},
+				DefaultSAExpirationSeconds: tt.defaultSAExpirationSeconds,
+			}
+
+			result, err := InjectClusterMetadata(t.Context(), schemaJSON, config, nil, log)
+			require.NoError(t, err)
+			require.NotNil(t, result)
+
+			var resultData map[string]any
+			err = json.Unmarshal(result, &resultData)
+			require.NoError(t, err)
+
+			metadata, exists := resultData["x-cluster-metadata"]
+			require.True(t, exists, "x-cluster-metadata should be present")
+
+			metadataMap, ok := metadata.(map[string]any)
+			require.True(t, ok, "x-cluster-metadata should be a map")
+
+			// Verify auth is present and correct
+			auth, exists := metadataMap["auth"]
+			require.True(t, exists, "auth should be present")
+
+			authMap, ok := auth.(map[string]any)
+			require.True(t, ok, "auth should be a map")
+
+			assert.Equal(t, "serviceAccount", authMap["type"])
+			assert.Equal(t, tt.serviceAccountRef.Name, authMap["serviceAccountName"])
+			assert.Equal(t, tt.serviceAccountRef.Namespace, authMap["serviceAccountNamespace"])
+			assert.Equal(t, float64(tt.expectedTokenExpirationSeconds), authMap["tokenExpirationSeconds"])
+
+			if tt.expectedAudience != nil {
+				audience, ok := authMap["audience"].([]any)
+				require.True(t, ok, "audience should be []any after JSON unmarshal")
+				assert.Len(t, audience, len(tt.expectedAudience))
+				for i, aud := range tt.expectedAudience {
+					assert.Equal(t, aud, audience[i])
+				}
+			}
+		})
+	}
 }
