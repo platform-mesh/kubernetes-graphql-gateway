@@ -33,13 +33,11 @@ func (s *Server) Run(ctx context.Context) error {
 		}
 	}()
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		if err := s.HTTPServer.Run(ctx); err != nil {
 			logger.Error(err, "HTTP server encountered an error")
 		}
-	}()
+	})
 
 	wg.Wait()
 	return nil

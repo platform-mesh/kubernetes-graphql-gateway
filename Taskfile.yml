@@ -112,25 +112,9 @@ tasks:
   listener:
     desc: "Start the listener server (kills existing process on port 8090 if needed)"
     cmds:
-      - |
-        # Check if port 8090 is in use and kill the process if found
-        PID=$(lsof -ti:8090 2>/dev/null || echo "")
-        if [ ! -z "$PID" ]; then
-          echo "Found existing process $PID on port 8090, killing it..."
-          kill $PID 2>/dev/null || true
-          sleep 2
-        fi
       - go run ./cmd/listener/listener.go 
 
   listener-kcp:
     desc: "Start the listener server (kills existing process on port 8090 if needed)"
     cmds:
-      - |
-        # Check if port 8090 is in use and kill the process if found
-        PID=$(lsof -ti:8090 2>/dev/null || echo "")
-        if [ ! -z "$PID" ]; then
-          echo "Found existing process $PID on port 8090, killing it..."
-          kill $PID 2>/dev/null || true
-          sleep 2
-        fi
-      - go run ./cmd/listener/listener.go --apiexport-endpoint-slice-name gateway.platform-mesh.io --multicluster-runtime-provider kcp --workspace-schema-host-override localhost:8090 
+      - go run ./cmd/listener/listener.go --apiexport-endpoint-slice-name gateway.platform-mesh.io --multicluster-runtime-provider kcp --kubeconfig=.secret/cc-d2-kcp.yaml

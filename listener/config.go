@@ -56,13 +56,15 @@ func NewConfig(options *options.CompletedOptions) (*Config, error) {
 
 	rules := clientcmd.NewDefaultClientConfigLoadingRules()
 	rules.ExplicitPath = options.KubeConfig
+
 	var err error
 	config.ClientConfig, err = clientcmd.NewNonInteractiveDeferredLoadingClientConfig(rules, nil).ClientConfig()
 	if err != nil {
 		return nil, err
 	}
+
 	config.ClientConfig = rest.CopyConfig(config.ClientConfig)
-	config.ClientConfig = rest.AddUserAgent(config.ClientConfig, "kube-bind-backend")
+	config.ClientConfig = rest.AddUserAgent(config.ClientConfig, "kubernetes-graphql-gateway-listener")
 
 	scheme := runtime.NewScheme()
 	if err := clientgoscheme.AddToScheme(scheme); err != nil {
