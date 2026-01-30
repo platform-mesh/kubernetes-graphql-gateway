@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	apisv1alpha2 "github.com/kcp-dev/sdk/apis/apis/v1alpha2"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/controllers/reconciler"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/workspacefile"
@@ -102,18 +101,7 @@ func (r *NamespaceReconciler) Reconcile(ctx context.Context, req mcreconcile.Req
 	if req.ClusterName == "" {
 		paths = []string{"default"}
 	} else {
-		var apibindings apisv1alpha2.APIBindingList
-		if err := c.List(ctx, &apibindings); err != nil {
-			logger.Error(err, "Failed to list APIBindings")
-			return ctrl.Result{}, fmt.Errorf("failed to list APIBindings: %w", err)
-		}
-
-		// There should be always just one APIBinding per workspace, but we loop for safety.
-		for _, ab := range apibindings.Items {
-			if ab.Annotations["kcp.io/path"] != "" {
-				paths = append(paths, ab.Annotations["kcp.io/path"])
-			}
-		}
+		paths = []string{req.ClusterName}
 	}
 
 	// Check if the anchor namespace exists

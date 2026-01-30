@@ -121,7 +121,7 @@ func (options *CompletedOptions) GetClusterURLResolverFunc() v1alpha1.ClusterURL
 		if len(parts) != 2 {
 			return "", fmt.Errorf("invalid current URL format: %s", currentURL)
 		}
-		newURL := fmt.Sprintf("%s/services/%s", parts[0], clusterName)
+		newURL := fmt.Sprintf("%s/clusters/%s", parts[0], clusterName)
 		return newURL, nil
 	}
 }
