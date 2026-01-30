@@ -388,23 +388,33 @@ func TestWatchSingleFile_RealFile(t *testing.T) {
 		watchDone <- watcher.WatchSingleFile(ctx, tempFile, 50) // 50ms debounce
 	}()
 
-	// Give the watcher time to start
-	time.Sleep(30 * time.Millisecond)
+	// Give the watcher time to start (longer delay for CI stability)
+	time.Sleep(100 * time.Millisecond)
 
 	// Modify the file to trigger an event
 	err = os.WriteFile(tempFile, []byte("modified"), 0644)
 	require.NoError(t, err)
 
-	// Give time for file change to be detected and debounced
-	time.Sleep(150 * time.Millisecond) // 50ms debounce + extra buffer
+	// Wait for file change to be detected with retry logic (more robust than fixed sleep)
+	detected := false
+	for range 30 { // Check for up to 600ms (30 * 20ms)
+		if len(handler.OnFileChangedCalls) > 0 {
+			detected = true
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
 
-	// Wait for watch to finish (should timeout after remaining time)
+	// Cancel context to stop watcher gracefully
+	cancel()
+
+	// Wait for watch to finish
 	err = <-watchDone
-	assert.NoError(t, err) // Graceful termination (timeout) is not an error
+	assert.NoError(t, err) // Graceful termination is not an error
 
 	// Check that file change was detected
-	assert.True(t, len(handler.OnFileChangedCalls) >= 1, "Expected at least 1 file change call")
-	if len(handler.OnFileChangedCalls) > 0 {
+	assert.True(t, detected, "Expected at least 1 file change call")
+	if detected {
 		assert.Equal(t, tempFile, handler.OnFileChangedCalls[0])
 	}
 }
@@ -457,7 +467,7 @@ func TestWatchDirectory_RealDirectory(t *testing.T) {
 
 	// Wait for file change to be detected with retry logic
 	detected := false
-	for i := 0; i < 20; i++ { // Check for up to 400ms (20 * 20ms)
+	for range 20 { // Check for up to 400ms (20 * 20ms)
 		if len(handler.OnFileChangedCalls) > 0 {
 			detected = true
 			break
@@ -655,7 +665,7 @@ func TestWatchSingleFile_WithDebounceTimer(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 
 	// Rapidly modify the file multiple times to test debounce timer cancellation
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		err = os.WriteFile(tempFile, []byte("modified"+string(rune(i))), 0644)
 		require.NoError(t, err)
 		time.Sleep(20 * time.Millisecond) // Less than debounce time
