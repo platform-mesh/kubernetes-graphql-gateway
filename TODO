@@ -20,6 +20,3 @@ TODO:
 4. Make sure we dont have behaviours driven by ENV variables but rather config struct only. Variables are hard to track and reason about when running in different environments. One should be able to reason about the system just by looking at the config struct/flags.
 5. Make sure contextual logging is in place everywhere in gateway and listener.
 6. Add traces and request logs into gateway http handler so that every request is logged with duration and status code.
-
-Later on:
-1. Add GRPC support for both listener and gateway so we remove file system dependency.

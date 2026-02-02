@@ -37,7 +37,7 @@ func NewServer(ctx context.Context, c *Config) (*Server, error) {
 		ctx,
 		s.Config.Manager,
 		opts,
-		s.Config.IOHandler,
+		s.Config.SchemaHandler,
 		s.Config.SchemaResolver,
 		c.Options.AnchorResource,
 		c.Options.ResourceGVR,

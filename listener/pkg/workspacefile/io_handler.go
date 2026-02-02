@@ -1,6 +1,7 @@
 package workspacefile
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path"
@@ -30,7 +31,7 @@ func NewIOHandler(schemasDir string) (*FileHandler, error) {
 }
 
 // Read reads the schema file for the given cluster name (relative path) from the schemasDir.
-func (h *FileHandler) Read(clusterName string) ([]byte, error) {
+func (h *FileHandler) Read(_ context.Context, clusterName string) ([]byte, error) {
 	fileName := path.Join(h.schemasDir, clusterName)
 	JSON, err := os.ReadFile(fileName)
 	if err != nil {
@@ -40,7 +41,7 @@ func (h *FileHandler) Read(clusterName string) ([]byte, error) {
 }
 
 // Write writes the given JSON bytes under the clusterName path, creating subdirectories as needed.
-func (h *FileHandler) Write(JSON []byte, clusterName string) error {
+func (h *FileHandler) Write(_ context.Context, JSON []byte, clusterName string) error {
 	fileName := path.Join(h.schemasDir, clusterName)
 	// Create intermediate directories if they don't exist
 	dir := filepath.Dir(fileName)
@@ -54,7 +55,7 @@ func (h *FileHandler) Write(JSON []byte, clusterName string) error {
 }
 
 // Delete removes the schema file for the given cluster name.
-func (h *FileHandler) Delete(clusterName string) error {
+func (h *FileHandler) Delete(_ context.Context, clusterName string) error {
 	fileName := path.Join(h.schemasDir, clusterName)
 	if err := os.Remove(fileName); err != nil {
 		return errors.Join(ErrDeleteJSONFile, err)
