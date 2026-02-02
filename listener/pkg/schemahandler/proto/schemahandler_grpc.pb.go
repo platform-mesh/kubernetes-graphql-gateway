@@ -25,7 +25,10 @@ const (
 // SchemaHandlerClient is the client API for SchemaHandler service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// SchemaHandler streams schema change events per cluster to subscribers.
 type SchemaHandlerClient interface {
+	// Subscribe streams schema change events.
 	Subscribe(ctx context.Context, in *SubscribeRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[SubscribeResponse], error)
 }
 
@@ -59,7 +62,10 @@ type SchemaHandler_SubscribeClient = grpc.ServerStreamingClient[SubscribeRespons
 // SchemaHandlerServer is the server API for SchemaHandler service.
 // All implementations must embed UnimplementedSchemaHandlerServer
 // for forward compatibility.
+//
+// SchemaHandler streams schema change events per cluster to subscribers.
 type SchemaHandlerServer interface {
+	// Subscribe streams schema change events.
 	Subscribe(*SubscribeRequest, grpc.ServerStreamingServer[SubscribeResponse]) error
 	mustEmbedUnimplementedSchemaHandlerServer()
 }

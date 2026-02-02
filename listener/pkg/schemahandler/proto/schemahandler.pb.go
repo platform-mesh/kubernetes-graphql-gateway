@@ -67,6 +67,7 @@ func (SubscribeResponse_EventType) EnumDescriptor() ([]byte, []int) {
 	return file_listener_pkg_schemahandler_proto_schemahandler_proto_rawDescGZIP(), []int{1, 0}
 }
 
+// SubscribeRequest is the request message for subscribing to schema change events.
 type SubscribeRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -103,6 +104,7 @@ func (*SubscribeRequest) Descriptor() ([]byte, []int) {
 	return file_listener_pkg_schemahandler_proto_schemahandler_proto_rawDescGZIP(), []int{0}
 }
 
+// SubscribeResponse is the response message for schema change events.
 type SubscribeResponse struct {
 	state         protoimpl.MessageState      `protogen:"open.v1"`
 	ClusterName   string                      `protobuf:"bytes,1,opt,name=cluster_name,json=clusterName,proto3" json:"cluster_name,omitempty"`

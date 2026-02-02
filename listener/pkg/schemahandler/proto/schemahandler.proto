@@ -4,12 +4,16 @@ package proto;
 
 option go_package = "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/schemahandler/proto";
 
+// SchemaHandler streams schema change events per cluster to subscribers.
 service SchemaHandler {
+  // Subscribe streams schema change events.
   rpc Subscribe(SubscribeRequest) returns (stream SubscribeResponse);
 }
 
+// SubscribeRequest is the request message for subscribing to schema change events.
 message SubscribeRequest {}
 
+// SubscribeResponse is the response message for schema change events.
 message SubscribeResponse {
   string cluster_name = 1;
   string schema = 2;
