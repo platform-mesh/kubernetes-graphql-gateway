@@ -6,6 +6,7 @@ import (
 
 	utilscontext "github.com/platform-mesh/kubernetes-graphql-gateway/gateway/utils/context"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 

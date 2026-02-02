@@ -10,6 +10,7 @@ import (
 	"github.com/platform-mesh/golang-commons/sentry"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/gateway/registry"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/watcher"
+
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 

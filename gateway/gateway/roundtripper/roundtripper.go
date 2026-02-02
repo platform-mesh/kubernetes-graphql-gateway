@@ -4,11 +4,10 @@ import (
 	"net/http"
 	"strings"
 
-	"sigs.k8s.io/controller-runtime/pkg/log"
-
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type TokenKey struct{}

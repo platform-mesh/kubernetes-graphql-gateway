@@ -9,15 +9,14 @@ import (
 
 	"github.com/gobuffalo/flect"
 	"github.com/graphql-go/graphql"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/apis"
 	common "github.com/platform-mesh/kubernetes-graphql-gateway/apis"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/resolver"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/kube-openapi/pkg/validation/spec"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // watchEventTypeEnum defines constant event types for subscriptions
@@ -691,7 +690,7 @@ func (g *Gateway) generateTypeName(typePrefix string, fieldPath []string) string
 
 // parseGVKExtension parses the x-kubernetes-group-version-kind extension from a resource schema.
 func parseGVKExtension(extensions map[string]any, resourceKey string) (*schema.GroupVersionKind, error) {
-	xkGvk, ok := extensions[apis.GVKExtensionKey]
+	xkGvk, ok := extensions[common.GVKExtensionKey]
 	if !ok {
 		return nil, errors.New("x-kubernetes-group-version-kind extension not found")
 	}

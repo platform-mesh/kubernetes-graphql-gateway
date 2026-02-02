@@ -23,6 +23,7 @@ import (
 
 	"github.com/platform-mesh/kubernetes-graphql-gateway/apis/v1alpha1"
 	"github.com/spf13/pflag"
+
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -60,20 +61,20 @@ func NewOptions() *Options {
 }
 
 func (options *Options) AddFlags(fs *pflag.FlagSet) {
-	fs.StringVar(&options.ExtraOptions.APIExportEndpointSliceName, "apiexport-endpoint-slice-name", options.ExtraOptions.APIExportEndpointSliceName, "name of the APIExport EndpointSlice to watch")
-	fs.StringVar(&options.ExtraOptions.WorkspaceSchemaHostOverride, "workspace-schema-host-override", options.ExtraOptions.WorkspaceSchemaHostOverride, "host override for workspace schema generation")
-	fs.StringVar(&options.ExtraOptions.workspaceSchemaKubeconfigOverride, "workspace-schema-kubeconfig-override", options.ExtraOptions.workspaceSchemaKubeconfigOverride, "kubeconfig override for workspace schema generation. If set together with --workspace-schema-host-override, the host override will take precedence.")
+	fs.StringVar(&options.APIExportEndpointSliceName, "apiexport-endpoint-slice-name", options.APIExportEndpointSliceName, "name of the APIExport EndpointSlice to watch")
+	fs.StringVar(&options.WorkspaceSchemaHostOverride, "workspace-schema-host-override", options.WorkspaceSchemaHostOverride, "host override for workspace schema generation")
+	fs.StringVar(&options.workspaceSchemaKubeconfigOverride, "workspace-schema-kubeconfig-override", options.workspaceSchemaKubeconfigOverride, "kubeconfig override for workspace schema generation. If set together with --workspace-schema-host-override, the host override will take precedence.")
 }
 
 func (options *Options) Complete() (*CompletedOptions, error) {
-	if options.ExtraOptions.workspaceSchemaKubeconfigOverride != "" {
+	if options.workspaceSchemaKubeconfigOverride != "" {
 		// Load the kubeconfig and build rest config
-		config, err := clientcmd.BuildConfigFromFlags("", options.ExtraOptions.workspaceSchemaKubeconfigOverride)
+		config, err := clientcmd.BuildConfigFromFlags("", options.workspaceSchemaKubeconfigOverride)
 		if err != nil {
 			return nil, fmt.Errorf("failed to build rest config from kubeconfig: %w", err)
 		}
 
-		options.ExtraOptions.WorkspaceSchemaKubeconfigRestConfig = config
+		options.WorkspaceSchemaKubeconfigRestConfig = config
 	}
 
 	return &CompletedOptions{
@@ -84,11 +85,11 @@ func (options *Options) Complete() (*CompletedOptions, error) {
 }
 
 func (options *CompletedOptions) Validate() error {
-	if options.ExtraOptions.workspaceSchemaKubeconfigOverride != "" {
+	if options.workspaceSchemaKubeconfigOverride != "" {
 		// Check if kubeconfig file exists
-		if _, err := os.Stat(options.ExtraOptions.workspaceSchemaKubeconfigOverride); err != nil {
+		if _, err := os.Stat(options.workspaceSchemaKubeconfigOverride); err != nil {
 			if os.IsNotExist(err) {
-				return fmt.Errorf("kubeconfig file does not exist: %s", options.ExtraOptions.workspaceSchemaKubeconfigOverride)
+				return fmt.Errorf("kubeconfig file does not exist: %s", options.workspaceSchemaKubeconfigOverride)
 			}
 			return fmt.Errorf("failed to access kubeconfig file: %w", err)
 		}
@@ -100,10 +101,10 @@ func (options *CompletedOptions) Validate() error {
 func (options *CompletedOptions) GetClusterMetadataOverrideFunc() v1alpha1.ClusterMetadataFunc {
 	return func(clusterName string) (*v1alpha1.ClusterMetadata, error) {
 		metadata := &v1alpha1.ClusterMetadata{}
-		if options.ExtraOptions.WorkspaceSchemaHostOverride != "" {
-			metadata.Host = options.ExtraOptions.WorkspaceSchemaHostOverride
+		if options.WorkspaceSchemaHostOverride != "" {
+			metadata.Host = options.WorkspaceSchemaHostOverride
 		}
-		if options.ExtraOptions.WorkspaceSchemaKubeconfigRestConfig != nil {
+		if options.WorkspaceSchemaKubeconfigRestConfig != nil {
 			// TODO: Convert rest.Config to ClusterMetadata
 			// For now, we just return an error
 			return nil, fmt.Errorf("conversion from rest.Config to ClusterMetadata not implemented")

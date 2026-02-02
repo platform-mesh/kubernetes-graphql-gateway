@@ -2,6 +2,7 @@ package options
 
 import (
 	"github.com/spf13/pflag"
+
 	"k8s.io/component-base/logs"
 	logsv1 "k8s.io/component-base/logs/api/v1"
 )
@@ -72,16 +73,16 @@ func NewOptions() *Options {
 func (options *Options) AddFlags(fs *pflag.FlagSet) {
 	logsv1.AddFlags(options.Logs, fs)
 
-	fs.StringVar(&options.ExtraOptions.SchemasDir, "schemas-dir", options.ExtraOptions.SchemasDir, "directory to store schema files")
-	fs.IntVar(&options.ExtraOptions.ServerBindPort, "gateway-port", options.ExtraOptions.ServerBindPort, "port for the GraphQL gateway server")
-	fs.StringVar(&options.ExtraOptions.ServerBindAddress, "gateway-address", options.ExtraOptions.ServerBindAddress, "address for the GraphQL gateway server")
-	fs.BoolVar(&options.ExtraOptions.PlaygroundEnabled, "enable-playground", options.ExtraOptions.PlaygroundEnabled, "enable the GraphQL playground")
-	fs.StringSliceVar(&options.ExtraOptions.CORSAllowedOrigins, "cors-allowed-origins", options.ExtraOptions.CORSAllowedOrigins, "list of allowed origins for CORS")
-	fs.StringSliceVar(&options.ExtraOptions.CORSAllowedHeaders, "cors-allowed-headers", options.ExtraOptions.CORSAllowedHeaders, "list of allowed headers for CORS")
-	fs.StringVar(&options.ExtraOptions.URLSuffix, "url-suffix", options.ExtraOptions.URLSuffix, "URL suffix for the GraphQL endpoint")
+	fs.StringVar(&options.SchemasDir, "schemas-dir", options.SchemasDir, "directory to store schema files")
+	fs.IntVar(&options.ServerBindPort, "gateway-port", options.ServerBindPort, "port for the GraphQL gateway server")
+	fs.StringVar(&options.ServerBindAddress, "gateway-address", options.ServerBindAddress, "address for the GraphQL gateway server")
+	fs.BoolVar(&options.PlaygroundEnabled, "enable-playground", options.PlaygroundEnabled, "enable the GraphQL playground")
+	fs.StringSliceVar(&options.CORSAllowedOrigins, "cors-allowed-origins", options.CORSAllowedOrigins, "list of allowed origins for CORS")
+	fs.StringSliceVar(&options.CORSAllowedHeaders, "cors-allowed-headers", options.CORSAllowedHeaders, "list of allowed headers for CORS")
+	fs.StringVar(&options.URLSuffix, "url-suffix", options.URLSuffix, "URL suffix for the GraphQL endpoint")
 
-	fs.BoolVar(&options.ExtraOptions.DevelopmentDisableAuth, "development-disable-auth", options.ExtraOptions.DevelopmentDisableAuth, "disable authentication in development mode")
-	fs.MarkHidden("development-disable-auth")
+	fs.BoolVar(&options.DevelopmentDisableAuth, "development-disable-auth", options.DevelopmentDisableAuth, "disable authentication in development mode")
+	fs.MarkHidden("development-disable-auth") //nolint:errcheck
 
 }
 

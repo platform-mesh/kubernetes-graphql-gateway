@@ -6,6 +6,7 @@ import (
 
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/gateway"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/http"
+
 	"k8s.io/klog/v2"
 )
 

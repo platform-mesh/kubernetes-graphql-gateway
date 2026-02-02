@@ -12,6 +12,7 @@ import (
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/resolver"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/schema"
 	"github.com/rs/zerolog/log"
+
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -26,8 +27,6 @@ type ClusterConfig struct {
 
 // TargetCluster represents a single target Kubernetes cluster
 type Cluster struct {
-	config ClusterConfig
-
 	name          string
 	client        client.WithWatch
 	restCfg       *rest.Config
