@@ -8,6 +8,7 @@ vars:
   MOCKERY_VERSION: v2.52.3 # https://github.com/vektra/mockery/releases
   CONTROLLER_GEN_VERSION: v0.18.0 # https://github.com/kubernetes-sigs/controller-tools/releases
   GOLANGCI_LINT_VERSION: v2.6.0
+  KCP_APIGEN_VERSION: v0.29.0 # https://pkg.go.dev/github.com/kcp-dev/sdk
 tasks:
   ## Setup
   setup:mockery:
@@ -30,13 +31,18 @@ tasks:
     internal: true
     cmds:
       - test -s {{.LOCAL_BIN}}/go-test-coverage || GOBIN=$(pwd)/{{.LOCAL_BIN}} go install github.com/vladopajic/go-test-coverage/v2@latest
+  setup:kcp-apigen:
+    internal: true
+    cmds:
+      - test -s {{.LOCAL_BIN}}/apigen || GOBIN=$(pwd)/{{.LOCAL_BIN}} go install github.com/kcp-dev/sdk/cmd/apigen@{{.KCP_APIGEN_VERSION}}
 
   ## Code Generation
   generate:
     desc: "Generate all CRD-related files (manifests + deepcopy methods)"
-    deps: [setup:controller-gen]
+    deps: [setup:controller-gen, setup:kcp-apigen ]
     cmds:
       - "{{.LOCAL_BIN}}/controller-gen object crd:crdVersions=v1 paths=./common/apis/v1alpha1 output:crd:artifacts:config=config/crd"
+      - "{{.LOCAL_BIN}}/apigen --output-dir config/kcp --input-dir config/crd"
 
   ## Development
   mockery:
@@ -132,17 +138,14 @@ tasks:
           kill $PID 2>/dev/null || true
           sleep 2
         fi
-      - go run main.go gateway
+      - go run ./cmd/gateway/gateway.go --enable-playground
 
   listener:
     desc: "Start the listener server (kills existing process on port 8090 if needed)"
     cmds:
-      - |
-        # Check if port 8090 is in use and kill the process if found
-        PID=$(lsof -ti:8090 2>/dev/null || echo "")
-        if [ ! -z "$PID" ]; then
-          echo "Found existing process $PID on port 8090, killing it..."
-          kill $PID 2>/dev/null || true
-          sleep 2
-        fi
-      - go run main.go listener
+      - go run ./cmd/listener/listener.go 
+
+  listener-kcp:
+    desc: "Start the listener server (kills existing process on port 8090 if needed)"
+    cmds:
+      - go run ./cmd/listener/listener.go --apiexport-endpoint-slice-name gateway.platform-mesh.io --multicluster-runtime-provider kcp --kubeconfig=.secret/cc-d2-kcp.yaml

@@ -1,0 +1,25 @@
+Design patterns:
+
+1. Everything is driven by configuration struct. No hardcoded values or env variables.
+2. Its less about kcp, more about multi-cluster. So we have two modes:
+   a. mcr mode (kcp as provider) - where listener connects to kcp
+   b. kube mode - where listener connects to cluster directly.
+3. Any additional "clusters" can be added via ClusterAccess CRD. So we have two types of clusters:
+   a. primary cluster - where listener is connected to
+   b. additional clusters - defined via ClusterAccess CRD (like VirtualWorkspaces). If we need custom path - it should be part of the CRD and loaded into API server.
+4. Small packages with clear responsibilities. No monoliths. Interfaces lives next to implementations.
+5. Contextual logging via controller-runtime log package.
+6. No common packages - it just api types that are shared between listener and gateway.
+7. Utils are always named (utils/something) and contain generic functions that can be reused across the project.
+
+
+TODO:
+1. Authentication part in listener needs cleaning and streamlinings
+2. Gateway needs wiring for remote-clusters mux handler. Basically every MCR cluster is /api/clusters/{clusterName}/graphql endpoint and remote clusters are /api/remote-clusters/{clusterName}/graphql endpoint
+3. Add impersonation middleware to gateway that would read `Impersonate-User` and `Impersonate-Group` headers and set them to the request context so that every request to k8s client would be done on behalf of that user.
+4. Make sure we dont have behaviours driven by ENV variables but rather config struct only. Variables are hard to track and reason about when running in different environments. One should be able to reason about the system just by looking at the config struct/flags.
+5. Make sure contextual logging is in place everywhere in gateway and listener.
+6. Add traces and request logs into gateway http handler so that every request is logged with duration and status code.
+
+Later on:
+1. Add GRPC support for both listener and gateway so we remove file system dependency.

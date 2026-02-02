@@ -9,7 +9,7 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/platform-mesh/golang-commons/logger"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/common"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/apis"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -128,7 +128,7 @@ func (b *SchemaBuilder) WithScope(rm meta.RESTMapper) *SchemaBuilder {
 		}
 		var gvksVal any
 		var ok bool
-		if gvksVal, ok = schema.Extensions[common.GVKExtensionKey]; !ok {
+		if gvksVal, ok = schema.Extensions[apis.GVKExtensionKey]; !ok {
 			continue
 		}
 		jsonBytes, err := json.Marshal(gvksVal)
@@ -163,9 +163,9 @@ func (b *SchemaBuilder) WithScope(rm meta.RESTMapper) *SchemaBuilder {
 		}
 
 		if namespaced {
-			schema.AddExtension(common.ScopeExtensionKey, apiextensionsv1.NamespaceScoped)
+			schema.AddExtension(apis.ScopeExtensionKey, apiextensionsv1.NamespaceScoped)
 		} else {
-			schema.AddExtension(common.ScopeExtensionKey, apiextensionsv1.ClusterScoped)
+			schema.AddExtension(apis.ScopeExtensionKey, apiextensionsv1.ClusterScoped)
 		}
 	}
 	return b
@@ -192,7 +192,7 @@ func (b *SchemaBuilder) WithApiResourceCategories(list []*metav1.APIResourceList
 			if !ok {
 				continue
 			}
-			resourceSchema.AddExtension(common.CategoriesExtensionKey, apiResource.Categories)
+			resourceSchema.AddExtension(apis.CategoriesExtensionKey, apiResource.Categories)
 			b.schemas[resourceKey] = resourceSchema
 		}
 	}
@@ -283,7 +283,7 @@ func (b *SchemaBuilder) buildKindRegistry() {
 			continue
 		}
 
-		gvksVal, ok := schema.Extensions[common.GVKExtensionKey]
+		gvksVal, ok := schema.Extensions[apis.GVKExtensionKey]
 		if !ok {
 			continue
 		}

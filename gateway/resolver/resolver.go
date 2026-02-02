@@ -2,6 +2,7 @@ package resolver
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -23,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
@@ -50,19 +52,21 @@ type Provider interface {
 }
 
 type CrudProvider interface {
-	ListItems(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn
-	GetItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn
-	GetItemAsYAML(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn
-	CreateItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn
-	UpdateItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn
-	DeleteItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn
-	SubscribeItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn
-	SubscribeItems(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn
+	ListItems(ctx context.Context, gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn
+	GetItem(ctx context.Context, gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn
+	GetItemAsYAML(ctx context.Context, gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn
+	CreateItem(ctx context.Context, gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn
+	UpdateItem(ctx context.Context, gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn
+	DeleteItem(ctx context.Context, gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn
+	SubscribeItem(ctx context.Context, gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn
+	SubscribeItems(ctx context.Context, gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn
 }
 
 type CustomQueriesProvider interface {
 	TypeByCategory(m map[string][]TypeByCategory) graphql.FieldResolveFn
 }
+
+var _ Provider = &Service{}
 
 type Service struct {
 	log *logger.Logger
@@ -71,33 +75,28 @@ type Service struct {
 	runtimeClient client.WithWatch
 }
 
-func New(log *logger.Logger, runtimeClient client.WithWatch) *Service {
+func New(runtimeClient client.WithWatch) *Service {
 	return &Service{
-		log:           log,
 		groupNames:    make(map[string]string),
 		runtimeClient: runtimeClient,
 	}
 }
 
 // ListItems returns a GraphQL CommonResolver function that lists Kubernetes resources of the given GroupVersionKind.
-func (r *Service) ListItems(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
+func (r *Service) ListItems(ctx context.Context, gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
 	return func(p graphql.ResolveParams) (any, error) {
-		ctx, span := otel.Tracer("").Start(p.Context, LIST_ITEMS, trace.WithAttributes(attribute.String("kind", gvk.Kind)))
+		logger := log.FromContext(ctx)
+		ctx, span := otel.Tracer("").Start(ctx, LIST_ITEMS, trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
 
 		gvk.Group = r.getOriginalGroupName(gvk.Group)
 
-		log, err := r.log.ChildLoggerWithAttributes(
+		logger = logger.WithValues(
 			"operation", "list",
 			"group", gvk.Group,
 			"version", gvk.Version,
 			"kind", gvk.Kind,
 		)
-		if err != nil {
-			r.log.Error().Err(err).Msg("Failed to create child logger")
-			// Proceed with parent logger if child logger creation fails
-			log = r.log
-		}
 
 		// Create an unstructured list to hold the results
 		list := &unstructured.UnstructuredList{}
@@ -109,7 +108,7 @@ func (r *Service) ListItems(gvk schema.GroupVersionKind, scope v1.ResourceScope)
 		if labelSelector, ok := p.Args[LabelSelectorArg].(string); ok && labelSelector != "" {
 			selector, err := labels.Parse(labelSelector)
 			if err != nil {
-				log.Error().Err(err).Str(LabelSelectorArg, labelSelector).Msg("Unable to parse given label selector")
+				logger.WithValues(LabelSelectorArg, labelSelector).Error(err, "Unable to parse given label selector")
 				return nil, err
 			}
 			opts = append(opts, client.MatchingLabelsSelector{Selector: selector})
@@ -142,7 +141,7 @@ func (r *Service) ListItems(gvk schema.GroupVersionKind, scope v1.ResourceScope)
 		}
 
 		if err = r.runtimeClient.List(ctx, list, opts...); err != nil {
-			log.Error().Err(err).Msg("Unable to list objects")
+			logger.WithValues("operation", "list").Error(err, "Unable to list objects")
 			return nil, pkgErrors.Wrap(err, "unable to list objects")
 		}
 
@@ -153,7 +152,7 @@ func (r *Service) ListItems(gvk schema.GroupVersionKind, scope v1.ResourceScope)
 
 		if sortBy != "" {
 			if err := validateSortBy(list.Items, sortBy); err != nil {
-				log.Error().Err(err).Str(SortByArg, sortBy).Msg("Invalid sortBy field path")
+				logger.WithValues(SortByArg, sortBy).Error(err, "Invalid sortBy field path")
 				return nil, err
 			}
 			sort.Slice(list.Items, func(i, j int) bool {
@@ -183,24 +182,21 @@ func (r *Service) ListItems(gvk schema.GroupVersionKind, scope v1.ResourceScope)
 }
 
 // GetItem returns a GraphQL CommonResolver function that retrieves a single Kubernetes resource of the given GroupVersionKind.
-func (r *Service) GetItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
+func (r *Service) GetItem(ctx context.Context, gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
 	return func(p graphql.ResolveParams) (any, error) {
-		ctx, span := otel.Tracer("").Start(p.Context, "GetItem", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
+		logger := log.FromContext(ctx)
+
+		ctx, span := otel.Tracer("").Start(ctx, "GetItem", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
 
 		gvk.Group = r.getOriginalGroupName(gvk.Group)
 
-		log, err := r.log.ChildLoggerWithAttributes(
+		logger = logger.WithValues(
 			"operation", "get",
 			"group", gvk.Group,
 			"version", gvk.Version,
 			"kind", gvk.Kind,
 		)
-		if err != nil {
-			r.log.Error().Err(err).Msg("Failed to create child logger")
-			// Proceed with parent logger if child logger creation fails
-			log = r.log
-		}
 
 		// Retrieve required arguments
 		name, err := getStringArg(p.Args, NameArg, true)
@@ -227,7 +223,7 @@ func (r *Service) GetItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) g
 
 		// Get the object using the runtime client
 		if err = r.runtimeClient.Get(ctx, key, obj); err != nil {
-			log.Error().Err(err).Str("name", name).Str("scope", string(scope)).Msg("Unable to get object")
+			logger.WithValues("name", name, "scope", string(scope)).Error(err, "Unable to get object")
 			return nil, err
 		}
 
@@ -235,13 +231,13 @@ func (r *Service) GetItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) g
 	}
 }
 
-func (r *Service) GetItemAsYAML(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
+func (r *Service) GetItemAsYAML(ctx context.Context, gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
 	return func(p graphql.ResolveParams) (any, error) {
 		var span trace.Span
-		p.Context, span = otel.Tracer("").Start(p.Context, "GetItemAsYAML", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
+		ctx, span = otel.Tracer("").Start(ctx, "GetItemAsYAML", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
 
-		out, err := r.GetItem(gvk, scope)(p)
+		out, err := r.GetItem(ctx, gvk, scope)(p)
 		if err != nil {
 			return "", err
 		}
@@ -255,9 +251,9 @@ func (r *Service) GetItemAsYAML(gvk schema.GroupVersionKind, scope v1.ResourceSc
 	}
 }
 
-func (r *Service) CreateItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
+func (r *Service) CreateItem(ctx context.Context, gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
 	return func(p graphql.ResolveParams) (any, error) {
-		ctx, span := otel.Tracer("").Start(p.Context, "CreateItem", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
+		ctx, span := otel.Tracer("").Start(ctx, "CreateItem", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
 
 		gvk.Group = r.getOriginalGroupName(gvk.Group)
@@ -301,14 +297,15 @@ func (r *Service) CreateItem(gvk schema.GroupVersionKind, scope v1.ResourceScope
 	}
 }
 
-func (r *Service) UpdateItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
+func (r *Service) UpdateItem(ctx context.Context, gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
 	return func(p graphql.ResolveParams) (any, error) {
-		ctx, span := otel.Tracer("").Start(p.Context, "UpdateItem", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
+		logger := log.FromContext(ctx)
+		ctx, span := otel.Tracer("").Start(ctx, "UpdateItem", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
 
 		gvk.Group = r.getOriginalGroupName(gvk.Group)
 
-		log := r.log.With().Str("operation", "update").Str("kind", gvk.Kind).Logger()
+		logger = logger.WithValues("operation", "update", "kind", gvk.Kind)
 
 		name, err := getStringArg(p.Args, NameArg, true)
 		if err != nil {
@@ -338,7 +335,7 @@ func (r *Service) UpdateItem(gvk schema.GroupVersionKind, scope v1.ResourceScope
 		// Fetch the existing object from the cluster
 		err = r.runtimeClient.Get(ctx, key, existingObj)
 		if err != nil {
-			log.Error().Err(err).Msg("Failed to get existing object")
+			logger.Error(err, "Failed to get existing object")
 			return nil, err
 		}
 
@@ -354,7 +351,7 @@ func (r *Service) UpdateItem(gvk schema.GroupVersionKind, scope v1.ResourceScope
 		// Apply the merge patch to the existing object
 		patch := client.RawPatch(types.MergePatchType, patchData)
 		if err := r.runtimeClient.Patch(ctx, existingObj, patch, &client.PatchOptions{DryRun: dryRun}); err != nil {
-			log.Error().Err(err).Msg("Failed to patch object")
+			logger.Error(err, "Failed to patch object")
 			return nil, err
 		}
 
@@ -363,14 +360,15 @@ func (r *Service) UpdateItem(gvk schema.GroupVersionKind, scope v1.ResourceScope
 }
 
 // DeleteItem returns a CommonResolver function for deleting a resource.
-func (r *Service) DeleteItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
+func (r *Service) DeleteItem(ctx context.Context, gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
 	return func(p graphql.ResolveParams) (any, error) {
-		ctx, span := otel.Tracer("").Start(p.Context, "DeleteItem", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
+		logger := log.FromContext(ctx)
+		ctx, span := otel.Tracer("").Start(ctx, "DeleteItem", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
 
 		gvk.Group = r.getOriginalGroupName(gvk.Group)
 
-		log := r.log.With().Str("operation", "delete").Str("kind", gvk.Kind).Logger()
+		logger = logger.WithValues("operation", "delete", "kind", gvk.Kind)
 
 		name, err := getStringArg(p.Args, NameArg, true)
 		if err != nil {
@@ -399,7 +397,7 @@ func (r *Service) DeleteItem(gvk schema.GroupVersionKind, scope v1.ResourceScope
 		}
 
 		if err := r.runtimeClient.Delete(ctx, obj, &client.DeleteOptions{DryRun: dryRun}); err != nil {
-			log.Error().Err(err).Msg("Failed to delete object")
+			logger.Error(err, "Failed to delete object")
 			return nil, err
 		}
 

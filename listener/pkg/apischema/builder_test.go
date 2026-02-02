@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/platform-mesh/golang-commons/logger/testlogger"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/common"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/apis"
 	apischema "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
 	apischemaMocks "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema/mocks"
 	"github.com/stretchr/testify/assert"
@@ -144,7 +144,7 @@ func TestWithApiResourceCategories(t *testing.T) {
 				tc.key: {VendorExtensible: spec.VendorExtensible{Extensions: map[string]any{}}},
 			})
 			b.WithApiResourceCategories(tc.list)
-			ext, found := b.GetSchemas()[tc.key].Extensions[common.CategoriesExtensionKey]
+			ext, found := b.GetSchemas()[tc.key].Extensions[apis.ScopeExtensionKey]
 			if tc.wantCats == nil {
 				assert.False(t, found, "expected no categories")
 				return
@@ -166,7 +166,7 @@ func TestWithScope(t *testing.T) {
 	s := &spec.Schema{
 		VendorExtensible: spec.VendorExtensible{
 			Extensions: map[string]any{
-				common.GVKExtensionKey: []map[string]string{
+				apis.GVKExtensionKey: []map[string]string{
 					{"group": gvk.Group, "version": gvk.Version, "kind": gvk.Kind},
 				},
 			},
@@ -187,6 +187,6 @@ func TestWithScope(t *testing.T) {
 	b.WithScope(mapper)
 
 	// Validate
-	scope := b.GetSchemas()["g.v1.K"].Extensions[common.ScopeExtensionKey]
+	scope := b.GetSchemas()["g.v1.K"].Extensions[apis.ScopeExtensionKey]
 	assert.Equal(t, apiextensionsv1.NamespaceScoped, scope, "scope value mismatch")
 }

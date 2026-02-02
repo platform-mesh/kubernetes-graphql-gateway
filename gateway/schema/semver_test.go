@@ -3,7 +3,7 @@ package schema
 import (
 	"testing"
 
-	"github.com/platform-mesh/kubernetes-graphql-gateway/common"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/apis"
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/kube-openapi/pkg/validation/spec"
@@ -28,7 +28,7 @@ func TestHighestSemverVersion(t *testing.T) {
 				"io.example.v1.MyResource": {
 					VendorExtensible: spec.VendorExtensible{
 						Extensions: map[string]any{
-							common.GVKExtensionKey: []any{
+							apis.GVKExtensionKey: []any{
 								map[string]any{
 									"group":   "io.example",
 									"version": "v1",
@@ -41,7 +41,7 @@ func TestHighestSemverVersion(t *testing.T) {
 				"io.example.v1alpha1.MyResource": {
 					VendorExtensible: spec.VendorExtensible{
 						Extensions: map[string]any{
-							common.GVKExtensionKey: []any{
+							apis.GVKExtensionKey: []any{
 								map[string]any{
 									"group":   "io.example",
 									"version": "v1alpha1",
@@ -54,7 +54,7 @@ func TestHighestSemverVersion(t *testing.T) {
 				"io.example.v1beta1.MyResource": {
 					VendorExtensible: spec.VendorExtensible{
 						Extensions: map[string]any{
-							common.GVKExtensionKey: []any{
+							apis.GVKExtensionKey: []any{
 								map[string]any{
 									"group":   "io.example",
 									"version": "v1beta1",
@@ -77,7 +77,7 @@ func TestHighestSemverVersion(t *testing.T) {
 				"io.example.v1.MyResource": {
 					VendorExtensible: spec.VendorExtensible{
 						Extensions: map[string]any{
-							common.GVKExtensionKey: []any{
+							apis.GVKExtensionKey: []any{
 								map[string]any{
 									"group":   "io.example",
 									"version": "v1",
@@ -90,7 +90,7 @@ func TestHighestSemverVersion(t *testing.T) {
 				"io.example.v2.MyResource": {
 					VendorExtensible: spec.VendorExtensible{
 						Extensions: map[string]any{
-							common.GVKExtensionKey: []any{
+							apis.GVKExtensionKey: []any{
 								map[string]any{
 									"group":   "io.example",
 									"version": "v2",
@@ -113,7 +113,7 @@ func TestHighestSemverVersion(t *testing.T) {
 				"io.example.v1beta1.MyResource": {
 					VendorExtensible: spec.VendorExtensible{
 						Extensions: map[string]any{
-							common.GVKExtensionKey: []any{
+							apis.GVKExtensionKey: []any{
 								map[string]any{
 									"group":   "io.example",
 									"version": "v1beta1",
@@ -126,7 +126,7 @@ func TestHighestSemverVersion(t *testing.T) {
 				"io.example.v1beta2.MyResource": {
 					VendorExtensible: spec.VendorExtensible{
 						Extensions: map[string]any{
-							common.GVKExtensionKey: []any{
+							apis.GVKExtensionKey: []any{
 								map[string]any{
 									"group":   "io.example",
 									"version": "v1beta2",
@@ -147,7 +147,7 @@ func TestHighestSemverVersion(t *testing.T) {
 				"io.example.v1.MyResource": {
 					VendorExtensible: spec.VendorExtensible{
 						Extensions: map[string]any{
-							common.GVKExtensionKey: []any{
+							apis.GVKExtensionKey: []any{
 								map[string]any{
 									"group":   "io.example",
 									"version": "v1",
@@ -171,7 +171,7 @@ func TestHighestSemverVersion(t *testing.T) {
 				"io.example.v1alpha1.MyResource": {
 					VendorExtensible: spec.VendorExtensible{
 						Extensions: map[string]any{
-							common.GVKExtensionKey: []any{
+							apis.GVKExtensionKey: []any{
 								map[string]any{
 									"group":   "io.example",
 									"version": "v1alpha1",
@@ -184,7 +184,7 @@ func TestHighestSemverVersion(t *testing.T) {
 				"io.example.v1alpha2.MyResource": {
 					VendorExtensible: spec.VendorExtensible{
 						Extensions: map[string]any{
-							common.GVKExtensionKey: []any{
+							apis.GVKExtensionKey: []any{
 								map[string]any{
 									"group":   "io.example",
 									"version": "v1alpha2",
@@ -197,7 +197,7 @@ func TestHighestSemverVersion(t *testing.T) {
 				"io.example.v1beta1.MyResource": {
 					VendorExtensible: spec.VendorExtensible{
 						Extensions: map[string]any{
-							common.GVKExtensionKey: []any{
+							apis.GVKExtensionKey: []any{
 								map[string]any{
 									"group":   "io.example",
 									"version": "v1beta1",
@@ -242,7 +242,7 @@ func TestHasAnotherVersion(t *testing.T) {
 				"io.example.v1.MyResource": {
 					VendorExtensible: spec.VendorExtensible{
 						Extensions: map[string]any{
-							common.GVKExtensionKey: []any{
+							apis.GVKExtensionKey: []any{
 								map[string]any{
 									"group":   "io.example",
 									"version": "v1",
@@ -255,7 +255,7 @@ func TestHasAnotherVersion(t *testing.T) {
 				"io.example.v1alpha1.MyResource": {
 					VendorExtensible: spec.VendorExtensible{
 						Extensions: map[string]any{
-							common.GVKExtensionKey: []any{
+							apis.GVKExtensionKey: []any{
 								map[string]any{
 									"group":   "io.example",
 									"version": "v1alpha1",
@@ -268,7 +268,7 @@ func TestHasAnotherVersion(t *testing.T) {
 				"io.example.v1beta1.MyResource": {
 					VendorExtensible: spec.VendorExtensible{
 						Extensions: map[string]any{
-							common.GVKExtensionKey: []any{
+							apis.GVKExtensionKey: []any{
 								map[string]any{
 									"group":   "io.example",
 									"version": "v1beta1",
@@ -293,7 +293,7 @@ func TestHasAnotherVersion(t *testing.T) {
 				"io.example.v1.MyResource": {
 					VendorExtensible: spec.VendorExtensible{
 						Extensions: map[string]any{
-							common.GVKExtensionKey: []any{
+							apis.GVKExtensionKey: []any{
 								map[string]any{
 									"group":   "io.example",
 									"version": "v1",
@@ -319,7 +319,7 @@ func TestHasAnotherVersion(t *testing.T) {
 				"io.example.v1.MyResource": {
 					VendorExtensible: spec.VendorExtensible{
 						Extensions: map[string]any{
-							common.GVKExtensionKey: []any{
+							apis.GVKExtensionKey: []any{
 								map[string]any{
 									"group":   "io.example",
 									"version": "v1",
@@ -332,7 +332,7 @@ func TestHasAnotherVersion(t *testing.T) {
 				"io.example.v1.OtherMyResource": {
 					VendorExtensible: spec.VendorExtensible{
 						Extensions: map[string]any{
-							common.GVKExtensionKey: []any{
+							apis.GVKExtensionKey: []any{
 								map[string]any{
 									"group":   "io.example",
 									"version": "v1",
@@ -358,7 +358,7 @@ func TestHasAnotherVersion(t *testing.T) {
 				"io.example.v1.Pod": {
 					VendorExtensible: spec.VendorExtensible{
 						Extensions: map[string]any{
-							common.GVKExtensionKey: []any{
+							apis.GVKExtensionKey: []any{
 								map[string]any{
 									"group":   "io.example",
 									"version": "v1",
@@ -371,7 +371,7 @@ func TestHasAnotherVersion(t *testing.T) {
 				"io.other.v1.Pod": {
 					VendorExtensible: spec.VendorExtensible{
 						Extensions: map[string]any{
-							common.GVKExtensionKey: []any{
+							apis.GVKExtensionKey: []any{
 								map[string]any{
 									"group":   "io.other",
 									"version": "v1",
@@ -398,7 +398,7 @@ func TestHasAnotherVersion(t *testing.T) {
 				"io.example.v1.MyResource": {
 					VendorExtensible: spec.VendorExtensible{
 						Extensions: map[string]any{
-							common.GVKExtensionKey: []any{
+							apis.GVKExtensionKey: []any{
 								map[string]any{
 									"group":   "io.example",
 									"version": "v1",
@@ -411,7 +411,7 @@ func TestHasAnotherVersion(t *testing.T) {
 				"io.example.v2.MyResource": {
 					VendorExtensible: spec.VendorExtensible{
 						Extensions: map[string]any{
-							common.GVKExtensionKey: []any{
+							apis.GVKExtensionKey: []any{
 								map[string]any{
 									"group":   "io.example",
 									"version": "v2",
@@ -424,7 +424,7 @@ func TestHasAnotherVersion(t *testing.T) {
 				"io.example.v1.OtherKind": {
 					VendorExtensible: spec.VendorExtensible{
 						Extensions: map[string]any{
-							common.GVKExtensionKey: []any{
+							apis.GVKExtensionKey: []any{
 								map[string]any{
 									"group":   "io.example",
 									"version": "v1",
@@ -451,7 +451,7 @@ func TestHasAnotherVersion(t *testing.T) {
 				"io.example.v1.MyResource": {
 					VendorExtensible: spec.VendorExtensible{
 						Extensions: map[string]any{
-							common.GVKExtensionKey: []any{
+							apis.GVKExtensionKey: []any{
 								map[string]any{
 									"group":   "io.example",
 									"version": "v1",
@@ -465,7 +465,7 @@ func TestHasAnotherVersion(t *testing.T) {
 				"io.example.v2.MyResource2": {
 					VendorExtensible: spec.VendorExtensible{
 						Extensions: map[string]any{
-							common.GVKExtensionKey: []any{
+							apis.GVKExtensionKey: []any{
 								map[string]any{
 									"group":   "io.example",
 									"version": "v2",

@@ -5,9 +5,9 @@ This page shows you how to get started using the GraphQL Gateway for Kubernetes.
 ## Prerequisites
 - Installed [Golang](https://go.dev/doc/install)
 - Installed [Taskfile](https://taskfile.dev/installation)
-- A Kubernetes cluster to connect to (some options below)
-  - Option A: Preexisting standard Kubernetes cluster
-  - Option B: Preexisting Kubernetes cluster that is available through [Kubernetes Control Plane (KCP)](https://docs.kcp.io/kcp/main/setup/quickstart/)
+- A Kubernetes cluster to connect to (some options below). Project useses Multicluster-runtime to manage connections to clusters.
+  - Option A: Standard Kubernetes cluster. Singleton cluster access mode is supported out of the box.
+  - Option B: kcp - Kubernetes-like Control Planes (https://docs.kcp.io/kcp/main/setup/quickstart/) using multicluster-runtime's kcp provider.
   - Option C: Create your own locally running Kubernetes cluster using [kind](https://kind.sigs.k8s.io/)
 - Clone the `kubernetes-graphql-gateway` repository and change to the root directory
 ```shell
@@ -25,8 +25,8 @@ Make sure you have completed the steps from the [Prerequisites](#prerequisites) 
 ```shell
 task listener
 ```
-This will create a directory `./bin/definitions` and start watching the cluster APIs for changes.
-In that directory a file will be created for each workspace in KCP or a standard Kubernetes cluster.
+This will create a directory `./_output/schemas/{schema}` and start watching the cluster APIs for changes.
+In that directory a file will be created for each workspace in kcp or a standard Kubernetes cluster.
 The file will contain the API definitions for the resources in that workspace.
 
 ## Running the Gateway
@@ -37,6 +37,12 @@ In the root directory of the `kubernetes-graphql-gateway` repository, open a new
 ```shell
 task gateway
 ```
+
+When gateway is started, it will read the schema definitions from the `./_output/schemas` directory created by the listener.
+```
+--enable-playground
+```
+ flag enables the GraphQL playground for easy testing and exploration of the API under `http://localhost:8080/api?`
 
 The gateway will watch the `./bin/definitions` directory for changes and update the schema accordingly.
 It will also spawn a GraphQL playground server that allows you to execute GraphQL queries via your browser.
@@ -73,7 +79,7 @@ Kubernetes extensively uses dotted keys (e.g., `app.kubernetes.io/name`) in labe
 
 **Quick Example:**
 ```shell
-mutation createPodWithLabels($labels: StringMapInput) {
+utation createPodWithLabels($labels: StringMapInput) {
   v1 {
     createPod(
       namespace: "default"
@@ -109,4 +115,37 @@ mutation createPodWithLabels($labels: StringMapInput) {
     {"key": "environment", "value": "production"}
   ]
 }
+```
+
+
+# Option A: Standard Kubernetes Cluster
+
+If you are using a standard Kubernetes cluster, the setup is straightforward. Just follow the steps in the [Running the Listener](#running-the-listener)
+
+
+# Option B: kcp - Kubernetes-like Control Planes
+
+Set kubeconfig to point to your KCP instance. 
+
+```
+export KUBECONFIG=.kcp/admin.kubeconfig
+```
+
+Bootstrap the kcp provider by running:
+
+```shell
+kubectl apply -f config/kcp  
+```
+
+Run the listener in kcp mode:
+
+```shell
+task listener-kcp
+```
+
+In separate terminal create a workspace in kcp and bind the `gateway.platform-mesh.io` API export to it:
+
+```shell
+kubectl create-workspace bob --enter
+kubectl kcp bind apiexport root:gateway.platform-mesh.io  gateway.platform-mesh.io --accept-permission-claim namespaces.core  
 ```
