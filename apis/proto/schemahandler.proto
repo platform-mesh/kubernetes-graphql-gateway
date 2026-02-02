@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package proto;
 
-option go_package = "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/schemahandler/proto";
+option go_package = "github.com/platform-mesh/kubernetes-graphql-gateway/sdk";
 
 // SchemaHandler streams schema change events per cluster to subscribers.
 service SchemaHandler {

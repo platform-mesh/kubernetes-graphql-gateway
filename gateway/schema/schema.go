@@ -9,7 +9,7 @@ import (
 
 	"github.com/gobuffalo/flect"
 	"github.com/graphql-go/graphql"
-	common "github.com/platform-mesh/kubernetes-graphql-gateway/apis"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/apis"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/resolver"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -690,7 +690,7 @@ func (g *Gateway) generateTypeName(typePrefix string, fieldPath []string) string
 
 // parseGVKExtension parses the x-kubernetes-group-version-kind extension from a resource schema.
 func parseGVKExtension(extensions map[string]any, resourceKey string) (*schema.GroupVersionKind, error) {
-	xkGvk, ok := extensions[common.GVKExtensionKey]
+	xkGvk, ok := extensions[apis.GVKExtensionKey]
 	if !ok {
 		return nil, errors.New("x-kubernetes-group-version-kind extension not found")
 	}
@@ -753,14 +753,14 @@ func (g *Gateway) storeCategory(
 	if !ok || resourceSpec.Extensions == nil {
 		return errors.New("no resource extensions")
 	}
-	categoriesRaw, ok := resourceSpec.Extensions[common.CategoriesExtensionKey]
+	categoriesRaw, ok := resourceSpec.Extensions[apis.CategoriesExtensionKey]
 	if !ok {
-		return fmt.Errorf("%s extension not found", common.CategoriesExtensionKey)
+		return fmt.Errorf("%s extension not found", apis.CategoriesExtensionKey)
 	}
 
 	categoriesRawArray, ok := categoriesRaw.([]any)
 	if !ok {
-		return fmt.Errorf("%s extension is not an array", common.CategoriesExtensionKey)
+		return fmt.Errorf("%s extension is not an array", apis.CategoriesExtensionKey)
 	}
 
 	categories := make([]string, len(categoriesRawArray))
@@ -792,7 +792,7 @@ func (g *Gateway) getScope(resourceURI string) (apiextensionsv1.ResourceScope, e
 	if resourceSpec.Extensions == nil {
 		return "", errors.New("no resource extensions")
 	}
-	scopeRaw, ok := resourceSpec.Extensions[common.ScopeExtensionKey]
+	scopeRaw, ok := resourceSpec.Extensions[apis.ScopeExtensionKey]
 	if !ok {
 		return "", errors.New("scope extension not found")
 	}

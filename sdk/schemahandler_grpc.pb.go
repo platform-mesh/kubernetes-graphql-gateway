@@ -2,9 +2,9 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.0
 // - protoc             v6.33.4
-// source: listener/pkg/schemahandler/proto/schemahandler.proto
+// source: apis/proto/schemahandler.proto
 
-package proto
+package sdk
 
 import (
 	context "context"
@@ -126,5 +126,5 @@ var SchemaHandler_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
-	Metadata: "listener/pkg/schemahandler/proto/schemahandler.proto",
+	Metadata: "apis/proto/schemahandler.proto",
 }

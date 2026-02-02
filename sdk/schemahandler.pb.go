@@ -2,9 +2,9 @@
 // versions:
 // 	protoc-gen-go v1.36.11
 // 	protoc        v6.33.4
-// source: listener/pkg/schemahandler/proto/schemahandler.proto
+// source: apis/proto/schemahandler.proto
 
-package proto
+package sdk
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -51,11 +51,11 @@ func (x SubscribeResponse_EventType) String() string {
 }
 
 func (SubscribeResponse_EventType) Descriptor() protoreflect.EnumDescriptor {
-	return file_listener_pkg_schemahandler_proto_schemahandler_proto_enumTypes[0].Descriptor()
+	return file_apis_proto_schemahandler_proto_enumTypes[0].Descriptor()
 }
 
 func (SubscribeResponse_EventType) Type() protoreflect.EnumType {
-	return &file_listener_pkg_schemahandler_proto_schemahandler_proto_enumTypes[0]
+	return &file_apis_proto_schemahandler_proto_enumTypes[0]
 }
 
 func (x SubscribeResponse_EventType) Number() protoreflect.EnumNumber {
@@ -64,7 +64,7 @@ func (x SubscribeResponse_EventType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use SubscribeResponse_EventType.Descriptor instead.
 func (SubscribeResponse_EventType) EnumDescriptor() ([]byte, []int) {
-	return file_listener_pkg_schemahandler_proto_schemahandler_proto_rawDescGZIP(), []int{1, 0}
+	return file_apis_proto_schemahandler_proto_rawDescGZIP(), []int{1, 0}
 }
 
 // SubscribeRequest is the request message for subscribing to schema change events.
@@ -76,7 +76,7 @@ type SubscribeRequest struct {
 
 func (x *SubscribeRequest) Reset() {
 	*x = SubscribeRequest{}
-	mi := &file_listener_pkg_schemahandler_proto_schemahandler_proto_msgTypes[0]
+	mi := &file_apis_proto_schemahandler_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -88,7 +88,7 @@ func (x *SubscribeRequest) String() string {
 func (*SubscribeRequest) ProtoMessage() {}
 
 func (x *SubscribeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_listener_pkg_schemahandler_proto_schemahandler_proto_msgTypes[0]
+	mi := &file_apis_proto_schemahandler_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -101,7 +101,7 @@ func (x *SubscribeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeRequest.ProtoReflect.Descriptor instead.
 func (*SubscribeRequest) Descriptor() ([]byte, []int) {
-	return file_listener_pkg_schemahandler_proto_schemahandler_proto_rawDescGZIP(), []int{0}
+	return file_apis_proto_schemahandler_proto_rawDescGZIP(), []int{0}
 }
 
 // SubscribeResponse is the response message for schema change events.
@@ -116,7 +116,7 @@ type SubscribeResponse struct {
 
 func (x *SubscribeResponse) Reset() {
 	*x = SubscribeResponse{}
-	mi := &file_listener_pkg_schemahandler_proto_schemahandler_proto_msgTypes[1]
+	mi := &file_apis_proto_schemahandler_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -128,7 +128,7 @@ func (x *SubscribeResponse) String() string {
 func (*SubscribeResponse) ProtoMessage() {}
 
 func (x *SubscribeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_listener_pkg_schemahandler_proto_schemahandler_proto_msgTypes[1]
+	mi := &file_apis_proto_schemahandler_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -141,7 +141,7 @@ func (x *SubscribeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeResponse.ProtoReflect.Descriptor instead.
 func (*SubscribeResponse) Descriptor() ([]byte, []int) {
-	return file_listener_pkg_schemahandler_proto_schemahandler_proto_rawDescGZIP(), []int{1}
+	return file_apis_proto_schemahandler_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *SubscribeResponse) GetClusterName() string {
@@ -165,11 +165,11 @@ func (x *SubscribeResponse) GetEventType() SubscribeResponse_EventType {
 	return SubscribeResponse_ADDED
 }
 
-var File_listener_pkg_schemahandler_proto_schemahandler_proto protoreflect.FileDescriptor
+var File_apis_proto_schemahandler_proto protoreflect.FileDescriptor
 
-const file_listener_pkg_schemahandler_proto_schemahandler_proto_rawDesc = "" +
+const file_apis_proto_schemahandler_proto_rawDesc = "" +
 	"\n" +
-	"4listener/pkg/schemahandler/proto/schemahandler.proto\x12\x05proto\"\x12\n" +
+	"\x1eapis/proto/schemahandler.proto\x12\x05proto\"\x12\n" +
 	"\x10SubscribeRequest\"\xb6\x01\n" +
 	"\x11SubscribeResponse\x12!\n" +
 	"\fcluster_name\x18\x01 \x01(\tR\vclusterName\x12\x16\n" +
@@ -180,28 +180,28 @@ const file_listener_pkg_schemahandler_proto_schemahandler_proto_rawDesc = "" +
 	"\x05ADDED\x10\x00\x12\v\n" +
 	"\aREMOVED\x10\x012Q\n" +
 	"\rSchemaHandler\x12@\n" +
-	"\tSubscribe\x12\x17.proto.SubscribeRequest\x1a\x18.proto.SubscribeResponse0\x01BVZTgithub.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/schemahandler/protob\x06proto3"
+	"\tSubscribe\x12\x17.proto.SubscribeRequest\x1a\x18.proto.SubscribeResponse0\x01B9Z7github.com/platform-mesh/kubernetes-graphql-gateway/sdkb\x06proto3"
 
 var (
-	file_listener_pkg_schemahandler_proto_schemahandler_proto_rawDescOnce sync.Once
-	file_listener_pkg_schemahandler_proto_schemahandler_proto_rawDescData []byte
+	file_apis_proto_schemahandler_proto_rawDescOnce sync.Once
+	file_apis_proto_schemahandler_proto_rawDescData []byte
 )
 
-func file_listener_pkg_schemahandler_proto_schemahandler_proto_rawDescGZIP() []byte {
-	file_listener_pkg_schemahandler_proto_schemahandler_proto_rawDescOnce.Do(func() {
-		file_listener_pkg_schemahandler_proto_schemahandler_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_listener_pkg_schemahandler_proto_schemahandler_proto_rawDesc), len(file_listener_pkg_schemahandler_proto_schemahandler_proto_rawDesc)))
+func file_apis_proto_schemahandler_proto_rawDescGZIP() []byte {
+	file_apis_proto_schemahandler_proto_rawDescOnce.Do(func() {
+		file_apis_proto_schemahandler_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_apis_proto_schemahandler_proto_rawDesc), len(file_apis_proto_schemahandler_proto_rawDesc)))
 	})
-	return file_listener_pkg_schemahandler_proto_schemahandler_proto_rawDescData
+	return file_apis_proto_schemahandler_proto_rawDescData
 }
 
-var file_listener_pkg_schemahandler_proto_schemahandler_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_listener_pkg_schemahandler_proto_schemahandler_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
-var file_listener_pkg_schemahandler_proto_schemahandler_proto_goTypes = []any{
+var file_apis_proto_schemahandler_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_apis_proto_schemahandler_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_apis_proto_schemahandler_proto_goTypes = []any{
 	(SubscribeResponse_EventType)(0), // 0: proto.SubscribeResponse.EventType
 	(*SubscribeRequest)(nil),         // 1: proto.SubscribeRequest
 	(*SubscribeResponse)(nil),        // 2: proto.SubscribeResponse
 }
-var file_listener_pkg_schemahandler_proto_schemahandler_proto_depIdxs = []int32{
+var file_apis_proto_schemahandler_proto_depIdxs = []int32{
 	0, // 0: proto.SubscribeResponse.event_type:type_name -> proto.SubscribeResponse.EventType
 	1, // 1: proto.SchemaHandler.Subscribe:input_type -> proto.SubscribeRequest
 	2, // 2: proto.SchemaHandler.Subscribe:output_type -> proto.SubscribeResponse
@@ -212,27 +212,27 @@ var file_listener_pkg_schemahandler_proto_schemahandler_proto_depIdxs = []int32{
 	0, // [0:1] is the sub-list for field type_name
 }
 
-func init() { file_listener_pkg_schemahandler_proto_schemahandler_proto_init() }
-func file_listener_pkg_schemahandler_proto_schemahandler_proto_init() {
-	if File_listener_pkg_schemahandler_proto_schemahandler_proto != nil {
+func init() { file_apis_proto_schemahandler_proto_init() }
+func file_apis_proto_schemahandler_proto_init() {
+	if File_apis_proto_schemahandler_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_listener_pkg_schemahandler_proto_schemahandler_proto_rawDesc), len(file_listener_pkg_schemahandler_proto_schemahandler_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_apis_proto_schemahandler_proto_rawDesc), len(file_apis_proto_schemahandler_proto_rawDesc)),
 			NumEnums:      1,
 			NumMessages:   2,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_listener_pkg_schemahandler_proto_schemahandler_proto_goTypes,
-		DependencyIndexes: file_listener_pkg_schemahandler_proto_schemahandler_proto_depIdxs,
-		EnumInfos:         file_listener_pkg_schemahandler_proto_schemahandler_proto_enumTypes,
-		MessageInfos:      file_listener_pkg_schemahandler_proto_schemahandler_proto_msgTypes,
+		GoTypes:           file_apis_proto_schemahandler_proto_goTypes,
+		DependencyIndexes: file_apis_proto_schemahandler_proto_depIdxs,
+		EnumInfos:         file_apis_proto_schemahandler_proto_enumTypes,
+		MessageInfos:      file_apis_proto_schemahandler_proto_msgTypes,
 	}.Build()
-	File_listener_pkg_schemahandler_proto_schemahandler_proto = out.File
-	file_listener_pkg_schemahandler_proto_schemahandler_proto_goTypes = nil
-	file_listener_pkg_schemahandler_proto_schemahandler_proto_depIdxs = nil
+	File_apis_proto_schemahandler_proto = out.File
+	file_apis_proto_schemahandler_proto_goTypes = nil
+	file_apis_proto_schemahandler_proto_depIdxs = nil
 }

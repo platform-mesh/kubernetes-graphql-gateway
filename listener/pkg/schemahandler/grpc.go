@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/broadcaster"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/schemahandler/proto"
+	proto "github.com/platform-mesh/kubernetes-graphql-gateway/sdk"
 
 	"k8s.io/klog/v2"
 )
