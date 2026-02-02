@@ -23,8 +23,10 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	kcpapis "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
-	kcpcore "github.com/kcp-dev/kcp/sdk/apis/core/v1alpha1"
+	mccontext "sigs.k8s.io/multicluster-runtime/pkg/context"
+
+	kcpapis "github.com/kcp-dev/sdk/apis/apis/v1alpha1"
+	kcpcore "github.com/kcp-dev/sdk/apis/core/v1alpha1"
 )
 
 func TestAPIBindingReconciler_Reconcile(t *testing.T) {
@@ -69,6 +71,7 @@ users:
 	tests := []struct {
 		name        string
 		req         ctrl.Request
+		clusterName string
 		mockSetup   func(*mocks.MockClient, *kcpmocks.MockDiscoveryFactory, *apschemamocks.MockResolver, *kcpmocks.MockClusterPathResolver)
 		setupFS     func(schemaDir string, t *testing.T)
 		postAssert  func(schemaDir string, t *testing.T)
@@ -80,8 +83,9 @@ users:
 			name: "system_workspace_ignored",
 			req: ctrl.Request{
 				NamespacedName: types.NamespacedName{Name: "test-binding"},
-				ClusterName:    "system:shard",
 			},
+			clusterName: "system:shard",
+
 			mockSetup: func(mc *mocks.MockClient, mdf *kcpmocks.MockDiscoveryFactory, mar *apschemamocks.MockResolver, mcpr *kcpmocks.MockClusterPathResolver) {
 				mockClusterClient := mocks.NewMockClient(t)
 				mcpr.EXPECT().ClientForCluster("system:shard").
@@ -95,8 +99,8 @@ users:
 			name: "cluster_client_error",
 			req: ctrl.Request{
 				NamespacedName: types.NamespacedName{Name: "test-binding"},
-				ClusterName:    "test-cluster",
 			},
+			clusterName: "test-cluster",
 			mockSetup: func(mc *mocks.MockClient, mdf *kcpmocks.MockDiscoveryFactory, mar *apschemamocks.MockResolver, mcpr *kcpmocks.MockClusterPathResolver) {
 				mcpr.EXPECT().ClientForCluster("test-cluster").
 					Return(nil, errors.New("cluster client error")).Once()
@@ -109,8 +113,8 @@ users:
 			name: "cluster_is_deleted_triggers_cleanup",
 			req: ctrl.Request{
 				NamespacedName: types.NamespacedName{Name: "test-binding"},
-				ClusterName:    "deleted-cluster",
 			},
+			clusterName: "deleted-cluster",
 			mockSetup: func(mc *mocks.MockClient, mdf *kcpmocks.MockDiscoveryFactory, mar *apschemamocks.MockResolver, mcpr *kcpmocks.MockClusterPathResolver) {
 				mockClusterClient := mocks.NewMockClient(t)
 				mcpr.EXPECT().ClientForCluster("deleted-cluster").
@@ -162,8 +166,8 @@ users:
 			name: "path_for_cluster_error",
 			req: ctrl.Request{
 				NamespacedName: types.NamespacedName{Name: "test-binding"},
-				ClusterName:    "error-cluster",
 			},
+			clusterName: "error-cluster",
 			mockSetup: func(mc *mocks.MockClient, mdf *kcpmocks.MockDiscoveryFactory, mar *apschemamocks.MockResolver, mcpr *kcpmocks.MockClusterPathResolver) {
 				mockClusterClient := mocks.NewMockClient(t)
 				mcpr.EXPECT().ClientForCluster("error-cluster").
@@ -195,8 +199,8 @@ users:
 			name: "discovery_client_creation_error",
 			req: ctrl.Request{
 				NamespacedName: types.NamespacedName{Name: "test-binding"},
-				ClusterName:    "test-cluster",
 			},
+			clusterName: "test-cluster",
 			mockSetup: func(mc *mocks.MockClient, mdf *kcpmocks.MockDiscoveryFactory, mar *apschemamocks.MockResolver, mcpr *kcpmocks.MockClusterPathResolver) {
 				mockClusterClient := mocks.NewMockClient(t)
 				mcpr.EXPECT().ClientForCluster("test-cluster").
@@ -240,8 +244,8 @@ users:
 			name: "rest_mapper_creation_error",
 			req: ctrl.Request{
 				NamespacedName: types.NamespacedName{Name: "test-binding"},
-				ClusterName:    "test-cluster",
 			},
+			clusterName: "test-cluster",
 			mockSetup: func(mc *mocks.MockClient, mdf *kcpmocks.MockDiscoveryFactory, mar *apschemamocks.MockResolver, mcpr *kcpmocks.MockClusterPathResolver) {
 				mockClusterClient := mocks.NewMockClient(t)
 				mockDiscoveryClient := kcpmocks.NewMockDiscoveryInterface(t)
@@ -290,8 +294,8 @@ users:
 			name: "file_not_exists_creates_new_schema",
 			req: ctrl.Request{
 				NamespacedName: types.NamespacedName{Name: "test-binding"},
-				ClusterName:    "new-cluster",
 			},
+			clusterName: "new-cluster",
 			mockSetup: func(mc *mocks.MockClient, mdf *kcpmocks.MockDiscoveryFactory, mar *apschemamocks.MockResolver, mcpr *kcpmocks.MockClusterPathResolver) {
 				mockClusterClient := mocks.NewMockClient(t)
 				mockDiscoveryClient := kcpmocks.NewMockDiscoveryInterface(t)
@@ -353,8 +357,8 @@ users:
 			name: "schema_resolution_error_on_new_file",
 			req: ctrl.Request{
 				NamespacedName: types.NamespacedName{Name: "test-binding"},
-				ClusterName:    "schema-error-cluster",
 			},
+			clusterName: "schema-error-cluster",
 			mockSetup: func(mc *mocks.MockClient, mdf *kcpmocks.MockDiscoveryFactory, mar *apschemamocks.MockResolver, mcpr *kcpmocks.MockClusterPathResolver) {
 				mockClusterClient := mocks.NewMockClient(t)
 				mockDiscoveryClient := kcpmocks.NewMockDiscoveryInterface(t)
@@ -409,8 +413,8 @@ users:
 			name: "file_read_error",
 			req: ctrl.Request{
 				NamespacedName: types.NamespacedName{Name: "test-binding"},
-				ClusterName:    "read-error-cluster",
 			},
+			clusterName: "read-error-cluster",
 			mockSetup: func(mc *mocks.MockClient, mdf *kcpmocks.MockDiscoveryFactory, mar *apschemamocks.MockResolver, mcpr *kcpmocks.MockClusterPathResolver) {
 				mockClusterClient := mocks.NewMockClient(t)
 				mockDiscoveryClient := kcpmocks.NewMockDiscoveryInterface(t)
@@ -469,8 +473,8 @@ users:
 			name: "schema_unchanged_no_write",
 			req: ctrl.Request{
 				NamespacedName: types.NamespacedName{Name: "test-binding"},
-				ClusterName:    "unchanged-cluster",
 			},
+			clusterName: "unchanged-cluster",
 			mockSetup: func(mc *mocks.MockClient, mdf *kcpmocks.MockDiscoveryFactory, mar *apschemamocks.MockResolver, mcpr *kcpmocks.MockClusterPathResolver) {
 				mockClusterClient := mocks.NewMockClient(t)
 				mockDiscoveryClient := kcpmocks.NewMockDiscoveryInterface(t)
@@ -535,8 +539,8 @@ users:
 			name: "schema_changed_writes_update",
 			req: ctrl.Request{
 				NamespacedName: types.NamespacedName{Name: "test-binding"},
-				ClusterName:    "changed-cluster",
 			},
+			clusterName: "changed-cluster",
 			mockSetup: func(mc *mocks.MockClient, mdf *kcpmocks.MockDiscoveryFactory, mar *apschemamocks.MockResolver, mcpr *kcpmocks.MockClusterPathResolver) {
 				mockClusterClient := mocks.NewMockClient(t)
 				mockDiscoveryClient := kcpmocks.NewMockDiscoveryInterface(t)
@@ -600,8 +604,8 @@ users:
 			name: "remove_initializer_from_apibinding",
 			req: ctrl.Request{
 				NamespacedName: types.NamespacedName{Name: "test-binding"},
-				ClusterName:    "new-cluster",
 			},
+			clusterName: "new-cluster",
 			mockSetup: func(mc *mocks.MockClient, mdf *kcpmocks.MockDiscoveryFactory, mar *apschemamocks.MockResolver, mcpr *kcpmocks.MockClusterPathResolver) {
 				mockClusterClient := mocks.NewMockClient(t)
 				mockDiscoveryClient := kcpmocks.NewMockDiscoveryInterface(t)
@@ -693,7 +697,7 @@ users:
 			// 2. Use integration tests for the full flow
 			// 3. Create a wrapper that can be mocked
 
-			got, err := reconciler.Reconcile(t.Context(), tt.req)
+			got, err := reconciler.Reconcile(mccontext.WithCluster(t.Context(), tt.clusterName), tt.req)
 
 			if tt.wantErr {
 				assert.Error(t, err)

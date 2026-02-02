@@ -173,7 +173,7 @@ func (s *IntegrationTestSuite) SetupSuite() {
 	}()
 
 	testLog.Info("Waiting for cache sync")
-	s.Require().True(mgr.GetCache().WaitForCacheSync(s.ctx), "Cache failed to sync")
+	s.Require().True(mgr.GetLocalManager().GetCache().WaitForCacheSync(s.ctx), "Cache failed to sync")
 
 	testLog.Info("Creating gateway service")
 	s.gateway, err = manager.NewGateway(s.ctx, commonsLogger.ComponentLogger("gateway"), appCfg)

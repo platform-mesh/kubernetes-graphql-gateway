@@ -15,8 +15,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	kcpapis "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
-	kcpcore "github.com/kcp-dev/kcp/sdk/apis/core/v1alpha1"
+	kcpapis "github.com/kcp-dev/sdk/apis/apis/v1alpha1"
+	kcpcore "github.com/kcp-dev/sdk/apis/core/v1alpha1"
+	kcptenancy "github.com/kcp-dev/sdk/apis/tenancy/v1alpha1"
 )
 
 func TestNewKCPReconciler(t *testing.T) {
@@ -30,7 +31,7 @@ func TestNewKCPReconciler(t *testing.T) {
 		errContains string
 	}{
 		{
-			name: "successful_creation",
+			name: "successful_creation_connection_error",
 			appCfg: config.Config{
 				OpenApiDefinitionsPath: t.TempDir(),
 			},
@@ -43,6 +44,7 @@ func TestNewKCPReconciler(t *testing.T) {
 					// Register KCP types
 					_ = kcpapis.AddToScheme(scheme)
 					_ = kcpcore.AddToScheme(scheme)
+					_ = kcptenancy.AddToScheme(scheme)
 					return scheme
 				}(),
 				ManagerOpts: ctrl.Options{
@@ -52,22 +54,28 @@ func TestNewKCPReconciler(t *testing.T) {
 						// Register KCP types
 						_ = kcpapis.AddToScheme(scheme)
 						_ = kcpcore.AddToScheme(scheme)
+						_ = kcptenancy.AddToScheme(scheme)
 						return scheme
 					}(),
 				},
 			},
-			wantErr: false,
+			wantErr:     true,
+			errContains: "no such host", // Proves that WorkspaceType registration passed
 		},
 		{
 			name: "invalid_openapi_definitions_path",
 			appCfg: config.Config{
-				OpenApiDefinitionsPath: "/invalid/path/that/does/not/exist",
+				OpenApiDefinitionsPath: "/dev/null/invalid",
 			},
 			opts: reconciler.ReconcilerOpts{
 				Config: &rest.Config{
 					Host: "https://kcp.example.com",
 				},
-				Scheme: runtime.NewScheme(),
+				Scheme: func() *runtime.Scheme {
+					scheme := runtime.NewScheme()
+					_ = kcptenancy.AddToScheme(scheme)
+					return scheme
+				}(),
 				ManagerOpts: ctrl.Options{
 					Metrics: server.Options{BindAddress: "0"},
 				},

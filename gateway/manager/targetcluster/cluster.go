@@ -18,7 +18,6 @@ import (
 	"k8s.io/kube-openapi/pkg/spec3"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/kcp"
 )
 
 // FileData represents the data extracted from a schema file
@@ -130,12 +129,8 @@ func (tc *TargetCluster) connect(appCfg appConfig.Config, metadata *ClusterMetad
 		)
 	})
 
-	// Create client - use KCP-aware client only for KCP mode, standard client otherwise
-	if appCfg.EnableKcp {
-		tc.client, err = kcp.NewClusterAwareClientWithWatch(tc.restCfg, client.Options{})
-	} else {
-		tc.client, err = client.NewWithWatch(tc.restCfg, client.Options{})
-	}
+	// Create client
+	tc.client, err = client.NewWithWatch(tc.restCfg, client.Options{})
 	if err != nil {
 		return fmt.Errorf("failed to create cluster client: %w", err)
 	}

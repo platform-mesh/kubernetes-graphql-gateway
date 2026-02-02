@@ -10,7 +10,7 @@ import (
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	kcpcore "github.com/kcp-dev/kcp/sdk/apis/core/v1alpha1"
+	kcpcore "github.com/kcp-dev/sdk/apis/core/v1alpha1"
 )
 
 var (

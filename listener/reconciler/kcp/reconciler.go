@@ -2,6 +2,7 @@ package kcp
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/platform-mesh/golang-commons/logger"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
@@ -9,14 +10,19 @@ import (
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/workspacefile"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/reconciler"
 
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
-	kcpctrl "sigs.k8s.io/controller-runtime/pkg/kcp"
 
-	kcpapis "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
+	mcmanager "sigs.k8s.io/multicluster-runtime/pkg/manager"
+
+	kcpapis "github.com/kcp-dev/sdk/apis/apis/v1alpha1"
+	kcptenancy "github.com/kcp-dev/sdk/apis/tenancy/v1alpha1"
+
+	"github.com/kcp-dev/multicluster-provider/initializingworkspaces"
 )
 
 type KCPReconciler struct {
-	mgr                        ctrl.Manager
+	mgr                        mcmanager.Manager
 	apiBindingReconciler       *APIBindingReconciler
 	virtualWorkspaceReconciler *VirtualWorkspaceReconciler
 	configWatcher              *ConfigWatcher
@@ -30,17 +36,28 @@ func NewKCPReconciler(
 ) (*KCPReconciler, error) {
 	log.Info().Msg("Setting up KCP reconciler with workspace discovery")
 
-	// Create KCP-aware manager
-	mgr, err := kcpctrl.NewClusterAwareManager(opts.Config, opts.ManagerOpts)
-	if err != nil {
-		log.Error().Err(err).Msg("failed to create KCP-aware manager")
-		return nil, err
+	if opts.Scheme == nil {
+		return nil, fmt.Errorf("scheme should not be nil")
 	}
 
-	// Create IO handler for schema files
 	ioHandler, err := workspacefile.NewIOHandler(appCfg.OpenApiDefinitionsPath)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to create IO handler")
+		return nil, err
+	}
+
+	utilruntime.Must(kcptenancy.AddToScheme(opts.Scheme))
+
+	// Create multi-cluster manager
+	provider, err := initializingworkspaces.New(opts.Config, "root:orgs", initializingworkspaces.Options{Scheme: opts.Scheme})
+	if err != nil {
+		log.Error().Err(err).Msg("unable to construct cluster provider")
+		return nil, err
+	}
+
+	mgr, err := mcmanager.New(opts.Config, provider, opts.ManagerOpts)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to create multi-cluster manager")
 		return nil, err
 	}
 
@@ -63,7 +80,7 @@ func NewKCPReconciler(
 
 	// Create APIBinding reconciler (but don't set up controller yet)
 	apiBindingReconciler := &APIBindingReconciler{
-		Client:              mgr.GetClient(),
+		Client:              mgr.GetLocalManager().GetClient(),
 		Scheme:              opts.Scheme,
 		RestConfig:          opts.Config,
 		IOHandler:           ioHandler,
@@ -100,7 +117,7 @@ func NewKCPReconciler(
 	return reconcilerInstance, nil
 }
 
-func (r *KCPReconciler) GetManager() ctrl.Manager {
+func (r *KCPReconciler) GetManager() mcmanager.Manager {
 	return r.mgr
 }
 
@@ -111,16 +128,16 @@ func (r *KCPReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	return ctrl.Result{}, nil
 }
 
-func (r *KCPReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *KCPReconciler) SetupWithManager(mgr mcmanager.Manager) error {
 	// Handle cases where the reconciler wasn't properly initialized (e.g., in tests)
 	if r.apiBindingReconciler == nil {
 		return nil
 	}
 
-	// Setup the APIBinding controller with cluster context - this is crucial for req.ClusterName
-	if err := ctrl.NewControllerManagedBy(mgr).
+	// Setup the APIBinding controller
+	if err := ctrl.NewControllerManagedBy(mgr.GetLocalManager()).
 		For(&kcpapis.APIBinding{}).
-		Complete(kcpctrl.WithClusterInContext(r.apiBindingReconciler)); err != nil {
+		Complete(r.apiBindingReconciler); err != nil {
 		r.log.Error().Err(err).Msg("failed to setup APIBinding controller")
 		return err
 	}

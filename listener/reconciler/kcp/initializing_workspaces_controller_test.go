@@ -21,7 +21,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	kcpcore "github.com/kcp-dev/kcp/sdk/apis/core/v1alpha1"
+	mccontext "sigs.k8s.io/multicluster-runtime/pkg/context"
+
+	kcpcore "github.com/kcp-dev/sdk/apis/core/v1alpha1"
 )
 
 func TestInitializingWorkspacesReconciler_Reconcile(t *testing.T) {
@@ -63,18 +65,19 @@ users:
 	mockLogger, _ := logger.New(logger.DefaultConfig())
 
 	tests := []struct {
-		name       string
-		req        ctrl.Request
-		mockSetup  func(*mocks.MockClient, *kcpmocks.MockDiscoveryFactory, *apschemamocks.MockResolver, *kcpmocks.MockClusterPathResolver)
-		wantResult ctrl.Result
-		wantErr    bool
+		name        string
+		req         ctrl.Request
+		clusterName string
+		mockSetup   func(*mocks.MockClient, *kcpmocks.MockDiscoveryFactory, *apschemamocks.MockResolver, *kcpmocks.MockClusterPathResolver)
+		wantResult  ctrl.Result
+		wantErr     bool
 	}{
 		{
 			name: "system_workspace_ignored",
 			req: ctrl.Request{
 				NamespacedName: types.NamespacedName{Name: "test-cluster"},
-				ClusterName:    "system:shard",
 			},
+			clusterName: "system:shard",
 			mockSetup: func(mc *mocks.MockClient, mdf *kcpmocks.MockDiscoveryFactory, mar *apschemamocks.MockResolver, mcpr *kcpmocks.MockClusterPathResolver) {
 			},
 			wantResult: ctrl.Result{},
@@ -84,8 +87,8 @@ users:
 			name: "successful_initialization",
 			req: ctrl.Request{
 				NamespacedName: types.NamespacedName{Name: "test-cluster"},
-				ClusterName:    "root:org",
 			},
+			clusterName: "root:org",
 			mockSetup: func(mc *mocks.MockClient, mdf *kcpmocks.MockDiscoveryFactory, mar *apschemamocks.MockResolver, mcpr *kcpmocks.MockClusterPathResolver) {
 				lc := &kcpcore.LogicalCluster{
 					ObjectMeta: metav1.ObjectMeta{
@@ -153,7 +156,7 @@ users:
 				Log:                 mockLogger,
 			}
 
-			result, err := r.Reconcile(context.Background(), tt.req)
+			result, err := r.Reconcile(mccontext.WithCluster(context.Background(), tt.clusterName), tt.req)
 
 			if tt.wantErr {
 				assert.Error(t, err)

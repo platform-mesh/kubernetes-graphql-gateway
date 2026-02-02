@@ -15,13 +15,16 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
-	kcpctrl "sigs.k8s.io/controller-runtime/pkg/kcp"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	kcpapis "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
-	kcpcore "github.com/kcp-dev/kcp/sdk/apis/core/v1alpha1"
-	kcptenancy "github.com/kcp-dev/kcp/sdk/apis/tenancy/v1alpha1"
+	mcmanager "sigs.k8s.io/multicluster-runtime/pkg/manager"
+
+	kcpapis "github.com/kcp-dev/sdk/apis/apis/v1alpha1"
+	kcpcore "github.com/kcp-dev/sdk/apis/core/v1alpha1"
+	kcptenancy "github.com/kcp-dev/sdk/apis/tenancy/v1alpha1"
+
+	"github.com/kcp-dev/multicluster-provider/initializingworkspaces"
 )
 
 var initializerCmd = &cobra.Command{
@@ -75,9 +78,18 @@ var initializerCmd = &cobra.Command{
 			LeaderElectionID:       "initializer.platform-mesh.io",
 		}
 
-		mgr, err := kcpctrl.NewClusterAwareManager(restCfg, mgrOpts)
+		provider, err := initializingworkspaces.New(restCfg, "root:orgs",
+			initializingworkspaces.Options{
+				Scheme: mgrOpts.Scheme,
+			},
+		)
 		if err != nil {
-			log.Fatal().Err(err).Msg("failed to create KCP-aware manager")
+			log.Fatal().Err(err).Msg("unable to construct cluster provider")
+		}
+
+		mgr, err := mcmanager.New(restCfg, provider, mgrOpts)
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to create multi-cluster manager")
 		}
 
 		ioHandler, err := workspacefile.NewIOHandler(appCfg.OpenApiDefinitionsPath)
@@ -106,35 +118,33 @@ var initializerCmd = &cobra.Command{
 			Log:                 log,
 		}
 
-		var initializingWSMgr ctrl.Manager
 		if appCfg.Listener.InitializingWorkspacesQueueURL != "" {
-			initializingWSMgr, err = kcp.NewInitializingWorkspacesManager(appCfg.Listener.InitializingWorkspacesQueueURL, restCfg, scheme)
+			initializingWSMgr, err := kcp.NewInitializingWorkspacesManager(appCfg.Listener.InitializingWorkspacesQueueURL, restCfg, scheme)
 			if err != nil {
 				log.Fatal().Err(err).Msg("failed to create initializing workspaces manager")
 			}
 			initializingWSReconciler.Client = initializingWSMgr.GetClient()
-		} else {
-			initializingWSReconciler.Client = mgr.GetClient()
-		}
 
-		setupMgr := mgr
-		if initializingWSMgr != nil {
-			setupMgr = initializingWSMgr
-		}
+			if err := ctrl.NewControllerManagedBy(initializingWSMgr).
+				For(&kcpcore.LogicalCluster{}).
+				Complete(initializingWSReconciler); err != nil {
+				log.Fatal().Err(err).Msg("failed to setup InitializingWorkspaces controller")
+			}
 
-		if err := ctrl.NewControllerManagedBy(setupMgr).
-			For(&kcpcore.LogicalCluster{}).
-			Complete(kcpctrl.WithClusterInContext(initializingWSReconciler)); err != nil {
-			log.Fatal().Err(err).Msg("failed to setup InitializingWorkspaces controller")
-		}
-
-		if initializingWSMgr != nil {
 			go func() {
 				log.Info().Msg("starting initializing workspaces manager")
 				if err := initializingWSMgr.Start(ctx); err != nil {
 					log.Fatal().Err(err).Msg("problem running initializing workspaces manager")
 				}
 			}()
+		} else {
+			initializingWSReconciler.Client = mgr.GetLocalManager().GetClient()
+
+			if err := ctrl.NewControllerManagedBy(mgr.GetLocalManager()).
+				For(&kcpcore.LogicalCluster{}).
+				Complete(initializingWSReconciler); err != nil {
+				log.Fatal().Err(err).Msg("failed to setup InitializingWorkspaces controller")
+			}
 		}
 
 		if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {

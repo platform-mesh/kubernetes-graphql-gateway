@@ -16,9 +16,7 @@ import (
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/roundtripper"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/targetcluster"
 
-	"sigs.k8s.io/controller-runtime/pkg/kontext"
-
-	"github.com/kcp-dev/logicalcluster/v3"
+	mccontext "sigs.k8s.io/multicluster-runtime/pkg/context"
 )
 
 func TestGetToken(t *testing.T) {
@@ -198,8 +196,8 @@ func TestSetContexts(t *testing.T) {
 
 			// Check KCP context
 			if tt.expectKcp {
-				clusterFromCtx, _ := kontext.ClusterFrom(result.Context())
-				if clusterFromCtx != logicalcluster.Name(tt.workspace) {
+				clusterFromCtx, _ := mccontext.ClusterFrom(result.Context())
+				if clusterFromCtx != tt.workspace {
 					t.Errorf("expected cluster %q in context, got %q", tt.workspace, clusterFromCtx)
 				}
 			}

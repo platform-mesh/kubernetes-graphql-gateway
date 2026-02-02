@@ -15,9 +15,7 @@ import (
 	appConfig "github.com/platform-mesh/kubernetes-graphql-gateway/common/config"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/manager/roundtripper"
 
-	"sigs.k8s.io/controller-runtime/pkg/kontext"
-
-	"github.com/kcp-dev/logicalcluster/v3"
+	mccontext "sigs.k8s.io/multicluster-runtime/pkg/context"
 )
 
 // GraphQLHandler wraps a GraphQL schema and HTTP handler
@@ -64,7 +62,7 @@ func SetContexts(r *http.Request, workspace, token string, enableKcp bool) *http
 		if kcpWorkspace, ok := r.Context().Value(kcpWorkspaceKey).(string); ok && kcpWorkspace != "" {
 			kcpWorkspaceName = kcpWorkspace
 		}
-		r = r.WithContext(kontext.WithCluster(r.Context(), logicalcluster.Name(kcpWorkspaceName)))
+		r = r.WithContext(mccontext.WithCluster(r.Context(), kcpWorkspaceName))
 	}
 	return r.WithContext(context.WithValue(r.Context(), roundtripper.TokenKey{}, token))
 }

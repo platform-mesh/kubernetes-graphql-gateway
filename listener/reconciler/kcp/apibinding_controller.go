@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io/fs"
 	"strings"
 
@@ -18,7 +19,10 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	kcpapis "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
+	mccontext "sigs.k8s.io/multicluster-runtime/pkg/context"
+	mcmanager "sigs.k8s.io/multicluster-runtime/pkg/manager"
+
+	kcpapis "github.com/kcp-dev/sdk/apis/apis/v1alpha1"
 )
 
 // APIBindingReconciler reconciles an APIBinding object
@@ -36,14 +40,19 @@ type APIBindingReconciler struct {
 const apiBindingInitializerAnnotation = "initializer.apis.kcp.io/gateway"
 
 func (r *APIBindingReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	clusterName, ok := mccontext.ClusterFrom(ctx)
+	if !ok {
+		return ctrl.Result{}, fmt.Errorf("cluster not found in context")
+	}
+
 	// ignore system workspaces (e.g. system:shard)
-	if strings.HasPrefix(req.ClusterName, "system") {
+	if strings.HasPrefix(clusterName, "system") {
 		return ctrl.Result{}, nil
 	}
 
-	logger := r.Log.With().Str("cluster", req.ClusterName).Str("name", req.Name).Logger()
+	logger := r.Log.With().Str("cluster", clusterName).Str("name", req.Name).Logger()
 
-	clusterClt, err := r.ClusterPathResolver.ClientForCluster(req.ClusterName)
+	clusterClt, err := r.ClusterPathResolver.ClientForCluster(clusterName)
 	if err != nil {
 		logger.Error().Err(err).Msg("failed to get cluster client")
 		return ctrl.Result{}, err
@@ -58,7 +67,7 @@ func (r *APIBindingReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, nil
 	}
 
-	clusterPath, err := PathForCluster(req.ClusterName, clusterClt)
+	clusterPath, err := PathForCluster(clusterName, clusterClt)
 	if err != nil {
 		if errors.Is(err, ErrClusterIsDeleted) {
 			logger.Info().Msg("cluster is deleted, triggering cleanup")
@@ -149,8 +158,8 @@ func (r *APIBindingReconciler) generateCurrentSchema(dc discovery.DiscoveryInter
 		r.Log,
 	)
 }
-func (r *APIBindingReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
+func (r *APIBindingReconciler) SetupWithManager(mgr mcmanager.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr.GetLocalManager()).
 		For(&kcpapis.APIBinding{}).
 		Complete(r)
 }

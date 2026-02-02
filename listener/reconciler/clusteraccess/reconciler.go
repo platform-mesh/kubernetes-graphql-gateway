@@ -18,6 +18,8 @@ import (
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	mcmanager "sigs.k8s.io/multicluster-runtime/pkg/manager"
 )
 
 var (
@@ -86,7 +88,7 @@ type ClusterAccessReconciler struct {
 	ioHandler        *workspacefile.FileHandler
 	schemaResolver   apischema.Resolver
 	log              *logger.Logger
-	mgr              ctrl.Manager
+	mgr              mcmanager.Manager
 	opts             reconciler.ReconcilerOpts
 	lifecycleManager *controllerruntime.LifecycleManager
 }
@@ -97,8 +99,8 @@ func NewReconciler(
 	schemaResolver apischema.Resolver,
 	log *logger.Logger,
 ) (reconciler.CustomReconciler, error) {
-	// Create standard manager
-	mgr, err := ctrl.NewManager(opts.Config, opts.ManagerOpts)
+	// Create multi-cluster manager
+	mgr, err := mcmanager.New(opts.Config, nil, opts.ManagerOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +128,7 @@ func NewReconciler(
 	return r, nil
 }
 
-func (r *ClusterAccessReconciler) GetManager() ctrl.Manager {
+func (r *ClusterAccessReconciler) GetManager() mcmanager.Manager {
 	return r.mgr
 }
 
@@ -134,8 +136,8 @@ func (r *ClusterAccessReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	return r.lifecycleManager.Reconcile(ctx, req, &gatewayv1alpha1.ClusterAccess{})
 }
 
-func (r *ClusterAccessReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
+func (r *ClusterAccessReconciler) SetupWithManager(mgr mcmanager.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr.GetLocalManager()).
 		For(&gatewayv1alpha1.ClusterAccess{}).
 		Complete(r)
 }

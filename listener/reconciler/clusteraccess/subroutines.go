@@ -157,6 +157,6 @@ func (s *generateSchemaSubroutine) GetName() string {
 	return "generate-schema"
 }
 
-func (s *generateSchemaSubroutine) Finalizers() []string {
+func (s *generateSchemaSubroutine) Finalizers(_ runtimeobject.RuntimeObject) []string {
 	return []string{finalizerName}
 }

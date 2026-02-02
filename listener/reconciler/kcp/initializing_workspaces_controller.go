@@ -16,7 +16,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	kcpcore "github.com/kcp-dev/kcp/sdk/apis/core/v1alpha1"
+	mccontext "sigs.k8s.io/multicluster-runtime/pkg/context"
+	mcmanager "sigs.k8s.io/multicluster-runtime/pkg/manager"
+
+	kcpcore "github.com/kcp-dev/sdk/apis/core/v1alpha1"
 )
 
 // InitializingWorkspacesReconciler reconciles LogicalCluster objects in the initializingworkspaces virtual workspace
@@ -32,12 +35,17 @@ type InitializingWorkspacesReconciler struct {
 type ExportedInitializingWorkspacesReconciler = InitializingWorkspacesReconciler
 
 func (r *InitializingWorkspacesReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	clusterName, ok := mccontext.ClusterFrom(ctx)
+	if !ok {
+		return ctrl.Result{}, fmt.Errorf("cluster not found in context")
+	}
+
 	// ignore system workspaces
-	if strings.HasPrefix(req.ClusterName, "system") {
+	if strings.HasPrefix(clusterName, "system") {
 		return ctrl.Result{}, nil
 	}
 
-	logger := r.Log.With().Str("cluster", req.ClusterName).Str("name", req.Name).Logger()
+	logger := r.Log.With().Str("cluster", clusterName).Str("name", req.Name).Logger()
 	logger.Info().Msg("reconciling initializing workspace...")
 
 	lc := &kcpcore.LogicalCluster{}
@@ -89,7 +97,7 @@ func (r *InitializingWorkspacesReconciler) Reconcile(ctx context.Context, req ct
 	}
 	logger.Info().Msg("schema file generated and saved")
 
-	parentClusterClt, err := r.ClusterPathResolver.ClientForCluster(req.ClusterName)
+	parentClusterClt, err := r.ClusterPathResolver.ClientForCluster(clusterName)
 	if err != nil {
 		logger.Error().Err(err).Msg("failed to get parent cluster client")
 		return ctrl.Result{}, err
@@ -137,8 +145,8 @@ func (r *InitializingWorkspacesReconciler) Reconcile(ctx context.Context, req ct
 	return ctrl.Result{}, nil
 }
 
-func (r *InitializingWorkspacesReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
+func (r *InitializingWorkspacesReconciler) SetupWithManager(mgr mcmanager.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr.GetLocalManager()).
 		For(&kcpcore.LogicalCluster{}).
 		Complete(r)
 }

@@ -22,9 +22,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	kcpapis "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
-	kcpcore "github.com/kcp-dev/kcp/sdk/apis/core/v1alpha1"
-	kcptenancy "github.com/kcp-dev/kcp/sdk/apis/tenancy/v1alpha1"
+	kcpapis "github.com/kcp-dev/sdk/apis/apis/v1alpha1"
+	kcpcore "github.com/kcp-dev/sdk/apis/core/v1alpha1"
+	kcptenancy "github.com/kcp-dev/sdk/apis/tenancy/v1alpha1"
 )
 
 var listenCmd = &cobra.Command{
