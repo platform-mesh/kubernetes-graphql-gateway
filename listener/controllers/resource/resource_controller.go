@@ -188,7 +188,7 @@ func (r *Reconciler) SetupWithManager(mgr mcmanager.Manager) error {
 	}
 
 	// Create a predicate to only watch the anchor resource
-	namespacePredicate := predicate.NewPredicateFuncs(func(object client.Object) bool {
+	anchorResourcePredicate := predicate.NewPredicateFuncs(func(object client.Object) bool {
 		us, err := runtime.DefaultUnstructuredConverter.ToUnstructured(object)
 		if err != nil {
 			klog.Error("failure converting object to unstructured", "err", err.Error())
@@ -211,7 +211,7 @@ func (r *Reconciler) SetupWithManager(mgr mcmanager.Manager) error {
 	us.SetGroupVersionKind(r.resourceGVK)
 
 	return mcbuilder.ControllerManagedBy(mgr).
-		For(&us, mcbuilder.WithPredicates(namespacePredicate)).
+		For(&us, mcbuilder.WithPredicates(anchorResourcePredicate)).
 		WithOptions(r.opts).
 		Named(controllerName).
 		Complete(r)
