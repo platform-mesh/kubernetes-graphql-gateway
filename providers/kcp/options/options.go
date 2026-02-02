@@ -39,8 +39,8 @@ type ExtraOptions struct {
 	// workspaceSchemaKubeconfigOverride is the kubeconfig override for workspace schema generation.
 	// If set together with WorkspaceSchemaHostOverride, WorkspaceSchemaHostOverride will take precedence.
 	workspaceSchemaKubeconfigOverride string
-	// WorkspaceScehmaKubeconfigRestConfig is the rest config built from workspaceSchemaKubeconfigOverride
-	WorkspaceScehmaKubeconfigRestConfig *rest.Config
+	// WorkspaceSchemaKubeconfigRestConfig is the rest config built from workspaceSchemaKubeconfigOverride
+	WorkspaceSchemaKubeconfigRestConfig *rest.Config
 }
 
 type completedOptions struct {
@@ -73,7 +73,7 @@ func (options *Options) Complete() (*CompletedOptions, error) {
 			return nil, fmt.Errorf("failed to build rest config from kubeconfig: %w", err)
 		}
 
-		options.ExtraOptions.WorkspaceScehmaKubeconfigRestConfig = config
+		options.ExtraOptions.WorkspaceSchemaKubeconfigRestConfig = config
 	}
 
 	return &CompletedOptions{
@@ -103,7 +103,7 @@ func (options *CompletedOptions) GetClusterMetadataOverrideFunc() v1alpha1.Clust
 		if options.ExtraOptions.WorkspaceSchemaHostOverride != "" {
 			metadata.Host = options.ExtraOptions.WorkspaceSchemaHostOverride
 		}
-		if options.ExtraOptions.WorkspaceScehmaKubeconfigRestConfig != nil {
+		if options.ExtraOptions.WorkspaceSchemaKubeconfigRestConfig != nil {
 			// TODO: Convert rest.Config to ClusterMetadata
 			// For now, we just return an error
 			return nil, fmt.Errorf("conversion from rest.Config to ClusterMetadata not implemented")
