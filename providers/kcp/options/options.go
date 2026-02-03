@@ -17,8 +17,11 @@ limitations under the License.
 package options
 
 import (
+	"encoding/base64"
 	"fmt"
+	"net/url"
 	"os"
+	"path"
 	"strings"
 
 	"github.com/platform-mesh/kubernetes-graphql-gateway/apis/v1alpha1"
@@ -101,13 +104,32 @@ func (options *CompletedOptions) Validate() error {
 func (options *CompletedOptions) GetClusterMetadataOverrideFunc() v1alpha1.ClusterMetadataFunc {
 	return func(clusterName string) (*v1alpha1.ClusterMetadata, error) {
 		metadata := &v1alpha1.ClusterMetadata{}
-		if options.WorkspaceSchemaHostOverride != "" {
-			metadata.Host = options.WorkspaceSchemaHostOverride
-		}
 		if options.WorkspaceSchemaKubeconfigRestConfig != nil {
 			// TODO: Convert rest.Config to ClusterMetadata
-			// For now, we just return an error
-			return nil, fmt.Errorf("conversion from rest.Config to ClusterMetadata not implemented")
+			// For now, we just return a minimum
+
+			parsed, err := url.Parse(options.WorkspaceSchemaKubeconfigRestConfig.Host)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse host from rest config: %w", err)
+			}
+
+			parsed.Path = path.Join("clusters", clusterName)
+
+			metadata.Host = parsed.String()
+
+			metadata.CA = &v1alpha1.CAMetadata{
+				Data: base64.StdEncoding.EncodeToString(options.WorkspaceSchemaKubeconfigRestConfig.CAData),
+			}
+			/// REMOVE BEFORE COMMITTING
+			metadata.Auth = &v1alpha1.AuthMetadata{
+				CertData: base64.StdEncoding.EncodeToString(options.WorkspaceSchemaKubeconfigRestConfig.CertData),
+				KeyData:  base64.StdEncoding.EncodeToString(options.WorkspaceSchemaKubeconfigRestConfig.KeyData),
+			}
+			metadata.Auth.Type = v1alpha1.AuthTypeClientCert
+			return metadata, nil
+		}
+		if options.WorkspaceSchemaHostOverride != "" {
+			metadata.Host = options.WorkspaceSchemaHostOverride
 		}
 		return metadata, nil
 	}
@@ -115,9 +137,9 @@ func (options *CompletedOptions) GetClusterMetadataOverrideFunc() v1alpha1.Clust
 
 func (options *CompletedOptions) GetClusterURLResolverFunc() v1alpha1.ClusterURLResolver {
 	return func(currentURL string, clusterName string) (string, error) {
-		//if options.ExtraOptions.WorkspaceSchemaHostOverride != "" {
-		//	return options.ExtraOptions.WorkspaceSchemaHostOverride, nil
-		//}
+		if options.ExtraOptions.WorkspaceSchemaHostOverride != "" {
+			return options.ExtraOptions.WorkspaceSchemaHostOverride, nil
+		}
 		parts := strings.Split(currentURL, "/services/")
 		if len(parts) != 2 {
 			return "", fmt.Errorf("invalid current URL format: %s", currentURL)

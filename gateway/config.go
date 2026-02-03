@@ -19,12 +19,15 @@ func NewConfig(options *options.CompletedOptions) (*Config, error) {
 	config := &Config{
 		Options: options,
 	}
+
 	gatewayServer, err := gateway.New(gateway.GatewayConfig{
 		DevelopmentDisableAuth: config.Options.DevelopmentDisableAuth,
-		GraphQLPretty:          true, // Always pretty print for readability
+		GraphQLPretty:          true,
 		GraphQLPlayground:      config.Options.PlaygroundEnabled,
 		GraphQLGraphiQL:        config.Options.PlaygroundEnabled,
+		SchemaHandler:          config.Options.SchemaHandler,
 		SchemaDirectory:        config.Options.SchemasDir,
+		GRPCAddress:            config.Options.GRPCListenerAddress,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create gateway server: %w", err)

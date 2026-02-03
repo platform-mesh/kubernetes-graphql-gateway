@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	utilscontext "github.com/platform-mesh/kubernetes-graphql-gateway/gateway/utils/context"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -39,8 +40,15 @@ func NewServer(c ServerConfig) (*Server, error) {
 	// Pattern: /api/clusters/{clusterName} where {clusterName} captures the path segment
 	s.Handle("/api/clusters/{clusterName}", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		clusterName := r.PathValue("clusterName")
+		// FIXME: for now lets implement the token extraction here until a better place is found
+
+		authHeader := r.Header.Get("Authorization")
+		token := strings.TrimPrefix(authHeader, "Bearer ")
+
+		ctx := utilscontext.SetToken(r.Context(), token)
+
 		// Add cluster name to request context for downstream handlers
-		ctx := utilscontext.SetCluster(r.Context(), clusterName)
+		ctx = utilscontext.SetCluster(ctx, clusterName)
 		c.Gateway.ServeHTTP(w, r.WithContext(ctx))
 	}))
 

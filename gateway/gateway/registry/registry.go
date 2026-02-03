@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"strings"
 	"sync"
 
+	"github.com/platform-mesh/golang-commons/sentry"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/gateway/cluster"
 	utilscontext "github.com/platform-mesh/kubernetes-graphql-gateway/gateway/utils/context"
 
@@ -14,9 +14,7 @@ import (
 )
 
 // ClusterRegistryConfig holds configuration for the ClusterRegistry.
-// TODO: Move this into options for dedicated gateway config.
 type ClusterRegistryConfig struct {
-	SchemaDirectory        string
 	DevelopmentDisableAuth bool
 
 	GraphQLPretty     bool
@@ -41,90 +39,57 @@ func New(
 	}
 }
 
-// LoadCluster loads a target cluster from a schema file
-func (cr *ClusterRegistry) LoadCluster(ctx context.Context, schemaFilePath string) error {
-	cr.mu.Lock()
-	defer cr.mu.Unlock()
-	return cr.loadCluster(ctx, schemaFilePath)
-}
-
-// loadCluster loads a target cluster from a schema file
-func (cr *ClusterRegistry) loadCluster(ctx context.Context, schemaFilePath string) error {
+// OnSchemaChanged implements watcher.SchemaEventHandler.
+// It is called when a schema is created or updated.
+func (cr *ClusterRegistry) OnSchemaChanged(ctx context.Context, clusterName string, schema string) {
 	logger := log.FromContext(ctx)
 
-	// Extract cluster name from file path
-	// The file name (without directory) is used as the cluster name
-	name := extractClusterName(schemaFilePath)
+	cr.mu.Lock()
+	defer cr.mu.Unlock()
 
-	logger.V(4).WithValues("cluster", name, "file", schemaFilePath).Info("Loading target cluster")
+	logger.V(4).WithValues("cluster", clusterName).Info("Loading target cluster")
 
-	// Create or update cluster
-	cl, err := cluster.New(name, schemaFilePath, cluster.ClusterConfig{
+	// Remove existing cluster if present
+	if _, exists := cr.clusters[clusterName]; exists {
+		delete(cr.clusters, clusterName)
+		logger.V(4).WithValues("cluster", clusterName).Info("Removed existing cluster for update")
+	}
+
+	// Create new cluster from schema
+	cl, err := cluster.New(clusterName, schema, cluster.ClusterConfig{
 		DevelopmentDisableAuth: cr.config.DevelopmentDisableAuth,
 		GraphQLPretty:          cr.config.GraphQLPretty,
 		GraphQLPlayground:      cr.config.GraphQLPlayground,
 		GraphQLGraphiQL:        cr.config.GraphQLGraphiQL,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to create target cluster %s: %w", name, err)
+		logger.Error(err, "Failed to create cluster", "cluster", clusterName)
+		sentry.CaptureError(err, sentry.Tags{"cluster": clusterName})
+		return
 	}
 
-	// Store cluster
-	cr.clusters[name] = cl
-
-	return nil
+	cr.clusters[clusterName] = cl
+	logger.Info("Successfully loaded cluster", "cluster", clusterName)
 }
 
-// UpdateCluster updates an existing cluster from a schema file
-func (cr *ClusterRegistry) UpdateCluster(ctx context.Context, schemaFilePath string) error {
-	cr.mu.Lock()
-	defer cr.mu.Unlock()
-	// For simplified implementation, just reload the cluster
-	// TODO: if loading fails we gonna loose the existing cluster, improve this. This is atomic.
-	err := cr.removeCluster(ctx, schemaFilePath)
-	if err != nil {
-		return err
-	}
-
-	return cr.loadCluster(ctx, schemaFilePath)
-}
-
-// RemoveCluster removes a cluster by schema file path
-func (cr *ClusterRegistry) RemoveCluster(ctx context.Context, schemaFilePath string) error {
-	cr.mu.Lock()
-	defer cr.mu.Unlock()
-
-	return cr.removeCluster(ctx, schemaFilePath)
-}
-
-// removeCluster removes a cluster by schema file path
-func (cr *ClusterRegistry) removeCluster(ctx context.Context, schemaFilePath string) error {
+// OnSchemaDeleted implements watcher.SchemaEventHandler.
+// It is called when a schema is removed.
+func (cr *ClusterRegistry) OnSchemaDeleted(ctx context.Context, clusterName string) {
 	logger := log.FromContext(ctx)
 
-	// Extract cluster name from file path
-	name := extractClusterName(schemaFilePath)
+	cr.mu.Lock()
+	defer cr.mu.Unlock()
 
-	logger.V(4).WithValues(
-		"cluster", name,
-		"file", schemaFilePath,
-	).Info("Removing target cluster")
+	logger.V(4).WithValues("cluster", clusterName).Info("Removing target cluster")
 
-	_, exists := cr.clusters[name]
+	_, exists := cr.clusters[clusterName]
 	if !exists {
-		logger.V(2).WithValues(
-			"cluster", name,
-		).Info("Attempted to remove non-existent cluster")
-		return nil
+		logger.V(2).WithValues("cluster", clusterName).Info("Attempted to remove non-existent cluster")
+		return
 	}
 
-	// Remove cluster (no cleanup needed in simplified version)
-	delete(cr.clusters, name)
-
-	logger.V(4).WithValues(
-		"cluster", name,
-	).Info("Successfully removed target cluster")
-
-	return nil
+	delete(cr.clusters, clusterName)
+	logger.Info("Successfully removed cluster", "cluster", clusterName)
 }
 
 // GetCluster returns a cluster by name
@@ -173,15 +138,3 @@ func (cr *ClusterRegistry) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	cluster.ServeHTTP(w, r)
 }
 
-// extractClusterName extracts the cluster name from a file path.
-// The file name (last component of the path) is used as the cluster name.
-// For example: "_output/schemas/root:bob" -> "root:bob"
-func extractClusterName(filePath string) string {
-	// Find the last path separator
-	lastSlash := strings.LastIndex(filePath, "/")
-	if lastSlash == -1 {
-		// No slash found, use the whole path as the name
-		return filePath
-	}
-	return filePath[lastSlash+1:]
-}

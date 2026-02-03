@@ -1,6 +1,8 @@
 package options
 
 import (
+	"errors"
+
 	"github.com/spf13/pflag"
 
 	"k8s.io/component-base/logs"
@@ -14,8 +16,12 @@ type Options struct {
 }
 
 type ExtraOptions struct {
-	// SchemasDir is the directory to store schema files.
+	// SchemasDir is the directory to store schema files (used with file watcher).
 	SchemasDir string
+	// SchemaHandler specifies how to receive schema updates ("file" or "grpc").
+	SchemaHandler string
+	// GRPCListenerAddress is the address of the gRPC listener (used with grpc watcher).
+	GRPCListenerAddress string
 	// ServerBindAddress is the address for the GraphQL gateway server.
 	ServerBindAddress string
 	// ServerBindPort is the port for the GraphQL gateway server.
@@ -56,13 +62,15 @@ func NewOptions() *Options {
 		Logs: logs,
 
 		ExtraOptions: ExtraOptions{
-			SchemasDir:         "_output/schemas",
-			ServerBindAddress:  "0.0.0.0",
-			ServerBindPort:     8080,
-			PlaygroundEnabled:  false,
-			CORSAllowedOrigins: []string{},
-			CORSAllowedHeaders: []string{},
-			URLSuffix:          "/graphql",
+			SchemasDir:          "_output/schemas",
+			SchemaHandler:       "file",
+			GRPCListenerAddress: "localhost:50051",
+			ServerBindAddress:   "0.0.0.0",
+			ServerBindPort:      8080,
+			PlaygroundEnabled:   false,
+			CORSAllowedOrigins:  []string{},
+			CORSAllowedHeaders:  []string{},
+			URLSuffix:           "/graphql",
 
 			DevelopmentDisableAuth: false,
 		},
@@ -73,7 +81,9 @@ func NewOptions() *Options {
 func (options *Options) AddFlags(fs *pflag.FlagSet) {
 	logsv1.AddFlags(options.Logs, fs)
 
-	fs.StringVar(&options.SchemasDir, "schemas-dir", options.SchemasDir, "directory to store schema files")
+	fs.StringVar(&options.SchemasDir, "schemas-dir", options.SchemasDir, "directory to watch for schema files (used with --schema-handler=file)")
+	fs.StringVar(&options.SchemaHandler, "schema-handler", options.SchemaHandler, "how to receive schema updates: 'file' or 'grpc'")
+	fs.StringVar(&options.GRPCListenerAddress, "grpc-listener-address", options.GRPCListenerAddress, "address of the gRPC listener (used with --schema-handler=grpc)")
 	fs.IntVar(&options.ServerBindPort, "gateway-port", options.ServerBindPort, "port for the GraphQL gateway server")
 	fs.StringVar(&options.ServerBindAddress, "gateway-address", options.ServerBindAddress, "address for the GraphQL gateway server")
 	fs.BoolVar(&options.PlaygroundEnabled, "enable-playground", options.PlaygroundEnabled, "enable the GraphQL playground")
@@ -83,7 +93,6 @@ func (options *Options) AddFlags(fs *pflag.FlagSet) {
 
 	fs.BoolVar(&options.DevelopmentDisableAuth, "development-disable-auth", options.DevelopmentDisableAuth, "disable authentication in development mode")
 	fs.MarkHidden("development-disable-auth") //nolint:errcheck
-
 }
 
 func (options *Options) Complete() (*CompletedOptions, error) {
@@ -98,5 +107,12 @@ func (options *Options) Complete() (*CompletedOptions, error) {
 }
 
 func (options *CompletedOptions) Validate() error {
+	if options.SchemaHandler == "grpc" && options.GRPCListenerAddress == "" {
+		return errors.New("--grpc-listener-address must be set when --schema-handler=grpc")
+	}
+
+	if options.SchemaHandler != "file" && options.SchemasDir == "" {
+		return errors.New("--schemas-dir must be set when --schema-handler is not 'file'")
+	}
 	return nil
 }

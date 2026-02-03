@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 
 	"github.com/platform-mesh/kubernetes-graphql-gateway/apis/v1alpha1"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/gateway/graphql"
@@ -34,15 +33,16 @@ type Cluster struct {
 	graphqlServer *graphql.GraphQLServer
 }
 
-// New creates a new Cluster from a schema file
+// New creates a new Cluster from a schema string.
+// The schemaJSON parameter should be the JSON content of the schema.
 func New(
 	name string,
-	schemaFilePath string,
+	schemaJSON string,
 	config ClusterConfig,
 ) (*Cluster, error) {
-	fileData, err := readSchemaFile(schemaFilePath)
+	schemaData, err := parseSchema(schemaJSON)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read schema file: %w", err)
+		return nil, fmt.Errorf("failed to parse schema: %w", err)
 	}
 
 	cluster := &Cluster{
@@ -50,7 +50,7 @@ func New(
 	}
 
 	// Connect to cluster - use metadata if available, otherwise fall back to standard config
-	if err := cluster.connectAndSetClient(config, fileData.ClusterMetadata); err != nil {
+	if err := cluster.connectAndSetClient(config, schemaData.ClusterMetadata); err != nil {
 		return nil, fmt.Errorf("failed to connect to cluster: %w", err)
 	}
 
@@ -59,7 +59,7 @@ func New(
 	resolverProvider := resolver.New(cluster.client)
 
 	// Create schema gateway
-	schemaGateway, err := schema.New(fileData.Components.Schemas, resolverProvider)
+	schemaGateway, err := schema.New(schemaData.Components.Schemas, resolverProvider)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create GraphQL schema: %w", err)
 	}
@@ -107,8 +107,6 @@ func (tc *Cluster) connectAndSetClient(config ClusterConfig, metadata *v1alpha1.
 		)
 	})
 
-	// Create client - in the new multicluster architecture, the cluster context
-	// is handled via context.WithCluster, so we use the standard client for both modes
 	tc.client, err = client.NewWithWatch(tc.restCfg, client.Options{})
 	if err != nil {
 		return fmt.Errorf("failed to create cluster client: %w", err)
@@ -133,17 +131,12 @@ func (tc *Cluster) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	tc.handler.Handler.ServeHTTP(w, r)
 }
 
-// readSchemaFile reads and parses a schema file
-func readSchemaFile(filePath string) (*v1alpha1.Schema, error) {
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read file: %w", err)
-	}
-
-	var fileData v1alpha1.Schema
-	if err := json.Unmarshal(data, &fileData); err != nil {
+// parseSchema parses a JSON schema string into a Schema struct
+func parseSchema(schemaJSON string) (*v1alpha1.Schema, error) {
+	var schemaData v1alpha1.Schema
+	if err := json.Unmarshal([]byte(schemaJSON), &schemaData); err != nil {
 		return nil, fmt.Errorf("failed to parse JSON: %w", err)
 	}
 
-	return &fileData, nil
+	return &schemaData, nil
 }
