@@ -1,6 +1,5 @@
 version: '3'
 
-dotenv: ['.taskenv', '.secret/.env', '{{.HOME}}/.env' ]
 vars:
   LOCAL_BIN: bin
   ENVTEST_K8S_VERSION: "1.34.0" # to get latest version run $(pwd)/bin/setup-envtest list
@@ -78,8 +77,22 @@ tasks:
       - "{{.LOCAL_BIN}}/golangci-lint run --timeout 10m ./..."
   envtest:
     deps: [setup:envtest]
+    env:
+      KUBEBUILDER_ASSETS:
+        # Workaround for setup-envtest bug: it doesn't verify binaries exist if directory is present
+        sh: |
+          ASSETS_PATH=$(pwd)/{{.LOCAL_BIN}}/k8s/{{.ENVTEST_K8S_VERSION}}-$(go env GOOS)-$(go env GOARCH)
+          if [ ! -x "$ASSETS_PATH/etcd" ] || [ ! -x "$ASSETS_PATH/kube-apiserver" ]; then
+            $(pwd)/{{.LOCAL_BIN}}/setup-envtest use {{.ENVTEST_K8S_VERSION}} --bin-dir $(pwd)/{{.LOCAL_BIN}} --force -p path
+          else
+            echo "$ASSETS_PATH"
+          fi
     cmds:
-      - KUBEBUILDER_ASSETS="$($(pwd)/{{.LOCAL_BIN}}/setup-envtest use {{.ENVTEST_K8S_VERSION}} -i --bin-dir $(pwd)/{{.LOCAL_BIN}} -p path)" go test ./... {{.ADDITIONAL_COMMAND_ARGS}}
+      - go test ./... {{.ADDITIONAL_COMMAND_ARGS}}
+  # envtest:
+  #   deps: [setup:envtest]
+  #   cmds:
+  #     - KUBEBUILDER_ASSETS="$($(pwd)/{{.LOCAL_BIN}}/setup-envtest use {{.ENVTEST_K8S_VERSION}} -i --bin-dir $(pwd)/{{.LOCAL_BIN}} -p path)" go test ./... {{.ADDITIONAL_COMMAND_ARGS}}
   test:
     deps: [setup:envtest]
     cmds:
