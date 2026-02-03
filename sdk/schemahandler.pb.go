@@ -24,19 +24,22 @@ const (
 type SubscribeResponse_EventType int32
 
 const (
-	SubscribeResponse_ADDED   SubscribeResponse_EventType = 0
-	SubscribeResponse_REMOVED SubscribeResponse_EventType = 1
+	SubscribeResponse_CREATED SubscribeResponse_EventType = 0
+	SubscribeResponse_UPDATED SubscribeResponse_EventType = 1
+	SubscribeResponse_REMOVED SubscribeResponse_EventType = 2
 )
 
 // Enum value maps for SubscribeResponse_EventType.
 var (
 	SubscribeResponse_EventType_name = map[int32]string{
-		0: "ADDED",
-		1: "REMOVED",
+		0: "CREATED",
+		1: "UPDATED",
+		2: "REMOVED",
 	}
 	SubscribeResponse_EventType_value = map[string]int32{
-		"ADDED":   0,
-		"REMOVED": 1,
+		"CREATED": 0,
+		"UPDATED": 1,
+		"REMOVED": 2,
 	}
 )
 
@@ -162,7 +165,7 @@ func (x *SubscribeResponse) GetEventType() SubscribeResponse_EventType {
 	if x != nil {
 		return x.EventType
 	}
-	return SubscribeResponse_ADDED
+	return SubscribeResponse_CREATED
 }
 
 var File_apis_proto_schemahandler_proto protoreflect.FileDescriptor
@@ -170,15 +173,16 @@ var File_apis_proto_schemahandler_proto protoreflect.FileDescriptor
 const file_apis_proto_schemahandler_proto_rawDesc = "" +
 	"\n" +
 	"\x1eapis/proto/schemahandler.proto\x12\x05proto\"\x12\n" +
-	"\x10SubscribeRequest\"\xb6\x01\n" +
+	"\x10SubscribeRequest\"\xc5\x01\n" +
 	"\x11SubscribeResponse\x12!\n" +
 	"\fcluster_name\x18\x01 \x01(\tR\vclusterName\x12\x16\n" +
 	"\x06schema\x18\x02 \x01(\tR\x06schema\x12A\n" +
 	"\n" +
-	"event_type\x18\x03 \x01(\x0e2\".proto.SubscribeResponse.EventTypeR\teventType\"#\n" +
-	"\tEventType\x12\t\n" +
-	"\x05ADDED\x10\x00\x12\v\n" +
-	"\aREMOVED\x10\x012Q\n" +
+	"event_type\x18\x03 \x01(\x0e2\".proto.SubscribeResponse.EventTypeR\teventType\"2\n" +
+	"\tEventType\x12\v\n" +
+	"\aCREATED\x10\x00\x12\v\n" +
+	"\aUPDATED\x10\x01\x12\v\n" +
+	"\aREMOVED\x10\x022Q\n" +
 	"\rSchemaHandler\x12@\n" +
 	"\tSubscribe\x12\x17.proto.SubscribeRequest\x1a\x18.proto.SubscribeResponse0\x01B9Z7github.com/platform-mesh/kubernetes-graphql-gateway/sdkb\x06proto3"
 

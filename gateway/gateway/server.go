@@ -24,11 +24,9 @@ type Service struct {
 type GatewayConfig struct {
 	DevelopmentDisableAuth bool
 
-	GraphQLPretty            bool
-	GraphQLPlayground        bool
-	GraphQLGraphiQL          bool
-	ServerCORSAllowedOrigins []string
-	ServerCORSAllowedHeaders []string
+	GraphQLPretty     bool
+	GraphQLPlayground bool
+	GraphQLGraphiQL   bool
 
 	SchemaDirectory string
 }
@@ -41,10 +39,6 @@ func New(config GatewayConfig) (*Service, error) {
 		GraphQLPretty:          config.GraphQLPretty,
 		GraphQLPlayground:      config.GraphQLPlayground,
 		GraphQLGraphiQL:        config.GraphQLGraphiQL,
-		ServerCORSConfig: registry.CORSConfig{
-			AllowedOrigins: config.ServerCORSAllowedOrigins,
-			AllowedHeaders: config.ServerCORSAllowedHeaders,
-		},
 	})
 
 	// Cluster registry acts as main server and is fed into watcher. So watcher updated new clusters there.
@@ -81,12 +75,4 @@ func (g *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	// Delegate to cluster registry
 	g.clusterRegistry.ServeHTTP(w, r)
-}
-
-// Shutdown gracefully shuts down the gateway and all its services
-func (g *Service) Shutdown(ctx context.Context) error {
-	if g.clusterRegistry != nil {
-		return g.clusterRegistry.Close(ctx)
-	}
-	return nil
 }

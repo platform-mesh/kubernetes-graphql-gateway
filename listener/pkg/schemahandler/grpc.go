@@ -2,13 +2,18 @@ package schemahandler
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"io/fs"
 	"sync"
 
-	"github.com/go-logr/logr"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/broadcaster"
 	proto "github.com/platform-mesh/kubernetes-graphql-gateway/sdk"
+
+	"sigs.k8s.io/controller-runtime/pkg/log"
+)
+
+var (
+	ErrNotExist = errors.New("schema does not exist")
 )
 
 type Handler interface {
@@ -19,29 +24,27 @@ type Handler interface {
 
 type Event struct {
 	ClusterName string
-	Schema      []byte // nil if Type is SchemaRemoved
+	Schema      string // nil if Type is SchemaRemoved
 	Type        proto.SubscribeResponse_EventType
 }
 
 type GRPCHandler struct {
-	schemas sync.Map // map[string][]byte
+	schemas sync.Map // map[string]string
 	bus     *broadcaster.Broadcaster[Event]
 	proto.UnimplementedSchemaHandlerServer
-	log logr.Logger
 }
 
-func New(log logr.Logger) *GRPCHandler {
-	log = log.WithName("schemahandler").WithValues("handler", "grpc")
+func New() *GRPCHandler {
 	return &GRPCHandler{
 		bus:     broadcaster.New[Event](),
 		schemas: sync.Map{},
-		log:     log,
 	}
 }
 
 // Delete implements [Handler].
 func (g *GRPCHandler) Delete(ctx context.Context, clusterName string) error {
-	g.log.V(8).Info("deleting schema for cluster", "cluster", clusterName)
+	log := log.FromContext(ctx)
+	log.V(8).Info("deleting schema for cluster", "cluster", clusterName)
 	g.schemas.Delete(clusterName)
 	g.bus.Publish(ctx, Event{
 		ClusterName: clusterName,
@@ -52,43 +55,54 @@ func (g *GRPCHandler) Delete(ctx context.Context, clusterName string) error {
 
 // Read implements [Handler].
 func (g *GRPCHandler) Read(ctx context.Context, clusterName string) ([]byte, error) {
-	g.log.V(8).Info("reading schema for cluster", "cluster", clusterName)
+	log := log.FromContext(ctx)
+	log.V(8).Info("reading schema for cluster", "cluster", clusterName)
+
 	value, ok := g.schemas.Load(clusterName)
 	if !ok {
-		g.log.V(8).Error(fmt.Errorf("schema not found for cluster"), "schema not found", "cluster", clusterName)
-		return nil, fs.ErrNotExist
-	}
-	schema, ok := value.([]byte)
-	if !ok {
-		return nil, fs.ErrNotExist
+		log.V(8).Error(fmt.Errorf("schema not found for cluster"), "schema not found", "cluster", clusterName)
+		return nil, ErrNotExist
 	}
 
-	return schema, nil
+	schema, ok := value.(string)
+	if !ok {
+		return nil, ErrNotExist
+	}
+
+	return []byte(schema), nil
 }
 
 // Write implements [Handler].
 func (g *GRPCHandler) Write(ctx context.Context, schema []byte, clusterName string) error {
-	g.log.V(8).Info("writing schema for cluster", "cluster", clusterName)
-	g.schemas.Store(clusterName, schema)
+	log := log.FromContext(ctx)
+	log.V(8).Info("writing schema for cluster", "cluster", clusterName)
+
+	_, loaded := g.schemas.Swap(clusterName, string(schema))
+
+	eventType := proto.SubscribeResponse_CREATED
+	if loaded {
+		eventType = proto.SubscribeResponse_UPDATED
+	}
 	g.bus.Publish(ctx, Event{
 		ClusterName: clusterName,
-		Schema:      schema,
-		Type:        proto.SubscribeResponse_ADDED,
+		Schema:      string(schema),
+		Type:        eventType,
 	})
 	return nil
 }
 
 func (g *GRPCHandler) Subscribe(req *proto.SubscribeRequest, stream proto.SchemaHandler_SubscribeServer) error {
-	g.log.V(8).Info("new schema subscription")
+	log := log.FromContext(stream.Context())
+	log.V(8).Info("new schema subscription")
 	// Send existing schemas first
 	g.schemas.Range(func(key, value any) bool {
 		err := stream.Send(&proto.SubscribeResponse{
 			ClusterName: key.(string),
-			Schema:      string(value.([]byte)),
-			EventType:   proto.SubscribeResponse_ADDED,
+			Schema:      value.(string),
+			EventType:   proto.SubscribeResponse_CREATED,
 		})
 		if err != nil {
-			g.log.Error(err, "failed to send existing schema for cluster", "cluster", key.(string))
+			log.Error(err, "failed to send existing schema for cluster", "cluster", key.(string))
 			return false
 		}
 		return true
@@ -97,7 +111,7 @@ func (g *GRPCHandler) Subscribe(req *proto.SubscribeRequest, stream proto.Schema
 	// Subscribe to updates
 	ch := g.bus.Subscribe(stream.Context())
 	for update := range ch {
-		g.log.V(8).Info("sending schema update", "cluster", update.ClusterName, "eventType", update.Type.String())
+		log.V(8).Info("sending schema update", "cluster", update.ClusterName, "eventType", update.Type.String())
 		resp := &proto.SubscribeResponse{
 			ClusterName: update.ClusterName,
 			Schema:      string(update.Schema),

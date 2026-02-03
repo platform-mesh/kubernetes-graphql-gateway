@@ -18,8 +18,9 @@ message SubscribeResponse {
   string cluster_name = 1;
   string schema = 2;
   enum EventType {
-    ADDED = 0;
-    REMOVED = 1;
+    CREATED = 0;
+    UPDATED = 1;
+    REMOVED = 2;
   }
   EventType event_type = 3;
 }

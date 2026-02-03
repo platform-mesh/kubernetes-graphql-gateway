@@ -25,7 +25,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	ctrl "sigs.k8s.io/controller-runtime"
 	ctrlconfig "sigs.k8s.io/controller-runtime/pkg/config"
-	ctrlog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
@@ -164,7 +163,7 @@ func NewConfig(options *options.CompletedOptions) (*Config, error) {
 			return nil, fmt.Errorf("error creating gRPC listener: %w", err)
 		}
 
-		handler := schemahandler.New(ctrlog.Log)
+		handler := schemahandler.New()
 
 		srv := grpc.NewServer()
 		sdk.RegisterSchemaHandlerServer(srv, handler)

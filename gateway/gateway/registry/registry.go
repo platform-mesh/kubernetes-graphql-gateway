@@ -22,13 +22,6 @@ type ClusterRegistryConfig struct {
 	GraphQLPretty     bool
 	GraphQLPlayground bool
 	GraphQLGraphiQL   bool
-
-	ServerCORSConfig CORSConfig
-}
-
-type CORSConfig struct {
-	AllowedOrigins []string
-	AllowedHeaders []string
 }
 
 // ClusterRegistry manages multiple target clusters and handles HTTP routing to them
@@ -138,38 +131,13 @@ func (cr *ClusterRegistry) removeCluster(ctx context.Context, schemaFilePath str
 func (cr *ClusterRegistry) GetCluster(name string) (*cluster.Cluster, bool) {
 	cr.mu.RLock()
 	defer cr.mu.RUnlock()
-	return cr.getCluster(name)
-}
-
-// getCluster returns a cluster by name
-func (cr *ClusterRegistry) getCluster(name string) (*cluster.Cluster, bool) {
 	cluster, exists := cr.clusters[name]
 	return cluster, exists
-}
-
-// Close closes all clusters and cleans up the registry
-func (cr *ClusterRegistry) Close(ctx context.Context) error {
-	logger := log.FromContext(ctx)
-	cr.mu.Lock()
-	defer cr.mu.Unlock()
-
-	for name := range cr.clusters {
-		logger.V(4).WithValues("cluster", name).Info("Closed cluster during registry shutdown")
-	}
-
-	cr.clusters = make(map[string]*cluster.Cluster)
-	logger.Info("Closed cluster registry")
-	return nil
 }
 
 // ServeHTTP routes HTTP requests to the appropriate target cluster
 func (cr *ClusterRegistry) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	logger := log.FromContext(r.Context())
-	// Handle CORS
-	if cr.handleCORS(w, r) {
-		return
-	}
-
 	// Extract cluster name from context (set by HTTP mux from path parameter)
 	clusterName, ok := utilscontext.GetClusterFromCtx(r.Context())
 	if !ok || clusterName == "" {
@@ -195,13 +163,6 @@ func (cr *ClusterRegistry) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Handle subscription requests
-	if r.Header.Get("Accept") == "text/event-stream" {
-		// Subscriptions will be handled by the cluster's ServeHTTP method
-		cluster.ServeHTTP(w, r)
-		return
-	}
-
 	// Route to target cluster
 	logger.V(4).WithValues(
 		"cluster", clusterName,
@@ -210,24 +171,6 @@ func (cr *ClusterRegistry) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	).Info("Routing request to target cluster")
 
 	cluster.ServeHTTP(w, r)
-}
-
-// handleCORS handles CORS preflight requests and headers
-func (cr *ClusterRegistry) handleCORS(w http.ResponseWriter, r *http.Request) bool {
-	if len(cr.config.ServerCORSConfig.AllowedOrigins) > 0 {
-		w.Header().Set("Access-Control-Allow-Origin", strings.Join(cr.config.ServerCORSConfig.AllowedOrigins, ","))
-	}
-	if len(cr.config.ServerCORSConfig.AllowedHeaders) > 0 {
-		w.Header().Set("Access-Control-Allow-Headers", strings.Join(cr.config.ServerCORSConfig.AllowedHeaders, ","))
-	}
-
-	// Handle preflight OPTIONS request
-	if r.Method == http.MethodOptions {
-		w.WriteHeader(http.StatusOK)
-		return true
-	}
-
-	return false
 }
 
 // extractClusterName extracts the cluster name from a file path.

@@ -11,7 +11,7 @@ import (
 )
 
 type Server struct {
-	HTTPServer http.Server
+	HTTPServer *http.Server
 	Gateway    *gateway.Service
 }
 
