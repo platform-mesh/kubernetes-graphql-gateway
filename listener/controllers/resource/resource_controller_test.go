@@ -11,6 +11,7 @@ import (
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/controllers/resource"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/options"
 	"github.com/stretchr/testify/suite"
+
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cluster"
@@ -18,6 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+
 	mcreconcile "sigs.k8s.io/multicluster-runtime/pkg/reconcile"
 	"sigs.k8s.io/multicluster-runtime/providers/single"
 )
@@ -94,6 +96,8 @@ func (suite *ResourceControllerTestSuite) TestSchemaGeneration() {
 
 func (suite *ResourceControllerTestSuite) TearDownSuite() {
 	err := suite.env.Stop()
-	os.RemoveAll(suite.listenerCfg.Options.SchemasDir)
 	suite.Require().NoError(err, "failed to stop test environment")
+
+	err = os.RemoveAll(suite.listenerCfg.Options.SchemasDir)
+	suite.Require().NoError(err, "failed to remove schemas directory")
 }

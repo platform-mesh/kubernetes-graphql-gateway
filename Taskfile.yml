@@ -78,13 +78,8 @@ tasks:
       - "{{.LOCAL_BIN}}/golangci-lint run --timeout 10m ./..."
   envtest:
     deps: [setup:envtest]
-    env:
-      KUBEBUILDER_ASSETS:
-        # Workaround for setup-envtest bug: it doesn't verify binaries exist if directory is present
-        sh: |
-          $(pwd)/{{.LOCAL_BIN}}/setup-envtest use {{.ENVTEST_K8S_VERSION}} --bin-dir $(pwd)/{{.LOCAL_BIN}} -p path
     cmds:
-      - go test ./... {{.ADDITIONAL_COMMAND_ARGS}}
+      - KUBEBUILDER_ASSETS="$($(pwd)/{{.LOCAL_BIN}}/setup-envtest use {{.ENVTEST_K8S_VERSION}} -i --bin-dir $(pwd)/{{.LOCAL_BIN}} -p path)" go test ./... {{.ADDITIONAL_COMMAND_ARGS}}
   test:
     deps: [setup:envtest]
     cmds:

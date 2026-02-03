@@ -165,6 +165,11 @@ func configureFromKubeconfig(config *rest.Config, kubeconfigData []byte) error {
 		return errors.Join(errors.New("failed to parse kubeconfig"), err)
 	}
 
-	config, err = clientConfig.ClientConfig()
+	cfg, err := clientConfig.ClientConfig()
+	if err != nil {
+		return errors.Join(errors.New("failed to get client config from kubeconfig"), err)
+	}
+
+	*config = *cfg
 	return err
 }

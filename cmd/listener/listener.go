@@ -3,10 +3,9 @@ package listener
 import (
 	"fmt"
 
-	"github.com/spf13/cobra"
-
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/options"
+	"github.com/spf13/cobra"
 
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	logsv1 "k8s.io/component-base/logs/api/v1"
