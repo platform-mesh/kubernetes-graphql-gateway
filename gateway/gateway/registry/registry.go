@@ -137,4 +137,3 @@ func (cr *ClusterRegistry) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	cluster.ServeHTTP(w, r)
 }
-

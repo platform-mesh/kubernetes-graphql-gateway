@@ -137,8 +137,8 @@ func (options *CompletedOptions) GetClusterMetadataOverrideFunc() v1alpha1.Clust
 
 func (options *CompletedOptions) GetClusterURLResolverFunc() v1alpha1.ClusterURLResolver {
 	return func(currentURL string, clusterName string) (string, error) {
-		if options.ExtraOptions.WorkspaceSchemaHostOverride != "" {
-			return options.ExtraOptions.WorkspaceSchemaHostOverride, nil
+		if options.WorkspaceSchemaHostOverride != "" {
+			return options.WorkspaceSchemaHostOverride, nil
 		}
 		parts := strings.Split(currentURL, "/services/")
 		if len(parts) != 2 {
