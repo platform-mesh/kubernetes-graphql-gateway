@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/pkg/errors"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/gateway/registry"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/gateway/watcher"
 )
@@ -13,64 +12,69 @@ import (
 // Service orchestrates the domain-driven architecture with target clusters
 type Service struct {
 	clusterRegistry *registry.ClusterRegistry
-	// TODO: This should be generalized to multiple watchers
-	schemaWatcher *watcher.FileWatcher
-
-	config *GatewayConfig
+	config          *GatewayConfig
 
 	started bool
 }
 
+// GatewayConfig holds configuration for the gateway service.
 type GatewayConfig struct {
 	DevelopmentDisableAuth bool
 
-	GraphQLPretty            bool
-	GraphQLPlayground        bool
-	GraphQLGraphiQL          bool
-	ServerCORSAllowedOrigins []string
-	ServerCORSAllowedHeaders []string
+	GraphQLPretty     bool
+	GraphQLPlayground bool
+	GraphQLGraphiQL   bool
 
+	// SchemaHandler specifies which watcher to use ("file" or "grpc")
+	SchemaHandler string
+
+	// SchemaDirectory is used when SchemaHandler is "file"
 	SchemaDirectory string
+
+	// GRPCAddress is used when SchemaHandler is "grpc"
+	GRPCAddress string
 }
 
 // New creates a new domain-driven Gateway instance
 func New(config GatewayConfig) (*Service, error) {
 	clusterRegistry := registry.New(registry.ClusterRegistryConfig{
-		SchemaDirectory:        config.SchemaDirectory,
 		DevelopmentDisableAuth: config.DevelopmentDisableAuth,
 		GraphQLPretty:          config.GraphQLPretty,
 		GraphQLPlayground:      config.GraphQLPlayground,
 		GraphQLGraphiQL:        config.GraphQLGraphiQL,
-		ServerCORSConfig: registry.CORSConfig{
-			AllowedOrigins: config.ServerCORSAllowedOrigins,
-			AllowedHeaders: config.ServerCORSAllowedHeaders,
-		},
 	})
 
-	// Cluster registry acts as main server and is fed into watcher. So watcher updated new clusters there.
-	schemaWatcher, err := watcher.NewFileWatcher(clusterRegistry)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create schema watcher")
-	}
-
-	gateway := &Service{
+	return &Service{
 		clusterRegistry: clusterRegistry,
-		schemaWatcher:   schemaWatcher,
 		config:          &config,
-	}
-
-	return gateway, nil
+	}, nil
 }
 
-// Run starts the gateway service
+// Run starts the gateway service with the configured watcher.
 func (g *Service) Run(ctx context.Context) error {
-	// Initialize schema watcher with context
-	if err := g.schemaWatcher.Initialize(ctx, g.config.SchemaDirectory); err != nil {
-		return fmt.Errorf("failed to initialize schema watcher: %w", err)
-	}
 	g.started = true
-	<-ctx.Done()
-	return nil
+
+	switch g.config.SchemaHandler {
+	case "file":
+		fw, err := watcher.NewFileWatcher(g.clusterRegistry)
+		if err != nil {
+			return fmt.Errorf("failed to create file watcher: %w", err)
+		}
+		return fw.Run(ctx, g.config.SchemaDirectory)
+
+	case "grpc":
+		gw, err := watcher.NewGRPCWatcher(
+			watcher.GRPCWatcherConfig{Address: g.config.GRPCAddress},
+			g.clusterRegistry,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to create gRPC watcher: %w", err)
+		}
+		return gw.Run(ctx)
+
+	default:
+		return fmt.Errorf("unknown schema handler: %s", g.config.SchemaHandler)
+	}
 }
 
 // ServeHTTP delegates HTTP requests to the cluster registry
@@ -79,14 +83,5 @@ func (g *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Gateway not started", http.StatusServiceUnavailable)
 		return
 	}
-	// Delegate to cluster registry
 	g.clusterRegistry.ServeHTTP(w, r)
-}
-
-// Shutdown gracefully shuts down the gateway and all its services
-func (g *Service) Shutdown(ctx context.Context) error {
-	if g.clusterRegistry != nil {
-		return g.clusterRegistry.Close(ctx)
-	}
-	return nil
 }

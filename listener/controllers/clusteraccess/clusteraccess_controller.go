@@ -24,7 +24,8 @@ import (
 
 	"github.com/platform-mesh/kubernetes-graphql-gateway/apis/v1alpha1"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/workspacefile"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/schemahandler"
+
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/discovery"
@@ -34,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
 	mcbuilder "sigs.k8s.io/multicluster-runtime/pkg/builder"
 	mcmanager "sigs.k8s.io/multicluster-runtime/pkg/manager"
 	mcreconcile "sigs.k8s.io/multicluster-runtime/pkg/reconcile"
@@ -52,7 +54,7 @@ var (
 type ClusterAccessReconciler struct {
 	manager        mcmanager.Manager
 	opts           controller.TypedOptions[mcreconcile.Request]
-	ioHandler      *workspacefile.FileHandler
+	ioHandler      schemahandler.Handler
 	schemaResolver apischema.Resolver
 }
 
@@ -61,7 +63,7 @@ func NewClusterAccessReconciler(
 	_ context.Context,
 	mgr mcmanager.Manager,
 	opts controller.TypedOptions[mcreconcile.Request],
-	ioHandler *workspacefile.FileHandler,
+	ioHandler schemahandler.Handler,
 	schemaResolver apischema.Resolver,
 ) (*ClusterAccessReconciler, error) {
 	r := &ClusterAccessReconciler{
@@ -97,7 +99,7 @@ func (r *ClusterAccessReconciler) Reconcile(ctx context.Context, req mcreconcile
 			if req.ClusterName != "" {
 				name = fmt.Sprintf("%s-%s", req.ClusterName, name)
 			}
-			if err := r.ioHandler.Delete(name); err != nil {
+			if err := r.ioHandler.Delete(ctx, name); err != nil {
 				logger.Error(err, "Failed to cleanup schema")
 			}
 			return ctrl.Result{}, nil
@@ -150,7 +152,7 @@ func (r *ClusterAccessReconciler) Reconcile(ctx context.Context, req mcreconcile
 	}
 
 	// Write schema to file
-	if err := r.ioHandler.Write(schemaWithMetadata, clusterName); err != nil {
+	if err := r.ioHandler.Write(ctx, schemaWithMetadata, clusterName); err != nil {
 		logger.Error(err, "Failed to write schema", "clusterAccess", ca.Name)
 		return ctrl.Result{}, err
 	}
@@ -169,7 +171,7 @@ func (r *ClusterAccessReconciler) SetupWithManager(mgr mcmanager.Manager) error 
 }
 
 // buildTargetClusterConfig extracts connection info from ClusterAccess and builds rest.Config
-func buildTargetClusterConfig(ctx context.Context, clusterAccess v1alpha1.ClusterAccess, k8sClient client.Client) (*rest.Config, error) {
+func buildTargetClusterConfig(_ context.Context, clusterAccess v1alpha1.ClusterAccess, _ client.Client) (*rest.Config, error) {
 	spec := clusterAccess.Spec
 
 	// Extract host (required)
@@ -188,7 +190,7 @@ func buildTargetClusterConfig(ctx context.Context, clusterAccess v1alpha1.Cluste
 
 // injectClusterMetadata injects cluster metadata into schema JSON
 // TODO: This is very unelegant, improve in future
-func injectClusterMetadata(ctx context.Context, schemaData []byte, clusterAccess v1alpha1.ClusterAccess) ([]byte, error) {
+func injectClusterMetadata(_ context.Context, schemaData []byte, clusterAccess v1alpha1.ClusterAccess) ([]byte, error) {
 	metadata, err := v1alpha1.BuildClusterMetadataFromClusterAccess(clusterAccess)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build cluster metadata from ClusterAccess: %w", err)

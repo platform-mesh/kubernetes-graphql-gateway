@@ -10,14 +10,13 @@ import (
 	"github.com/gobuffalo/flect"
 	"github.com/graphql-go/graphql"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/apis"
-	common "github.com/platform-mesh/kubernetes-graphql-gateway/apis"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/resolver"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/kube-openapi/pkg/validation/spec"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // watchEventTypeEnum defines constant event types for subscriptions
@@ -754,14 +753,14 @@ func (g *Gateway) storeCategory(
 	if !ok || resourceSpec.Extensions == nil {
 		return errors.New("no resource extensions")
 	}
-	categoriesRaw, ok := resourceSpec.Extensions[common.CategoriesExtensionKey]
+	categoriesRaw, ok := resourceSpec.Extensions[apis.CategoriesExtensionKey]
 	if !ok {
-		return fmt.Errorf("%s extension not found", common.CategoriesExtensionKey)
+		return fmt.Errorf("%s extension not found", apis.CategoriesExtensionKey)
 	}
 
 	categoriesRawArray, ok := categoriesRaw.([]any)
 	if !ok {
-		return fmt.Errorf("%s extension is not an array", common.CategoriesExtensionKey)
+		return fmt.Errorf("%s extension is not an array", apis.CategoriesExtensionKey)
 	}
 
 	categories := make([]string, len(categoriesRawArray))
@@ -793,7 +792,7 @@ func (g *Gateway) getScope(resourceURI string) (apiextensionsv1.ResourceScope, e
 	if resourceSpec.Extensions == nil {
 		return "", errors.New("no resource extensions")
 	}
-	scopeRaw, ok := resourceSpec.Extensions[common.ScopeExtensionKey]
+	scopeRaw, ok := resourceSpec.Extensions[apis.ScopeExtensionKey]
 	if !ok {
 		return "", errors.New("scope extension not found")
 	}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/controllers/resource"
+
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 
@@ -36,7 +37,7 @@ func NewServer(ctx context.Context, c *Config) (*Server, error) {
 		ctx,
 		s.Config.Manager,
 		opts,
-		s.Config.IOHandler,
+		s.Config.SchemaHandler,
 		s.Config.SchemaResolver,
 		c.Options.AnchorResource,
 		c.Options.ResourceGVR,

@@ -58,7 +58,7 @@ func TestRead(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			_, err := handler.Read(tc.clusterName)
+			_, err := handler.Read(t.Context(), tc.clusterName)
 			if tc.expectErr {
 				assert.Error(t, err)
 				return
@@ -85,7 +85,7 @@ func TestWrite(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			if err := handler.Write(testJSON, tc.clusterName); tc.expectErr {
+			if err := handler.Write(t.Context(), testJSON, tc.clusterName); tc.expectErr {
 				assert.Error(t, err)
 				return
 			}
@@ -123,7 +123,7 @@ func TestDelete(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			err := handler.Delete(tc.clusterName)
+			err := handler.Delete(t.Context(), tc.clusterName)
 			if tc.expectErr {
 				assert.Error(t, err)
 				return

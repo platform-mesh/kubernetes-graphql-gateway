@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/fsnotify/fsnotify"
+
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -73,12 +74,6 @@ func (w *FileWatcher) watchImmediate(ctx context.Context) error {
 			logger.Error(err, "directory watcher error")
 		}
 	}
-}
-
-// isTargetFileEvent checks if the event is for our target file
-func (w *FileWatcher) isTargetFileEvent(event fsnotify.Event, targetFile string) bool {
-	return filepath.Clean(event.Name) == filepath.Clean(targetFile) &&
-		event.Op&(fsnotify.Write|fsnotify.Create) != 0
 }
 
 // handleEvent processes file system events for directory watching

@@ -12,21 +12,22 @@ type Config struct {
 	Options *options.CompletedOptions
 
 	Gateway    *gateway.Service
-	HTTPServer http.Server
+	HTTPServer *http.Server
 }
 
 func NewConfig(options *options.CompletedOptions) (*Config, error) {
 	config := &Config{
 		Options: options,
 	}
+
 	gatewayServer, err := gateway.New(gateway.GatewayConfig{
-		DevelopmentDisableAuth:   config.Options.DevelopmentDisableAuth,
-		GraphQLPretty:            true, // Always pretty print for readability
-		GraphQLPlayground:        config.Options.PlaygroundEnabled,
-		GraphQLGraphiQL:          config.Options.PlaygroundEnabled,
-		ServerCORSAllowedOrigins: config.Options.CORSAllowedOrigins,
-		ServerCORSAllowedHeaders: config.Options.CORSAllowedHeaders,
-		SchemaDirectory:          config.Options.SchemasDir,
+		DevelopmentDisableAuth: config.Options.DevelopmentDisableAuth,
+		GraphQLPretty:          true,
+		GraphQLPlayground:      config.Options.PlaygroundEnabled,
+		GraphQLGraphiQL:        config.Options.PlaygroundEnabled,
+		SchemaHandler:          config.Options.SchemaHandler,
+		SchemaDirectory:        config.Options.SchemasDir,
+		GRPCAddress:            config.Options.GRPCListenerAddress,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create gateway server: %w", err)
@@ -36,6 +37,11 @@ func NewConfig(options *options.CompletedOptions) (*Config, error) {
 	httpServer, err := http.NewServer(http.ServerConfig{
 		Gateway: gatewayServer,
 		Addr:    fmt.Sprintf("%s:%d", config.Options.ServerBindAddress, config.Options.ServerBindPort),
+		CORSConfig: http.CORSConfig{
+			AllowedOrigins:   config.Options.CORSAllowedOrigins,
+			AllowedHeaders:   config.Options.CORSAllowedHeaders,
+			AllowCredentials: true,
+		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTTP server: %w", err)

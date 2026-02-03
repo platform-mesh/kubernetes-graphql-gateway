@@ -21,9 +21,11 @@ import (
 	"fmt"
 
 	"github.com/google/cel-go/cel"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/apis/v1alpha1"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/controllers/reconciler"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/workspacefile"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/schemahandler"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,11 +36,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+
 	mcbuilder "sigs.k8s.io/multicluster-runtime/pkg/builder"
 	mcmanager "sigs.k8s.io/multicluster-runtime/pkg/manager"
 	mcreconcile "sigs.k8s.io/multicluster-runtime/pkg/reconcile"
-
-	"github.com/platform-mesh/kubernetes-graphql-gateway/apis/v1alpha1"
 )
 
 const (
@@ -63,7 +64,7 @@ func New(
 	_ context.Context,
 	mgr mcmanager.Manager,
 	opts controller.TypedOptions[mcreconcile.Request],
-	ioHandler *workspacefile.FileHandler,
+	ioHandler schemahandler.Handler,
 	schemaResolver apischema.Resolver,
 	anchorResource string,
 	resourceGVR string,
@@ -118,10 +119,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, req mcreconcile.Request) (ct
 	}
 
 	// If we are running in k8s mode, the cluster name might be empty.
-	paths := []string{}
-	if req.ClusterName == "" {
-		paths = []string{"default"}
-	} else {
+	paths := []string{"default"}
+	if req.ClusterName != "" {
 		paths = []string{req.ClusterName}
 	}
 
@@ -133,7 +132,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req mcreconcile.Request) (ct
 		if errors.IsNotFound(err) {
 			logger.Info("Anchor resource not found, cleaning up schema", "resource", r.anchorResource)
 			// Delete the schema file if namespace is deleted
-			if err := r.reconciler.Cleanup(paths); err != nil {
+			if err := r.reconciler.Cleanup(ctx, paths); err != nil {
 				logger.Error(err, "Failed to cleanup schema")
 			}
 			return ctrl.Result{}, nil

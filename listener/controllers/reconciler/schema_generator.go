@@ -7,10 +7,10 @@ import (
 
 	"github.com/platform-mesh/kubernetes-graphql-gateway/apis/v1alpha1"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/discovery"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // schemaGenerationParams contains parameters for schema generation

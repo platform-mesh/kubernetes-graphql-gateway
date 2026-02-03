@@ -5,11 +5,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/fs"
 
 	"github.com/platform-mesh/kubernetes-graphql-gateway/apis/v1alpha1"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/workspacefile"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/schemahandler"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
@@ -23,12 +23,12 @@ var (
 )
 
 type Reconciler struct {
-	ioHandler      *workspacefile.FileHandler
+	ioHandler      schemahandler.Handler
 	schemaResolver apischema.Resolver
 }
 
 func NewReconciler(
-	ioHandler *workspacefile.FileHandler,
+	ioHandler schemahandler.Handler,
 	schemaResolver apischema.Resolver,
 ) *Reconciler {
 	return &Reconciler{
@@ -74,15 +74,15 @@ func (r *Reconciler) Reconcile(ctx context.Context, schemaPaths []string, cfg *r
 		}
 
 		// Read existing schema (if it exists)
-		savedSchema, err := r.ioHandler.Read(schemaPath)
-		if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		savedSchema, err := r.ioHandler.Read(ctx, schemaPath)
+		if err != nil && !errors.Is(err, schemahandler.ErrNotExist) {
 			logger.Error(err, "Failed to read existing schema file")
 			return fmt.Errorf("failed to read existing schema: %w", err)
 		}
 
 		// Write if file doesn't exist or content has changed
-		if errors.Is(err, fs.ErrNotExist) || !bytes.Equal(currentSchema, savedSchema) {
-			if err := r.ioHandler.Write(currentSchema, schemaPath); err != nil {
+		if errors.Is(err, schemahandler.ErrNotExist) || !bytes.Equal(currentSchema, savedSchema) {
+			if err := r.ioHandler.Write(ctx, currentSchema, schemaPath); err != nil {
 				logger.Error(err, "Failed to write schema", "path", schemaPath)
 				return fmt.Errorf("failed to write schema: %w", err)
 			}
@@ -95,10 +95,10 @@ func (r *Reconciler) Reconcile(ctx context.Context, schemaPaths []string, cfg *r
 	return nil
 }
 
-func (r *Reconciler) Cleanup(schemaPaths []string) error {
+func (r *Reconciler) Cleanup(ctx context.Context, schemaPaths []string) error {
 	for _, schemaPath := range schemaPaths {
-		err := r.ioHandler.Delete(schemaPath)
-		if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		err := r.ioHandler.Delete(ctx, schemaPath)
+		if err != nil && !errors.Is(err, schemahandler.ErrNotExist) {
 			return fmt.Errorf("failed to delete schema for path %q: %w", schemaPath, err)
 		}
 	}

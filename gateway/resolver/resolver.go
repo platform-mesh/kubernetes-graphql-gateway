@@ -85,8 +85,8 @@ func New(runtimeClient client.WithWatch) *Service {
 // ListItems returns a GraphQL CommonResolver function that lists Kubernetes resources of the given GroupVersionKind.
 func (r *Service) ListItems(ctx context.Context, gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
 	return func(p graphql.ResolveParams) (any, error) {
-		logger := log.FromContext(ctx)
-		ctx, span := otel.Tracer("").Start(ctx, LIST_ITEMS, trace.WithAttributes(attribute.String("kind", gvk.Kind)))
+		logger := log.FromContext(p.Context)
+		ctx, span := otel.Tracer("").Start(p.Context, LIST_ITEMS, trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
 
 		gvk.Group = r.getOriginalGroupName(gvk.Group)
@@ -184,9 +184,9 @@ func (r *Service) ListItems(ctx context.Context, gvk schema.GroupVersionKind, sc
 // GetItem returns a GraphQL CommonResolver function that retrieves a single Kubernetes resource of the given GroupVersionKind.
 func (r *Service) GetItem(ctx context.Context, gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
 	return func(p graphql.ResolveParams) (any, error) {
-		logger := log.FromContext(ctx)
+		logger := log.FromContext(p.Context)
 
-		ctx, span := otel.Tracer("").Start(ctx, "GetItem", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
+		ctx, span := otel.Tracer("").Start(p.Context, "GetItem", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
 
 		gvk.Group = r.getOriginalGroupName(gvk.Group)
@@ -234,7 +234,7 @@ func (r *Service) GetItem(ctx context.Context, gvk schema.GroupVersionKind, scop
 func (r *Service) GetItemAsYAML(ctx context.Context, gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
 	return func(p graphql.ResolveParams) (any, error) {
 		var span trace.Span
-		ctx, span = otel.Tracer("").Start(ctx, "GetItemAsYAML", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
+		ctx, span = otel.Tracer("").Start(p.Context, "GetItemAsYAML", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
 
 		out, err := r.GetItem(ctx, gvk, scope)(p)
@@ -253,7 +253,7 @@ func (r *Service) GetItemAsYAML(ctx context.Context, gvk schema.GroupVersionKind
 
 func (r *Service) CreateItem(ctx context.Context, gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
 	return func(p graphql.ResolveParams) (any, error) {
-		ctx, span := otel.Tracer("").Start(ctx, "CreateItem", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
+		ctx, span := otel.Tracer("").Start(p.Context, "CreateItem", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
 
 		gvk.Group = r.getOriginalGroupName(gvk.Group)
@@ -299,8 +299,8 @@ func (r *Service) CreateItem(ctx context.Context, gvk schema.GroupVersionKind, s
 
 func (r *Service) UpdateItem(ctx context.Context, gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
 	return func(p graphql.ResolveParams) (any, error) {
-		logger := log.FromContext(ctx)
-		ctx, span := otel.Tracer("").Start(ctx, "UpdateItem", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
+		logger := log.FromContext(p.Context)
+		ctx, span := otel.Tracer("").Start(p.Context, "UpdateItem", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
 
 		gvk.Group = r.getOriginalGroupName(gvk.Group)
@@ -362,8 +362,8 @@ func (r *Service) UpdateItem(ctx context.Context, gvk schema.GroupVersionKind, s
 // DeleteItem returns a CommonResolver function for deleting a resource.
 func (r *Service) DeleteItem(ctx context.Context, gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
 	return func(p graphql.ResolveParams) (any, error) {
-		logger := log.FromContext(ctx)
-		ctx, span := otel.Tracer("").Start(ctx, "DeleteItem", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
+		logger := log.FromContext(p.Context)
+		ctx, span := otel.Tracer("").Start(p.Context, "DeleteItem", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
 
 		gvk.Group = r.getOriginalGroupName(gvk.Group)

@@ -19,11 +19,13 @@ package kcp
 import (
 	"context"
 
-	provider "github.com/kcp-dev/multicluster-provider/apiexport"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/cluster"
+
 	"sigs.k8s.io/multicluster-runtime/pkg/multicluster"
+
+	provider "github.com/kcp-dev/multicluster-provider/apiexport"
 )
 
 var _ multicluster.Provider = &Provider{}

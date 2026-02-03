@@ -1,17 +1,18 @@
 package workspacefile
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path"
 	"path/filepath"
+
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/schemahandler"
 )
 
 var (
 	ErrCreateSchemasDir = errors.New("failed to create or access schemas directory")
-	ErrReadJSONFile     = errors.New("failed to read JSON file")
 	ErrWriteJSONFile    = errors.New("failed to write JSON to file")
-	ErrDeleteJSONFile   = errors.New("failed to delete JSON file")
 )
 
 // FileHandler is a simple, concrete file store for schemas.
@@ -30,17 +31,17 @@ func NewIOHandler(schemasDir string) (*FileHandler, error) {
 }
 
 // Read reads the schema file for the given cluster name (relative path) from the schemasDir.
-func (h *FileHandler) Read(clusterName string) ([]byte, error) {
+func (h *FileHandler) Read(_ context.Context, clusterName string) ([]byte, error) {
 	fileName := path.Join(h.schemasDir, clusterName)
 	JSON, err := os.ReadFile(fileName)
 	if err != nil {
-		return nil, errors.Join(ErrReadJSONFile, err)
+		return nil, errors.Join(schemahandler.ErrNotExist, err)
 	}
 	return JSON, nil
 }
 
 // Write writes the given JSON bytes under the clusterName path, creating subdirectories as needed.
-func (h *FileHandler) Write(JSON []byte, clusterName string) error {
+func (h *FileHandler) Write(_ context.Context, JSON []byte, clusterName string) error {
 	fileName := path.Join(h.schemasDir, clusterName)
 	// Create intermediate directories if they don't exist
 	dir := filepath.Dir(fileName)
@@ -54,10 +55,10 @@ func (h *FileHandler) Write(JSON []byte, clusterName string) error {
 }
 
 // Delete removes the schema file for the given cluster name.
-func (h *FileHandler) Delete(clusterName string) error {
+func (h *FileHandler) Delete(_ context.Context, clusterName string) error {
 	fileName := path.Join(h.schemasDir, clusterName)
 	if err := os.Remove(fileName); err != nil {
-		return errors.Join(ErrDeleteJSONFile, err)
+		return errors.Join(schemahandler.ErrNotExist, err)
 	}
 	return nil
 }

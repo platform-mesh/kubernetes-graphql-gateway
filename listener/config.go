@@ -3,14 +3,20 @@ package listener
 import (
 	"crypto/tls"
 	"fmt"
+	"net"
 
-	"github.com/kcp-dev/multicluster-provider/apiexport"
 	"github.com/platform-mesh/golang-commons/logger"
 	gatewayv1alpha1 "github.com/platform-mesh/kubernetes-graphql-gateway/apis/v1alpha1"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/options"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/schemahandler"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/workspacefile"
+	kcpprovider "github.com/platform-mesh/kubernetes-graphql-gateway/providers/kcp"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/sdk"
 	"github.com/rs/zerolog/log"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
+
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -19,17 +25,18 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	ctrl "sigs.k8s.io/controller-runtime"
 	ctrlconfig "sigs.k8s.io/controller-runtime/pkg/config"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+
+	mcmanager "sigs.k8s.io/multicluster-runtime/pkg/manager"
 	"sigs.k8s.io/multicluster-runtime/pkg/multicluster"
 
 	kcpapisv1alpha1 "github.com/kcp-dev/sdk/apis/apis/v1alpha1"
 	kcpapis "github.com/kcp-dev/sdk/apis/apis/v1alpha2"
 	kcpcore "github.com/kcp-dev/sdk/apis/core/v1alpha1"
 	kcptenancy "github.com/kcp-dev/sdk/apis/tenancy/v1alpha1"
-	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
-	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
-	mcmanager "sigs.k8s.io/multicluster-runtime/pkg/manager"
 
-	kcpprovider "github.com/platform-mesh/kubernetes-graphql-gateway/providers/kcp"
+	"github.com/kcp-dev/multicluster-provider/apiexport"
 )
 
 type Config struct {
@@ -44,12 +51,12 @@ type Config struct {
 
 	ReconcilerGVK schema.GroupVersionKind
 
-	IOHandler      *workspacefile.FileHandler
+	SchemaHandler  schemahandler.Handler
 	SchemaResolver apischema.Resolver
 
-	// NamespaceReconcilerClusterMetadataFunc allows to provide cluster metadata for a given cluster name
+	// ResourceReconcilerClusterMetadataFunc allows to provide cluster metadata for a given cluster name
 	// when reconciling anchor namespaces.
-	NamespaceReconcilerClusterMetadataFunc func(clusterName string) (*gatewayv1alpha1.ClusterMetadata, error)
+	ResourceReconcilerClusterMetadataFunc func(clusterName string) (*gatewayv1alpha1.ClusterMetadata, error)
 }
 
 func NewConfig(options *options.CompletedOptions) (*Config, error) {
@@ -108,7 +115,7 @@ func NewConfig(options *options.CompletedOptions) (*Config, error) {
 		}
 
 		config.Provider = provider
-		config.NamespaceReconcilerClusterMetadataFunc = options.ProviderKcp.GetClusterMetadataOverrideFunc()
+		config.ResourceReconcilerClusterMetadataFunc = options.ProviderKcp.GetClusterMetadataOverrideFunc()
 	default:
 		config.Provider = nil
 	}
@@ -143,12 +150,36 @@ func NewConfig(options *options.CompletedOptions) (*Config, error) {
 
 	config.Manager = manager
 
-	// Initialize FileHandler for schema storage
-	ioHandler, err := workspacefile.NewIOHandler(options.SchemasDir)
-	if err != nil {
-		return nil, fmt.Errorf("error creating IO handler: %w", err)
+	switch options.SchemaHandler {
+	case "file":
+		config.SchemaHandler, err = workspacefile.NewIOHandler(options.SchemasDir)
+		if err != nil {
+			return nil, fmt.Errorf("error creating IO handler: %w", err)
+		}
+	case "grpc":
+
+		lis, err := net.Listen("tcp", options.GRPCListenAddr)
+		if err != nil {
+			return nil, fmt.Errorf("error creating gRPC listener: %w", err)
+		}
+
+		handler := schemahandler.New()
+
+		srv := grpc.NewServer()
+		sdk.RegisterSchemaHandlerServer(srv, handler)
+		reflection.Register(srv)
+
+		config.SchemaHandler = handler
+
+		go func() {
+			if err := srv.Serve(lis); err != nil {
+				log.Error().Err(err).Msg("error serving gRPC")
+			}
+
+			// TODO: Add graceful shutdown
+		}()
+
 	}
-	config.IOHandler = ioHandler
 
 	// Initialize schema resolver
 	// TODO: Move to context based logger.

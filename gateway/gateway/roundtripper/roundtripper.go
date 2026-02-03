@@ -4,14 +4,13 @@ import (
 	"net/http"
 	"strings"
 
-	"sigs.k8s.io/controller-runtime/pkg/log"
+	utilscontext "github.com/platform-mesh/kubernetes-graphql-gateway/gateway/utils/context"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
-
-type TokenKey struct{}
 
 type roundTripper struct {
 	adminRT, baseRT, unauthorizedRT http.RoundTripper
@@ -20,12 +19,12 @@ type roundTripper struct {
 
 type unauthorizedRoundTripper struct{}
 
-func New(adminRoundTripper, baseRoundTripper, unauthorizedRT http.RoundTripper, developmentDisableAuth ...bool) http.RoundTripper {
+func New(adminRoundTripper, baseRoundTripper, unauthorizedRT http.RoundTripper, developmentDisableAuth bool) http.RoundTripper {
 	return &roundTripper{
 		adminRT:                adminRoundTripper,
 		unauthorizedRT:         unauthorizedRT,
 		baseRT:                 baseRoundTripper,
-		developmentDisableAuth: len(developmentDisableAuth) > 0 && developmentDisableAuth[0],
+		developmentDisableAuth: developmentDisableAuth,
 	}
 }
 
@@ -40,7 +39,6 @@ func NewBaseRoundTripper(tlsConfig rest.TLSClientConfig) (http.RoundTripper, err
 		TLSClientConfig: rest.TLSClientConfig{
 			Insecure:   tlsConfig.Insecure,
 			ServerName: tlsConfig.ServerName,
-			CAFile:     tlsConfig.CAFile,
 			CAData:     tlsConfig.CAData,
 		},
 	})
@@ -70,7 +68,7 @@ func (rt *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 		return rt.adminRT.RoundTrip(req)
 	}
 
-	token, ok := req.Context().Value(TokenKey{}).(string)
+	token, ok := utilscontext.GetTokenFromCtx(ctx)
 	if !ok || token == "" {
 		logger.V(4).WithValues("path", req.URL.Path).Error(nil, "No token found for resource request, denying")
 		return rt.unauthorizedRT.RoundTrip(req)

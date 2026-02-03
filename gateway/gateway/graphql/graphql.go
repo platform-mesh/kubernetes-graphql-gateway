@@ -10,6 +10,7 @@ import (
 
 	"github.com/graphql-go/graphql"
 	"github.com/graphql-go/handler"
+
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
