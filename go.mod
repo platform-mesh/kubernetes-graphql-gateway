@@ -22,7 +22,7 @@ require (
 	github.com/kcp-dev/kcp/sdk v0.28.3
 	github.com/kcp-dev/logicalcluster/v3 v3.0.5
 	github.com/pkg/errors v0.9.1
-	github.com/platform-mesh/golang-commons v0.1.32
+	github.com/platform-mesh/golang-commons v0.9.29
 	github.com/prometheus/client_golang v1.23.2
 	github.com/rs/zerolog v1.34.0
 	github.com/spf13/cobra v1.10.2
