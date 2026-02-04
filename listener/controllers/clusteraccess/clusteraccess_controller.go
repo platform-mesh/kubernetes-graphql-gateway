@@ -39,7 +39,7 @@ type ClusterAccessReconciler struct {
 	manager        mcmanager.Manager
 	opts           controller.TypedOptions[mcreconcile.Request]
 	ioHandler      schemahandler.Handler
-	schemaResolver apischema.Resolver
+	schemaResolver *apischema.Resolver
 }
 
 // NewClusterAccessReconciler returns a new ClusterAccessReconciler
@@ -48,7 +48,7 @@ func NewClusterAccessReconciler(
 	mgr mcmanager.Manager,
 	opts controller.TypedOptions[mcreconcile.Request],
 	ioHandler schemahandler.Handler,
-	schemaResolver apischema.Resolver,
+	schemaResolver *apischema.Resolver,
 ) (*ClusterAccessReconciler, error) {
 	r := &ClusterAccessReconciler{
 		manager:        mgr,
@@ -122,7 +122,7 @@ func (r *ClusterAccessReconciler) Reconcile(ctx context.Context, req mcreconcile
 	}
 
 	// Create schema resolver for target cluster and resolve schema
-	JSON, err := r.schemaResolver.Resolve(targetDiscovery, targetRM)
+	JSON, err := r.schemaResolver.Resolve(ctx, targetDiscovery, targetRM)
 	if err != nil {
 		logger.Error(err, "Failed to resolve schema", "clusterAccess", ca.Name)
 		return ctrl.Result{}, err

@@ -1,7 +1,7 @@
 package apischema
 
 import (
-	"github.com/platform-mesh/golang-commons/logger"
+	"context"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -9,9 +9,9 @@ import (
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
-func ResolveSchema(dc discovery.DiscoveryInterface, rm meta.RESTMapper, log *logger.Logger) ([]byte, error) {
-	crdResolver := NewCRDResolver(dc, rm, log)
-	return crdResolver.resolveSchema(dc, rm)
+func ResolveSchema(ctx context.Context, dc discovery.DiscoveryInterface, rm meta.RESTMapper) ([]byte, error) {
+	resolver := NewResolver()
+	return resolver.Resolve(ctx, dc, rm)
 }
 
 func GetOpenAPISchemaKey(gvk metav1.GroupVersionKind) string {

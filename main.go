@@ -7,8 +7,9 @@ import (
 	"github.com/platform-mesh/kubernetes-graphql-gateway/cmd/listener"
 	"github.com/spf13/cobra"
 
-	_ "k8s.io/component-base/logs/json/register"
 	"k8s.io/klog/v2"
+
+	_ "k8s.io/component-base/logs/json/register"
 )
 
 func main() {

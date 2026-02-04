@@ -7,8 +7,8 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/go-logr/logr"
 	"github.com/hashicorp/go-multierror"
-	"github.com/platform-mesh/golang-commons/logger"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/apis"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -38,7 +38,7 @@ var (
 type SchemaBuilder struct {
 	schemas           map[string]*spec.Schema
 	err               *multierror.Error
-	log               *logger.Logger
+	log               logr.Logger
 	kindRegistry      map[GroupVersionKind]ResourceInfo // Changed: Use GVK as key for precise lookup
 	preferredVersions map[string]string                 // map[group/kind]preferredVersion
 }
@@ -51,7 +51,7 @@ type ResourceInfo struct {
 	SchemaKey string
 }
 
-func NewSchemaBuilder(oc openapi.Client, preferredApiGroups []string, log *logger.Logger) *SchemaBuilder {
+func NewSchemaBuilder(oc openapi.Client, preferredApiGroups []string, log logr.Logger) *SchemaBuilder {
 	b := &SchemaBuilder{
 		schemas:           make(map[string]*spec.Schema),
 		kindRegistry:      make(map[GroupVersionKind]ResourceInfo),
@@ -143,7 +143,7 @@ func (b *SchemaBuilder) WithScope(rm meta.RESTMapper) *SchemaBuilder {
 		}
 
 		if len(gvks) != 1 {
-			b.log.Debug().Int("gvkCount", len(gvks)).Msg("skipping schema with unexpected GVK count")
+			b.log.V(4).Info("skipping schema with unexpected GVK count", "gvkCount", len(gvks))
 			continue
 		}
 
@@ -154,11 +154,11 @@ func (b *SchemaBuilder) WithScope(rm meta.RESTMapper) *SchemaBuilder {
 		}, rm)
 
 		if err != nil {
-			b.log.Debug().Err(err).
-				Str("group", gvks[0].Group).
-				Str("version", gvks[0].Version).
-				Str("kind", gvks[0].Kind).
-				Msg("failed to get namespaced info for GVK")
+			b.log.V(4).Info("failed to get namespaced info for GVK",
+				"error", err,
+				"group", gvks[0].Group,
+				"version", gvks[0].Version,
+				"kind", gvks[0].Kind)
 			continue
 		}
 
@@ -204,7 +204,9 @@ func (b *SchemaBuilder) WithPreferredVersions(apiResLists []*metav1.APIResourceL
 	for _, apiResList := range apiResLists {
 		gv, err := runtimeSchema.ParseGroupVersion(apiResList.GroupVersion)
 		if err != nil {
-			b.log.Debug().Err(err).Str("groupVersion", apiResList.GroupVersion).Msg("failed to parse group version")
+			b.log.V(4).Info("failed to parse group version",
+				"error", err,
+				"groupVersion", apiResList.GroupVersion)
 			continue
 		}
 
@@ -216,11 +218,10 @@ func (b *SchemaBuilder) WithPreferredVersions(apiResLists []*metav1.APIResourceL
 			// ServerPreferredResources returns the preferred version for each group
 			b.preferredVersions[key] = gv.Version
 
-			b.log.Debug().
-				Str("group", gv.Group).
-				Str("kind", resource.Kind).
-				Str("preferredVersion", gv.Version).
-				Msg("registered preferred version")
+			b.log.V(5).Info("registered preferred version",
+				"group", gv.Group,
+				"kind", resource.Kind,
+				"preferredVersion", gv.Version)
 		}
 	}
 	return b
@@ -260,15 +261,14 @@ func (b *SchemaBuilder) expandWithSimpleDepthControl() {
 		}
 	}
 
-	b.log.Info().
-		Int("kindRegistrySize", len(b.kindRegistry)).
-		Int("relationTargets", len(relationTargets)).
-		Msg("Starting 1-level relationship expansion")
+	b.log.V(2).Info("starting 1-level relationship expansion",
+		"kindRegistrySize", len(b.kindRegistry),
+		"relationTargets", len(relationTargets))
 
 	// Second pass: expand only non-targets
 	for schemaKey, schema := range b.schemas {
 		if relationTargets[schemaKey] {
-			b.log.Debug().Str("schemaKey", schemaKey).Msg("Skipping relation target (1-level depth control)")
+			b.log.V(4).Info("skipping relation target (1-level depth control)", "schemaKey", schemaKey)
 			continue
 		}
 		b.expandRelationshipsSimple(schema, schemaKey)
@@ -291,14 +291,14 @@ func (b *SchemaBuilder) buildKindRegistry() {
 		jsonBytes, err := json.Marshal(gvksVal)
 		if err != nil {
 			b.err = multierror.Append(b.err, errors.Join(ErrBuildKindRegistry, err))
-			b.log.Debug().Err(err).Str("schemaKey", schemaKey).Msg("failed to marshal GVK")
+			b.log.V(4).Info("failed to marshal GVK", "error", err, "schemaKey", schemaKey)
 			continue
 		}
 
 		var gvks []*GroupVersionKind
 		if err := json.Unmarshal(jsonBytes, &gvks); err != nil {
 			b.err = multierror.Append(b.err, errors.Join(ErrBuildKindRegistry, err))
-			b.log.Debug().Err(err).Str("schemaKey", schemaKey).Msg("failed to unmarshal GVK")
+			b.log.V(4).Info("failed to unmarshal GVK", "error", err, "schemaKey", schemaKey)
 			continue
 		}
 
@@ -330,7 +330,7 @@ func (b *SchemaBuilder) buildKindRegistry() {
 	// Check for kinds with multiple resources but no preferred versions
 	b.warnAboutMissingPreferredVersions()
 
-	b.log.Debug().Int("gvkCount", len(b.kindRegistry)).Msg("built kind registry for relationships")
+	b.log.V(4).Info("built kind registry for relationships", "gvkCount", len(b.kindRegistry))
 }
 
 // warnAboutMissingPreferredVersions checks for kinds with multiple resources but no preferred versions
@@ -365,10 +365,9 @@ func (b *SchemaBuilder) warnAboutMissingPreferredVersions() {
 			for _, resource := range resources {
 				groups = append(groups, fmt.Sprintf("%s/%s", resource.Group, resource.Version))
 			}
-			b.log.Warn().
-				Str("kind", kindName).
-				Strs("availableResources", groups).
-				Msg("Multiple resources found for kind with no preferred version - using fallback resolution. Consider setting preferred versions for better API governance.")
+			b.log.Info("multiple resources found for kind with no preferred version - using fallback resolution",
+				"kind", kindName,
+				"availableResources", groups)
 		}
 	}
 }
@@ -398,11 +397,10 @@ func (b *SchemaBuilder) processReferenceField(schema *spec.Schema, schemaKey, pr
 
 	if bestResource == nil {
 		// No candidates found - skip relationship field generation
-		b.log.Debug().
-			Str("kind", baseKind).
-			Str("sourceField", propName).
-			Str("sourceSchema", schemaKey).
-			Msg("No candidates found for kind - skipping relationship field")
+		b.log.V(4).Info("no candidates found for kind - skipping relationship field",
+			"kind", baseKind,
+			"sourceField", propName,
+			"sourceSchema", schemaKey)
 		return
 	}
 
@@ -430,11 +428,10 @@ func (b *SchemaBuilder) findBestResourceForKind(kindName string) *ResourceInfo {
 	for i, candidate := range candidates {
 		groups[i] = b.formatGroupVersion(candidate)
 	}
-	b.log.Warn().
-		Str("kind", kindName).
-		Str("selectedGroup", b.formatGroupVersion(best)).
-		Strs("availableGroups", groups).
-		Msg("Multiple API groups provide this kind - selected first by priority (kubectl-style)")
+	b.log.Info("multiple API groups provide this kind - selected first by priority (kubectl-style)",
+		"kind", kindName,
+		"selectedGroup", b.formatGroupVersion(best),
+		"availableGroups", groups)
 
 	return &best
 }
@@ -523,14 +520,13 @@ func (b *SchemaBuilder) addRelationshipField(schema *spec.Schema, schemaKey, pro
 	ref := spec.MustCreateRef(refPath)
 	schema.Properties[fieldName] = spec.Schema{SchemaProps: spec.SchemaProps{Ref: ref}}
 
-	b.log.Info().
-		Str("sourceField", propName).
-		Str("targetField", fieldName).
-		Str("targetKind", target.Kind).
-		Str("targetGroup", target.Group).
-		Str("refPath", refPath).
-		Str("sourceSchema", schemaKey).
-		Msg("Added relationship field")
+	b.log.V(3).Info("added relationship field",
+		"sourceField", propName,
+		"targetField", fieldName,
+		"targetKind", target.Kind,
+		"targetGroup", target.Group,
+		"refPath", refPath,
+		"sourceSchema", schemaKey)
 }
 
 func isRefProperty(name string) bool {

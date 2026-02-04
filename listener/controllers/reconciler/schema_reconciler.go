@@ -24,12 +24,12 @@ var (
 
 type Reconciler struct {
 	schemaHandler  schemahandler.Handler
-	schemaResolver apischema.Resolver
+	schemaResolver *apischema.Resolver
 }
 
 func NewReconciler(
 	ioHandler schemahandler.Handler,
-	schemaResolver apischema.Resolver,
+	schemaResolver *apischema.Resolver,
 ) *Reconciler {
 	return &Reconciler{
 		schemaHandler:  ioHandler,

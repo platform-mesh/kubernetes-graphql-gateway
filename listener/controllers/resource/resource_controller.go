@@ -49,7 +49,7 @@ func New(
 	mgr mcmanager.Manager,
 	opts controller.TypedOptions[mcreconcile.Request],
 	schemaHandler schemahandler.Handler,
-	schemaResolver apischema.Resolver,
+	schemaResolver *apischema.Resolver,
 	anchorResource string,
 	resourceGVR string,
 	clusterMetadataFunc v1alpha1.ClusterMetadataFunc,

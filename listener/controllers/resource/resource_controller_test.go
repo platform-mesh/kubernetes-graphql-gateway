@@ -46,7 +46,6 @@ func (suite *ResourceControllerTestSuite) SetupSuite() {
 			filepath.Join("..", "..", "..", "config", "crd"),
 		},
 		ErrorIfCRDPathMissing: true,
-		BinaryAssetsDirectory: "../../../bin/k8s/1.34.0-darwin-arm64",
 	}
 
 	_, err := suite.env.Start()

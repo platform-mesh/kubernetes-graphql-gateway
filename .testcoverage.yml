@@ -4,3 +4,6 @@ exclude:
     - sdk
     - cmd
     - apis/v1alpha1/zz_generated.deepcopy.go
+    - listener/server.go
+    - listener/config.go
+    - listener/options

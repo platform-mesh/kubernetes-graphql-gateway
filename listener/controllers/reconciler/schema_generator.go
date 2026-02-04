@@ -26,7 +26,7 @@ type schemaGenerationParams struct {
 func generateSchemaWithMetadata(
 	ctx context.Context,
 	params schemaGenerationParams,
-	apiSchemaResolver apischema.Resolver,
+	apiSchemaResolver *apischema.Resolver,
 	metadata *v1alpha1.ClusterMetadata,
 ) ([]byte, error) {
 	logger := log.FromContext(ctx)
@@ -34,7 +34,7 @@ func generateSchemaWithMetadata(
 	logger.V(4).WithValues("clusterPath", params.ClusterPath).Info("starting API schema resolution")
 
 	// Resolve current schema from API server
-	rawSchema, err := apiSchemaResolver.Resolve(params.DiscoveryClient, params.RESTMapper)
+	rawSchema, err := apiSchemaResolver.Resolve(ctx, params.DiscoveryClient, params.RESTMapper)
 	if err != nil {
 		logger.Error(err, "failed to resolve server JSON schema")
 		return nil, fmt.Errorf("failed to resolve API schema: %w", err)

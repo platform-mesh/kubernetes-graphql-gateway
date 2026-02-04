@@ -3,7 +3,7 @@ package apischema_test
 import (
 	"testing"
 
-	"github.com/platform-mesh/golang-commons/logger/testlogger"
+	"github.com/go-logr/logr"
 	apischema "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
 	apimocks "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema/mocks"
 	"github.com/stretchr/testify/assert"
@@ -29,7 +29,7 @@ func schemaWithGVK(group, version, kind string) *spec.Schema {
 func Test_with_relationships_adds_single_target_field(t *testing.T) {
 	mock := apimocks.NewMockClient(t)
 	mock.EXPECT().Paths().Return(map[string]openapi.GroupVersion{}, nil)
-	b := apischema.NewSchemaBuilder(mock, nil, testlogger.New().Logger)
+	b := apischema.NewSchemaBuilder(mock, nil, logr.Discard())
 
 	// definitions contain a target kind Role in group g/v1
 	roleKey := "g.v1.Role"
@@ -58,7 +58,7 @@ func Test_with_relationships_adds_single_target_field(t *testing.T) {
 func Test_kubectl_style_priority_resolution_for_conflicts(t *testing.T) {
 	mock := apimocks.NewMockClient(t)
 	mock.EXPECT().Paths().Return(map[string]openapi.GroupVersion{}, nil)
-	b := apischema.NewSchemaBuilder(mock, nil, testlogger.New().Logger)
+	b := apischema.NewSchemaBuilder(mock, nil, logr.Discard())
 
 	// Two schemas with same Kind different groups - should use kubectl-style priority
 	first := schemaWithGVK("a.example", "v1", "Thing")
@@ -92,7 +92,7 @@ func Test_kubectl_style_priority_resolution_for_conflicts(t *testing.T) {
 func Test_kubectl_style_priority_respects_preferred_versions(t *testing.T) {
 	mock := apimocks.NewMockClient(t)
 	mock.EXPECT().Paths().Return(map[string]openapi.GroupVersion{}, nil)
-	b := apischema.NewSchemaBuilder(mock, nil, testlogger.New().Logger)
+	b := apischema.NewSchemaBuilder(mock, nil, logr.Discard())
 
 	// Multiple schemas with same Kind - conflicts exist even with preferred versions
 	childA := schemaWithGVK("a.example", "v1", "Child")
@@ -138,7 +138,7 @@ func Test_kubectl_style_priority_respects_preferred_versions(t *testing.T) {
 func Test_depth_control_prevents_deep_nesting(t *testing.T) {
 	mock := apimocks.NewMockClient(t)
 	mock.EXPECT().Paths().Return(map[string]openapi.GroupVersion{}, nil)
-	b := apischema.NewSchemaBuilder(mock, nil, testlogger.New().Logger)
+	b := apischema.NewSchemaBuilder(mock, nil, logr.Discard())
 
 	// Create a chain: Root -> Pod -> Service
 	// Only Root should get relationship fields, Pod and Service should be marked as targets
@@ -182,7 +182,7 @@ func Test_depth_control_prevents_deep_nesting(t *testing.T) {
 func Test_single_level_prevents_circular_relationships(t *testing.T) {
 	mock := apimocks.NewMockClient(t)
 	mock.EXPECT().Paths().Return(map[string]openapi.GroupVersion{}, nil)
-	b := apischema.NewSchemaBuilder(mock, nil, testlogger.New().Logger)
+	b := apischema.NewSchemaBuilder(mock, nil, logr.Discard())
 
 	// Create circular reference: A -> B, B -> A
 	aSchema := schemaWithGVK("example.com", "v1", "A")
@@ -217,7 +217,7 @@ func Test_single_level_prevents_circular_relationships(t *testing.T) {
 func Test_depth_control_with_multiple_chains(t *testing.T) {
 	mock := apimocks.NewMockClient(t)
 	mock.EXPECT().Paths().Return(map[string]openapi.GroupVersion{}, nil)
-	b := apischema.NewSchemaBuilder(mock, nil, testlogger.New().Logger)
+	b := apischema.NewSchemaBuilder(mock, nil, logr.Discard())
 
 	// Multiple chains: Chain1 (Root1 -> Pod), Chain2 (Root2 -> Service)
 	root1Schema := schemaWithGVK("example.com", "v1", "Root1")
@@ -259,7 +259,7 @@ func Test_depth_control_with_multiple_chains(t *testing.T) {
 func Test_same_kind_different_groups_with_explicit_disambiguation(t *testing.T) {
 	mock := apimocks.NewMockClient(t)
 	mock.EXPECT().Paths().Return(map[string]openapi.GroupVersion{}, nil)
-	b := apischema.NewSchemaBuilder(mock, nil, testlogger.New().Logger)
+	b := apischema.NewSchemaBuilder(mock, nil, logr.Discard())
 
 	// Create two different groups providing the same "Database" kind
 	mysqlDB := schemaWithGVK("mysql.example.com", "v1", "Database")
@@ -294,7 +294,7 @@ func Test_same_kind_different_groups_with_explicit_disambiguation(t *testing.T) 
 func Test_same_kind_different_groups_kubernetes_core_vs_custom(t *testing.T) {
 	mock := apimocks.NewMockClient(t)
 	mock.EXPECT().Paths().Return(map[string]openapi.GroupVersion{}, nil)
-	b := apischema.NewSchemaBuilder(mock, nil, testlogger.New().Logger)
+	b := apischema.NewSchemaBuilder(mock, nil, logr.Discard())
 
 	// Simulate core Kubernetes Service vs custom Service
 	coreService := schemaWithGVK("", "v1", "Service") // Core group (empty)
@@ -329,7 +329,7 @@ func Test_same_kind_different_groups_kubernetes_core_vs_custom(t *testing.T) {
 func Test_same_kind_different_groups_with_preferred_version_still_conflicts(t *testing.T) {
 	mock := apimocks.NewMockClient(t)
 	mock.EXPECT().Paths().Return(map[string]openapi.GroupVersion{}, nil)
-	b := apischema.NewSchemaBuilder(mock, nil, testlogger.New().Logger)
+	b := apischema.NewSchemaBuilder(mock, nil, logr.Discard())
 
 	// Multiple "Storage" providers with preferred version set
 	s3Storage := schemaWithGVK("aws.example.com", "v1", "Storage")
