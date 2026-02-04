@@ -1,6 +1,7 @@
 package resource_test
 
 import (
+	"context"
 	"flag"
 	"os"
 	"path/filepath"
@@ -29,6 +30,7 @@ type ResourceControllerTestSuite struct {
 
 	env         *envtest.Environment
 	listenerCfg *listener.Config
+	cancel      context.CancelFunc
 }
 
 func TestResourceControllerTestSuite(t *testing.T) {
@@ -52,7 +54,14 @@ func (suite *ResourceControllerTestSuite) SetupSuite() {
 	cfg, err := suite.env.Start()
 	suite.Require().NoError(err, "failed to start test environment")
 
+	// Write the kubeconfig bytes to a temp file for the listener config
+	kubeconfigPath := filepath.Join(suite.T().TempDir(), "kubeconfig")
+	err = os.WriteFile(kubeconfigPath, suite.env.KubeConfig, 0600)
+	suite.Require().NoError(err, "failed to write kubeconfig")
+
 	opts := options.NewOptions()
+	opts.KubeConfig = kubeconfigPath
+
 	completedOpts, err := opts.Complete()
 	suite.Require().NoError(err, "failed to complete options")
 
@@ -81,8 +90,11 @@ func (suite *ResourceControllerTestSuite) SetupSuite() {
 
 	suite.listenerCfg = listenerConfig
 
+	ctx, cancel := context.WithCancel(context.Background())
+	suite.cancel = cancel
+
 	go func() {
-		err = listenerConfig.Manager.Start(suite.T().Context())
+		err = listenerConfig.Manager.Start(ctx)
 		suite.Require().NoError(err, "failed to start multi-cluster manager")
 	}()
 }
@@ -91,10 +103,13 @@ func (suite *ResourceControllerTestSuite) TestSchemaGeneration() {
 	suite.Eventually(func() bool {
 		_, err := os.Stat(filepath.Join(suite.listenerCfg.Options.SchemasDir, "default"))
 		return err == nil
-	}, 10*time.Second, 500*time.Millisecond, "expected schema file to be generated")
+	}, 5*time.Second, 500*time.Millisecond, "expected schema file to be generated")
 }
 
 func (suite *ResourceControllerTestSuite) TearDownSuite() {
+	// Cancel the manager context first to allow graceful shutdown
+	suite.cancel()
+
 	err := suite.env.Stop()
 	suite.Require().NoError(err, "failed to stop test environment")
 
