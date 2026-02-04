@@ -1,13 +1,11 @@
-package main
+package listener
 
 import (
-	"context"
 	"fmt"
-	"os"
 
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/options"
-	"github.com/spf13/pflag"
+	"github.com/spf13/cobra"
 
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	logsv1 "k8s.io/component-base/logs/api/v1"
@@ -17,32 +15,33 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
-func main() {
-	err := run(genericapiserver.SetupSignalContext())
-	klog.Flush()
-
-	if err != nil {
-		fmt.Printf("Error running listener backend: %v\n", err)
-		os.Exit(1)
-	}
+type command struct {
+	options *options.Options
 }
 
-func run(ctx context.Context) error {
-	options := options.NewOptions()
-	options.AddFlags(pflag.CommandLine)
-	pflag.Parse()
-
-	// setup logging first
-	if err := logsv1.ValidateAndApply(options.Logs, nil); err != nil {
-		return err
+func NewCommand() *cobra.Command {
+	c := &command{
+		options: options.NewOptions(),
 	}
 
-	// Set up controller-runtime logger early to avoid warnings
+	cmd := &cobra.Command{
+		Use:   "listener",
+		Short: "Run the listener server",
+		RunE:  c.run,
+	}
+
+	c.options.AddFlags(cmd.Flags())
+	return cmd
+}
+
+func (c *command) run(cmd *cobra.Command, args []string) error {
+	if err := logsv1.ValidateAndApply(c.options.Logs, nil); err != nil {
+		return err
+	}
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
 	log.SetLogger(klog.NewKlogr())
 
-	// create server
-	completed, err := options.Complete()
+	completed, err := c.options.Complete()
 	if err != nil {
 		return err
 	}
@@ -50,7 +49,8 @@ func run(ctx context.Context) error {
 		return err
 	}
 
-	// start server
+	ctx := genericapiserver.SetupSignalContext()
+
 	config, err := listener.NewConfig(completed)
 	if err != nil {
 		return err
@@ -61,10 +61,9 @@ func run(ctx context.Context) error {
 	}
 
 	if err := server.Run(ctx); err != nil {
-		return err
+		return fmt.Errorf("error running listener: %w", err)
 	}
 
 	<-ctx.Done()
-
 	return nil
 }

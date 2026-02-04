@@ -1,19 +1,3 @@
-/*
-Copyright 2025 The Kube Bind Authors.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package clusteraccess
 
 import (
@@ -55,7 +39,7 @@ type ClusterAccessReconciler struct {
 	manager        mcmanager.Manager
 	opts           controller.TypedOptions[mcreconcile.Request]
 	ioHandler      schemahandler.Handler
-	schemaResolver apischema.Resolver
+	schemaResolver *apischema.Resolver
 }
 
 // NewClusterAccessReconciler returns a new ClusterAccessReconciler
@@ -64,7 +48,7 @@ func NewClusterAccessReconciler(
 	mgr mcmanager.Manager,
 	opts controller.TypedOptions[mcreconcile.Request],
 	ioHandler schemahandler.Handler,
-	schemaResolver apischema.Resolver,
+	schemaResolver *apischema.Resolver,
 ) (*ClusterAccessReconciler, error) {
 	r := &ClusterAccessReconciler{
 		manager:        mgr,
@@ -138,7 +122,7 @@ func (r *ClusterAccessReconciler) Reconcile(ctx context.Context, req mcreconcile
 	}
 
 	// Create schema resolver for target cluster and resolve schema
-	JSON, err := r.schemaResolver.Resolve(targetDiscovery, targetRM)
+	JSON, err := r.schemaResolver.Resolve(ctx, targetDiscovery, targetRM)
 	if err != nil {
 		logger.Error(err, "Failed to resolve schema", "clusterAccess", ca.Name)
 		return ctrl.Result{}, err

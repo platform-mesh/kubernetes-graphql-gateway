@@ -16,7 +16,6 @@ Design patterns:
 TODO:
 1. Authentication part in listener needs cleaning and streamlinings
 2. Gateway needs wiring for remote-clusters mux handler. Basically every MCR cluster is /api/clusters/{clusterName}/graphql endpoint and remote clusters are /api/remote-clusters/{clusterName}/graphql endpoint
-3. Add impersonation middleware to gateway that would read `Impersonate-User` and `Impersonate-Group` headers and set them to the request context so that every request to k8s client would be done on behalf of that user.
-4. Make sure we dont have behaviours driven by ENV variables but rather config struct only. Variables are hard to track and reason about when running in different environments. One should be able to reason about the system just by looking at the config struct/flags.
 5. Make sure contextual logging is in place everywhere in gateway and listener.
 6. Add traces and request logs into gateway http handler so that every request is logged with duration and status code.
+7. the RoundTripper is one hell of a mess - that needs to change

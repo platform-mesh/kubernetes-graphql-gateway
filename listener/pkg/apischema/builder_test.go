@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/platform-mesh/golang-commons/logger/testlogger"
+	"github.com/go-logr/logr"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/apis"
 	apischema "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
 	apischemaMocks "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema/mocks"
@@ -91,7 +91,7 @@ func TestNewSchemaBuilder(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			b := apischema.NewSchemaBuilder(tc.client, []string{"v1"}, testlogger.New().Logger)
+			b := apischema.NewSchemaBuilder(tc.client, []string{"v1"}, logr.Discard())
 			if tc.wantErr != nil {
 				assert.NotNil(t, b.GetError(), "expected error, got nil")
 				assert.Equal(t, 0, len(b.GetSchemas()), "expected 0 schemas on error")
@@ -139,12 +139,12 @@ func TestWithApiResourceCategories(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mock := apischemaMocks.NewMockClient(t)
 			mock.EXPECT().Paths().Return(map[string]openapi.GroupVersion{}, nil)
-			b := apischema.NewSchemaBuilder(mock, nil, testlogger.New().Logger)
+			b := apischema.NewSchemaBuilder(mock, nil, logr.Discard())
 			b.SetSchemas(map[string]*spec.Schema{
 				tc.key: {VendorExtensible: spec.VendorExtensible{Extensions: map[string]any{}}},
 			})
 			b.WithApiResourceCategories(tc.list)
-			ext, found := b.GetSchemas()[tc.key].Extensions[apis.ScopeExtensionKey]
+			ext, found := b.GetSchemas()[tc.key].Extensions[apis.CategoriesExtensionKey]
 			if tc.wantCats == nil {
 				assert.False(t, found, "expected no categories")
 				return
@@ -175,7 +175,7 @@ func TestWithScope(t *testing.T) {
 
 	mock := apischemaMocks.NewMockClient(t)
 	mock.EXPECT().Paths().Return(map[string]openapi.GroupVersion{}, nil)
-	b := apischema.NewSchemaBuilder(mock, nil, testlogger.New().Logger)
+	b := apischema.NewSchemaBuilder(mock, nil, logr.Discard())
 	b.SetSchemas(map[string]*spec.Schema{
 		"g.v1.K": s,
 	})

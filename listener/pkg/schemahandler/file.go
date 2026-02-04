@@ -1,4 +1,4 @@
-package workspacefile
+package schemahandler
 
 import (
 	"context"
@@ -6,8 +6,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-
-	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/schemahandler"
 )
 
 var (
@@ -22,8 +20,8 @@ type FileHandler struct {
 	schemasDir string
 }
 
-// NewIOHandler constructs a concrete FileHandler that stores files under schemasDir.
-func NewIOHandler(schemasDir string) (*FileHandler, error) {
+// NewFileHandler constructs a concrete FileHandler that stores files under schemasDir.
+func NewFileHandler(schemasDir string) (*FileHandler, error) {
 	if err := os.MkdirAll(schemasDir, os.ModePerm); err != nil {
 		return nil, errors.Join(ErrCreateSchemasDir, err)
 	}
@@ -35,7 +33,7 @@ func (h *FileHandler) Read(_ context.Context, clusterName string) ([]byte, error
 	fileName := path.Join(h.schemasDir, clusterName)
 	JSON, err := os.ReadFile(fileName)
 	if err != nil {
-		return nil, errors.Join(schemahandler.ErrNotExist, err)
+		return nil, errors.Join(ErrNotExist, err)
 	}
 	return JSON, nil
 }
@@ -58,7 +56,7 @@ func (h *FileHandler) Write(_ context.Context, JSON []byte, clusterName string) 
 func (h *FileHandler) Delete(_ context.Context, clusterName string) error {
 	fileName := path.Join(h.schemasDir, clusterName)
 	if err := os.Remove(fileName); err != nil {
-		return errors.Join(schemahandler.ErrNotExist, err)
+		return errors.Join(ErrNotExist, err)
 	}
 	return nil
 }

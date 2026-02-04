@@ -7,7 +7,6 @@ import (
 
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/kube-openapi/pkg/spec3"
 )
 
@@ -42,9 +41,10 @@ type ClusterMetadata struct {
 type AuthenticationType string
 
 const (
-	AuthTypeToken      AuthenticationType = "token"
-	AuthTypeKubeconfig AuthenticationType = "kubeconfig"
-	AuthTypeClientCert AuthenticationType = "clientCert"
+	AuthTypeToken          AuthenticationType = "token"
+	AuthTypeKubeconfig     AuthenticationType = "kubeconfig"
+	AuthTypeClientCert     AuthenticationType = "clientCert"
+	AuthTypeServiceAccount AuthenticationType = "serviceAccount"
 )
 
 // AuthMetadata represents authentication information
@@ -118,6 +118,7 @@ func buildConfigFromMetadata(metadata ClusterMetadata) (*rest.Config, error) {
 	if metadata.Auth == nil {
 		return config, nil
 	}
+
 	switch metadata.Auth.Type {
 	case AuthTypeToken:
 		if metadata.Auth.Token != "" {
@@ -164,61 +165,50 @@ func configureFromKubeconfig(config *rest.Config, kubeconfigData []byte) error {
 		return errors.Join(errors.New("failed to parse kubeconfig"), err)
 	}
 
-	rawConfig, err := clientConfig.RawConfig()
+	cfg, err := clientConfig.ClientConfig()
 	if err != nil {
-		return errors.Join(errors.New("failed to get raw kubeconfig"), err)
+		return errors.Join(errors.New("failed to get client config from kubeconfig"), err)
 	}
 
-	// Get the current context
-	currentContext := rawConfig.CurrentContext
-	if currentContext == "" {
-		return errors.New("no current context in kubeconfig")
-	}
-
-	context, exists := rawConfig.Contexts[currentContext]
-	if !exists {
-		return errors.New("current context not found in kubeconfig")
-	}
-
-	// Get auth info for current context
-	authInfo, exists := rawConfig.AuthInfos[context.AuthInfo]
-	if !exists {
-		return errors.New("auth info not found in kubeconfig")
-	}
-
-	return extractAuthFromKubeconfig(config, authInfo)
+	*config = *cfg
+	return err
 }
 
-// extractAuthFromKubeconfig extracts authentication info from kubeconfig AuthInfo
-func extractAuthFromKubeconfig(config *rest.Config, authInfo *api.AuthInfo) error {
-	if authInfo.Token != "" {
-		config.BearerToken = authInfo.Token
-		return nil
+// BuildClusterMetadataFromConfig creates a ClusterMetadata from a rest.Config
+func BuildClusterMetadataFromConfig(config *rest.Config) (*ClusterMetadata, error) {
+	if config == nil {
+		return nil, errors.New("config is required")
 	}
 
-	if authInfo.TokenFile != "" {
-		// TODO: Read token from file if needed
-		return errors.New("token file authentication not yet implemented")
+	if config.Host == "" {
+		return nil, errors.New("host is required in config")
 	}
 
-	if len(authInfo.ClientCertificateData) > 0 && len(authInfo.ClientKeyData) > 0 {
-		config.CertData = authInfo.ClientCertificateData
-		config.KeyData = authInfo.ClientKeyData
-		return nil
+	metadata := &ClusterMetadata{
+		Host: config.Host,
 	}
 
-	if authInfo.ClientCertificate != "" && authInfo.ClientKey != "" {
-		config.CertFile = authInfo.ClientCertificate
-		config.KeyFile = authInfo.ClientKey
-		return nil
+	// Handle CA data
+	if len(config.CAData) > 0 {
+		metadata.CA = &CAMetadata{
+			Data: base64.StdEncoding.EncodeToString(config.CAData),
+		}
 	}
 
-	if authInfo.Username != "" && authInfo.Password != "" {
-		config.Username = authInfo.Username
-		config.Password = authInfo.Password
-		return nil
+	// Determine authentication type and populate auth metadata
+	switch {
+	case config.BearerToken != "":
+		metadata.Auth = &AuthMetadata{
+			Type:  AuthTypeToken,
+			Token: config.BearerToken,
+		}
+	case len(config.CertData) > 0 && len(config.KeyData) > 0:
+		metadata.Auth = &AuthMetadata{
+			Type:     AuthTypeClientCert,
+			CertData: base64.StdEncoding.EncodeToString(config.CertData),
+			KeyData:  base64.StdEncoding.EncodeToString(config.KeyData),
+		}
 	}
 
-	// No recognizable authentication found
-	return errors.New("no valid authentication method found in kubeconfig")
+	return metadata, nil
 }

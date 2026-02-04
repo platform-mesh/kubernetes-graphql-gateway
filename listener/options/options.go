@@ -77,7 +77,7 @@ func NewOptions() *Options {
 			SchemaHandler:          "file",
 			SchemasDir:             "_output/schemas",
 			GRPCListenAddr:         ":50051",
-			AnchorResource:         "default",
+			AnchorResource:         "object.metadata.name == 'default'",
 			ResourceGVR:            "namespaces.v1",
 			MetricsBindAddress:     "0",
 			EnableHTTP2:            false,

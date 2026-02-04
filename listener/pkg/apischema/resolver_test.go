@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/platform-mesh/golang-commons/logger/testlogger"
 	apischema "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
 	apischemaMocks "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema/mocks"
 	"github.com/stretchr/testify/assert"
@@ -89,7 +88,7 @@ func TestResolveSchema(t *testing.T) {
 				dc.EXPECT().OpenAPIV3().Return(openAPIClient)
 			}
 
-			got, err := apischema.ResolveSchema(dc, rm, testlogger.New().Logger)
+			got, err := apischema.ResolveSchema(t.Context(), dc, rm)
 			if tc.wantErr != nil {
 				assert.ErrorIs(t, err, tc.wantErr)
 				return

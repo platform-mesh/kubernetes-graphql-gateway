@@ -1,19 +1,3 @@
-/*
-Copyright 2025 The Kube Bind Authors.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package resource
 
 import (
@@ -43,10 +27,10 @@ import (
 )
 
 const (
-	controllerName = "namespace-schema-controller"
+	controllerName = "resource-schema-controller"
 )
 
-// Reconciler reconciles the anchor namespace to trigger schema generation
+// Reconciler reconciles the anchor resource to trigger schema generation
 type Reconciler struct {
 	manager        mcmanager.Manager
 	opts           controller.TypedOptions[mcreconcile.Request]
@@ -64,8 +48,8 @@ func New(
 	_ context.Context,
 	mgr mcmanager.Manager,
 	opts controller.TypedOptions[mcreconcile.Request],
-	ioHandler schemahandler.Handler,
-	schemaResolver apischema.Resolver,
+	schemaHandler schemahandler.Handler,
+	schemaResolver *apischema.Resolver,
 	anchorResource string,
 	resourceGVR string,
 	clusterMetadataFunc v1alpha1.ClusterMetadataFunc,
@@ -74,7 +58,7 @@ func New(
 	r := &Reconciler{
 		manager:        mgr,
 		opts:           opts,
-		reconciler:     reconciler.NewReconciler(ioHandler, schemaResolver),
+		reconciler:     reconciler.NewReconciler(schemaHandler, schemaResolver),
 		anchorResource: anchorResource,
 
 		clusterMetadataFunc:    clusterMetadataFunc,
@@ -148,6 +132,13 @@ func (r *Reconciler) Reconcile(ctx context.Context, req mcreconcile.Request) (ct
 		if err != nil {
 			logger.Error(err, "Failed to get cluster metadata for namespace reconciliation", "cluster", req.ClusterName)
 			return ctrl.Result{}, fmt.Errorf("failed to get cluster metadata for namespace reconciliation: %w", err)
+		}
+	} else {
+		var err error
+		metadata, err = v1alpha1.BuildClusterMetadataFromConfig(config)
+		if err != nil {
+			logger.Error(err, "Failed to build metadata from config")
+			return ctrl.Result{}, fmt.Errorf("failed to build metadata from config: %w", err)
 		}
 	}
 

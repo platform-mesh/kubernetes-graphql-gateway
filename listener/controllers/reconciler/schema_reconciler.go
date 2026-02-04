@@ -23,16 +23,16 @@ var (
 )
 
 type Reconciler struct {
-	ioHandler      schemahandler.Handler
-	schemaResolver apischema.Resolver
+	schemaHandler  schemahandler.Handler
+	schemaResolver *apischema.Resolver
 }
 
 func NewReconciler(
 	ioHandler schemahandler.Handler,
-	schemaResolver apischema.Resolver,
+	schemaResolver *apischema.Resolver,
 ) *Reconciler {
 	return &Reconciler{
-		ioHandler:      ioHandler,
+		schemaHandler:  ioHandler,
 		schemaResolver: schemaResolver,
 	}
 }
@@ -74,7 +74,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, schemaPaths []string, cfg *r
 		}
 
 		// Read existing schema (if it exists)
-		savedSchema, err := r.ioHandler.Read(ctx, schemaPath)
+		savedSchema, err := r.schemaHandler.Read(ctx, schemaPath)
 		if err != nil && !errors.Is(err, schemahandler.ErrNotExist) {
 			logger.Error(err, "Failed to read existing schema file")
 			return fmt.Errorf("failed to read existing schema: %w", err)
@@ -82,7 +82,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, schemaPaths []string, cfg *r
 
 		// Write if file doesn't exist or content has changed
 		if errors.Is(err, schemahandler.ErrNotExist) || !bytes.Equal(currentSchema, savedSchema) {
-			if err := r.ioHandler.Write(ctx, currentSchema, schemaPath); err != nil {
+			if err := r.schemaHandler.Write(ctx, currentSchema, schemaPath); err != nil {
 				logger.Error(err, "Failed to write schema", "path", schemaPath)
 				return fmt.Errorf("failed to write schema: %w", err)
 			}
@@ -97,7 +97,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, schemaPaths []string, cfg *r
 
 func (r *Reconciler) Cleanup(ctx context.Context, schemaPaths []string) error {
 	for _, schemaPath := range schemaPaths {
-		err := r.ioHandler.Delete(ctx, schemaPath)
+		err := r.schemaHandler.Delete(ctx, schemaPath)
 		if err != nil && !errors.Is(err, schemahandler.ErrNotExist) {
 			return fmt.Errorf("failed to delete schema for path %q: %w", schemaPath, err)
 		}
