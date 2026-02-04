@@ -27,10 +27,8 @@ import (
 
 const (
 	controllerName = "resource-schema-controller"
-	controllerName = "resource-schema-controller"
 )
 
-// Reconciler reconciles the anchor resource to trigger schema generation
 // Reconciler reconciles the anchor resource to trigger schema generation
 type Reconciler struct {
 	manager        mcmanager.Manager

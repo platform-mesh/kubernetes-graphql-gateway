@@ -42,9 +42,9 @@ func TestSchemaSet_O1_Lookups(t *testing.T) {
 	}
 
 	schemas := apischema.NewSchemaSetFromMap(map[string]*spec.Schema{
-		"v1.Pod":              podSchema,
-		"apps.v1.Deployment":  deploymentSchema,
-		"custom.io.v1.Pod":    customPodSchema,
+		"v1.Pod":             podSchema,
+		"apps.v1.Deployment": deploymentSchema,
+		"custom.io.v1.Pod":   customPodSchema,
 	})
 
 	t.Run("Get by key", func(t *testing.T) {

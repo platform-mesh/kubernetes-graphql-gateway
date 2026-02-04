@@ -12,10 +12,10 @@ import (
 
 func TestExtractGVK(t *testing.T) {
 	tests := []struct {
-		name      string
-		schema    *spec.Schema
-		wantGVK   *apischema.GroupVersionKind
-		wantErr   bool
+		name    string
+		schema  *spec.Schema
+		wantGVK *apischema.GroupVersionKind
+		wantErr bool
 	}{
 		{
 			name: "valid GVK",
@@ -62,8 +62,8 @@ func TestExtractGVK(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "no extensions",
-			schema: &spec.Schema{},
+			name:    "no extensions",
+			schema:  &spec.Schema{},
 			wantGVK: nil,
 			wantErr: false,
 		},

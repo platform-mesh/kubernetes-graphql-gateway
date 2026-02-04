@@ -7,6 +7,7 @@ import (
 	"maps"
 
 	"github.com/platform-mesh/kubernetes-graphql-gateway/apis"
+
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/openapi"
 	"k8s.io/kube-openapi/pkg/schemamutation"
