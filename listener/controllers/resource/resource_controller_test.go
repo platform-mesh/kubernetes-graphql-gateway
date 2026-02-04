@@ -1,12 +1,15 @@
 package resource_test
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/platform-mesh/kubernetes-graphql-gateway/apis/v1alpha1"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/controllers/resource"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/options"
@@ -14,14 +17,12 @@ import (
 
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/cluster"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	mcreconcile "sigs.k8s.io/multicluster-runtime/pkg/reconcile"
-	"sigs.k8s.io/multicluster-runtime/providers/single"
 )
 
 type ResourceControllerTestSuite struct {
@@ -45,9 +46,10 @@ func (suite *ResourceControllerTestSuite) SetupSuite() {
 			filepath.Join("..", "..", "..", "config", "crd"),
 		},
 		ErrorIfCRDPathMissing: true,
+		BinaryAssetsDirectory: "../../../bin/k8s/1.34.0-darwin-arm64",
 	}
 
-	cfg, err := suite.env.Start()
+	_, err := suite.env.Start()
 	suite.Require().NoError(err, "failed to start test environment")
 
 	tmpDir := suite.T().TempDir()
@@ -67,11 +69,6 @@ func (suite *ResourceControllerTestSuite) SetupSuite() {
 	listenerConfig, err := listener.NewConfig(completedOpts)
 	suite.Require().NoError(err, "failed to create listener config")
 
-	defaultCluster, err := cluster.New(cfg)
-	suite.Require().NoError(err, "failed to create default cluster")
-
-	listenerConfig.Provider = single.New("default", defaultCluster)
-
 	r, err := resource.New(
 		suite.T().Context(),
 		listenerConfig.Manager,
@@ -84,6 +81,7 @@ func (suite *ResourceControllerTestSuite) SetupSuite() {
 		listenerConfig.Options.ClusterURLResolverFunc,
 	)
 	suite.Require().NoError(err, "failed to create resource reconciler")
+
 	err = r.SetupWithManager(listenerConfig.Manager)
 	suite.Require().NoError(err, "failed to setup resource reconciler with manager")
 
@@ -99,10 +97,21 @@ func (suite *ResourceControllerTestSuite) SetupSuite() {
 }
 
 func (suite *ResourceControllerTestSuite) TestSchemaGeneration() {
+	schemaFilePath := filepath.Join(suite.listenerCfg.Options.SchemasDir, "default")
 	suite.Eventually(func() bool {
-		_, err := os.Stat(filepath.Join(suite.listenerCfg.Options.SchemasDir, "default"))
+		_, err := os.Stat(schemaFilePath)
 		return err == nil
 	}, 5*time.Second, 500*time.Millisecond, "expected schema file to be generated")
+
+	raw, err := os.ReadFile(schemaFilePath)
+	suite.Require().NoError(err, "failed to read schema file")
+
+	var schema v1alpha1.Schema
+	err = json.NewDecoder(bytes.NewReader(raw)).Decode(&schema)
+	suite.Require().NoError(err, "failed to decode schema file")
+
+	suite.NotEmpty(schema.ClusterMetadata, "schema has metadata")
+	suite.NotEmpty(schema.Components, "schema has resources")
 }
 
 func (suite *ResourceControllerTestSuite) TearDownSuite() {

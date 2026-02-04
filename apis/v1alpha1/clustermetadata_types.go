@@ -173,3 +173,42 @@ func configureFromKubeconfig(config *rest.Config, kubeconfigData []byte) error {
 	*config = *cfg
 	return err
 }
+
+// BuildClusterMetadataFromConfig creates a ClusterMetadata from a rest.Config
+func BuildClusterMetadataFromConfig(config *rest.Config) (*ClusterMetadata, error) {
+	if config == nil {
+		return nil, errors.New("config is required")
+	}
+
+	if config.Host == "" {
+		return nil, errors.New("host is required in config")
+	}
+
+	metadata := &ClusterMetadata{
+		Host: config.Host,
+	}
+
+	// Handle CA data
+	if len(config.CAData) > 0 {
+		metadata.CA = &CAMetadata{
+			Data: base64.StdEncoding.EncodeToString(config.CAData),
+		}
+	}
+
+	// Determine authentication type and populate auth metadata
+	switch {
+	case config.BearerToken != "":
+		metadata.Auth = &AuthMetadata{
+			Type:  AuthTypeToken,
+			Token: config.BearerToken,
+		}
+	case len(config.CertData) > 0 && len(config.KeyData) > 0:
+		metadata.Auth = &AuthMetadata{
+			Type:     AuthTypeClientCert,
+			CertData: base64.StdEncoding.EncodeToString(config.CertData),
+			KeyData:  base64.StdEncoding.EncodeToString(config.KeyData),
+		}
+	}
+
+	return metadata, nil
+}
