@@ -1,4 +1,4 @@
-package workspacefile
+package schemahandler_test
 
 import (
 	"os"
@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/schemahandler"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -25,7 +26,7 @@ func TestNewIOHandler(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			_, err := NewIOHandler(tc.schemasDir)
+			_, err := schemahandler.NewFileHandler(tc.schemasDir)
 			if tc.expectErr {
 				assert.Error(t, err)
 				return
@@ -38,14 +39,14 @@ func TestNewIOHandler(t *testing.T) {
 func TestRead(t *testing.T) {
 	tempDir := t.TempDir()
 
-	validClusterName := "root:sap:openmfp"
+	validClusterName := "root:orgs:default"
 
 	validFile := filepath.Join(tempDir, validClusterName)
 
 	err := os.WriteFile(validFile, testJSON, 0644)
 	assert.NoError(t, err)
 
-	handler, err := NewIOHandler(tempDir)
+	handler, err := schemahandler.NewFileHandler(tempDir)
 	assert.NoError(t, err)
 
 	tests := map[string]struct {
@@ -70,14 +71,14 @@ func TestRead(t *testing.T) {
 
 func TestWrite(t *testing.T) {
 	tempDir := t.TempDir()
-	handler, err := NewIOHandler(tempDir)
+	handler, err := schemahandler.NewFileHandler(tempDir)
 	assert.NoError(t, err)
 
 	tests := map[string]struct {
 		clusterName string
 		expectErr   bool
 	}{
-		"valid_write":         {clusterName: "root:sap:openmfp", expectErr: false},
+		"valid_write":         {clusterName: "root:orgs:default", expectErr: false},
 		"subdirectory_path":   {clusterName: "virtual-workspace/api-export-ws", expectErr: false},
 		"nested_subdirectory": {clusterName: "some/nested/path/workspace", expectErr: false},
 		"invalid_file_chars":  {clusterName: "invalid\x00name", expectErr: true},
@@ -99,10 +100,10 @@ func TestWrite(t *testing.T) {
 
 func TestDelete(t *testing.T) {
 	tempDir := t.TempDir()
-	handler, err := NewIOHandler(tempDir)
+	handler, err := schemahandler.NewFileHandler(tempDir)
 	assert.NoError(t, err)
 
-	existing := "root:sap:openmfp"
+	existing := "root:orgs:default"
 	nested := filepath.Join("some", "nested", "path", "workspace")
 
 	err = os.WriteFile(filepath.Join(tempDir, existing), testJSON, 0o644)

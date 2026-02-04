@@ -34,7 +34,7 @@ type GRPCHandler struct {
 	proto.UnimplementedSchemaHandlerServer
 }
 
-func New() *GRPCHandler {
+func NewGRPCHandler() *GRPCHandler {
 	return &GRPCHandler{
 		bus:     broadcaster.New[Event](),
 		schemas: sync.Map{},

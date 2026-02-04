@@ -2,7 +2,6 @@ package resource_test
 
 import (
 	"context"
-	"flag"
 	"os"
 	"path/filepath"
 	"testing"
@@ -38,9 +37,6 @@ func TestResourceControllerTestSuite(t *testing.T) {
 }
 
 func (suite *ResourceControllerTestSuite) SetupSuite() {
-	klog.InitFlags(nil)
-	_ = flag.Set("v", "5")
-
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
 	log.SetLogger(klog.NewKlogr())
 
@@ -54,13 +50,16 @@ func (suite *ResourceControllerTestSuite) SetupSuite() {
 	cfg, err := suite.env.Start()
 	suite.Require().NoError(err, "failed to start test environment")
 
+	tmpDir := suite.T().TempDir()
+
 	// Write the kubeconfig bytes to a temp file for the listener config
-	kubeconfigPath := filepath.Join(suite.T().TempDir(), "kubeconfig")
+	kubeconfigPath := filepath.Join(tmpDir, "kubeconfig")
 	err = os.WriteFile(kubeconfigPath, suite.env.KubeConfig, 0600)
 	suite.Require().NoError(err, "failed to write kubeconfig")
 
 	opts := options.NewOptions()
 	opts.KubeConfig = kubeconfigPath
+	opts.SchemasDir = filepath.Join(tmpDir, "schemas")
 
 	completedOpts, err := opts.Complete()
 	suite.Require().NoError(err, "failed to complete options")
@@ -90,7 +89,7 @@ func (suite *ResourceControllerTestSuite) SetupSuite() {
 
 	suite.listenerCfg = listenerConfig
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(suite.T().Context())
 	suite.cancel = cancel
 
 	go func() {
@@ -112,7 +111,4 @@ func (suite *ResourceControllerTestSuite) TearDownSuite() {
 
 	err := suite.env.Stop()
 	suite.Require().NoError(err, "failed to stop test environment")
-
-	err = os.RemoveAll(suite.listenerCfg.Options.SchemasDir)
-	suite.Require().NoError(err, "failed to remove schemas directory")
 }

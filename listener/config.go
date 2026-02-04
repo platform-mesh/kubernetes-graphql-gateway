@@ -10,7 +10,6 @@ import (
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/options"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/schemahandler"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/workspacefile"
 	kcpprovider "github.com/platform-mesh/kubernetes-graphql-gateway/providers/kcp"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/sdk"
 	"github.com/rs/zerolog/log"
@@ -152,9 +151,9 @@ func NewConfig(options *options.CompletedOptions) (*Config, error) {
 
 	switch options.SchemaHandler {
 	case "file":
-		config.SchemaHandler, err = workspacefile.NewIOHandler(options.SchemasDir)
+		config.SchemaHandler, err = schemahandler.NewFileHandler(options.SchemasDir)
 		if err != nil {
-			return nil, fmt.Errorf("error creating IO handler: %w", err)
+			return nil, fmt.Errorf("error creating file handler: %w", err)
 		}
 	case "grpc":
 
@@ -163,7 +162,7 @@ func NewConfig(options *options.CompletedOptions) (*Config, error) {
 			return nil, fmt.Errorf("error creating gRPC listener: %w", err)
 		}
 
-		handler := schemahandler.New()
+		handler := schemahandler.NewGRPCHandler()
 
 		srv := grpc.NewServer()
 		sdk.RegisterSchemaHandlerServer(srv, handler)

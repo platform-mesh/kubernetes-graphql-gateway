@@ -1,6 +1,6 @@
 module github.com/platform-mesh/kubernetes-graphql-gateway
 
-go 1.25.0
+go 1.25.6
 
 // this PR introduces newer version of graphiQL that supports headers
 // https://github.com/graphql-go/handler/pull/93
