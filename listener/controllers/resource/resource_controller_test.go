@@ -73,7 +73,6 @@ func (suite *ResourceControllerTestSuite) SetupSuite() {
 		listenerConfig.Manager,
 		controller.TypedOptions[mcreconcile.Request]{},
 		listenerConfig.SchemaHandler,
-		listenerConfig.SchemaResolver,
 		listenerConfig.Options.AnchorResource,
 		listenerConfig.Options.ResourceGVR,
 		listenerConfig.Options.ClusterMetadataFunc,

@@ -3,29 +3,23 @@ package apischema
 import (
 	"context"
 
-	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/openapi"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
-func ResolveSchema(ctx context.Context, dc discovery.DiscoveryInterface, rm meta.RESTMapper) ([]byte, error) {
-	resolver := NewResolver()
-	return resolver.Resolve(ctx, dc, rm)
+// ResolveSchema is a convenience function for tests.
+func ResolveSchema(ctx context.Context, oc openapi.Client, enrichers ...Enricher) ([]byte, error) {
+	resolver := NewResolver(enrichers...)
+	return resolver.Resolve(ctx, oc)
 }
 
-func GetOpenAPISchemaKey(gvk metav1.GroupVersionKind) string {
-	return getOpenAPISchemaKey(gvk)
+// LoadSchemas loads schemas from an OpenAPI client for testing.
+func LoadSchemas(ctx context.Context, oc openapi.Client) (*SchemaSet, error) {
+	loader := NewSchemaLoader()
+	return loader.Load(ctx, oc)
 }
 
-func (b *SchemaBuilder) GetSchemas() map[string]*spec.Schema {
-	return b.schemas
-}
-
-func (b *SchemaBuilder) GetError() error {
-	return b.err
-}
-
-func (b *SchemaBuilder) SetSchemas(schemas map[string]*spec.Schema) {
-	b.schemas = schemas
+// ExtractGVKFromSchema extracts the GVK from a schema for testing.
+func ExtractGVKFromSchema(schema *spec.Schema) (*GroupVersionKind, error) {
+	return extractGVK(schema)
 }
