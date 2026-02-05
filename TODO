@@ -19,3 +19,4 @@ TODO:
 5. Make sure contextual logging is in place everywhere in gateway and listener.
 6. Add traces and request logs into gateway http handler so that every request is logged with duration and status code.
 7. the RoundTripper is one hell of a mess - that needs to change
+8. Remove context from ResourceContext
