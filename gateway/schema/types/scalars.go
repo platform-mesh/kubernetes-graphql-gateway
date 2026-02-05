@@ -1,4 +1,4 @@
-package schema
+package types
 
 import (
 	"encoding/json"
@@ -7,7 +7,8 @@ import (
 	"github.com/graphql-go/graphql/language/ast"
 )
 
-var jsonStringScalar = graphql.NewScalar(graphql.ScalarConfig{
+// JSONStringScalar is a GraphQL scalar for JSON-serialized string representation of any object.
+var JSONStringScalar = graphql.NewScalar(graphql.ScalarConfig{
 	Name:        "JSONString",
 	Description: "A JSON-serialized string representation of any object.",
 	Serialize: func(value any) any {
@@ -43,7 +44,8 @@ var jsonStringScalar = graphql.NewScalar(graphql.ScalarConfig{
 	},
 })
 
-var stringMapScalar = graphql.NewScalar(graphql.ScalarConfig{
+// StringMapScalar is a GraphQL scalar for map[string]string input types.
+var StringMapScalar = graphql.NewScalar(graphql.ScalarConfig{
 	Name:        "StringMapInput",
 	Description: "Input type for a map from strings to strings.",
 	Serialize: func(value any) any {
@@ -60,9 +62,8 @@ var stringMapScalar = graphql.NewScalar(graphql.ScalarConfig{
 				for _, item := range arr {
 					if obj, ok := item.(map[string]any); ok {
 						if key, keyOk := obj["key"].(string); keyOk {
-							if val, valOk := obj["value"].(string); valOk {
-								result[key] = val
-							}
+							val, _ := obj["value"].(string)
+							result[key] = val
 						}
 					}
 				}
@@ -81,19 +82,21 @@ var stringMapScalar = graphql.NewScalar(graphql.ScalarConfig{
 					return nil
 				}
 
+				var key, val string
 				for _, field := range obj.Fields {
 					switch field.Name.Value {
 					case "key":
-						if key, ok := field.Value.GetValue().(string); ok {
-							result[key] = ""
+						if k, ok := field.Value.GetValue().(string); ok {
+							key = k
 						}
 					case "value":
-						if val, ok := field.Value.GetValue().(string); ok {
-							for key := range result {
-								result[key] = val
-							}
+						if v, ok := field.Value.GetValue().(string); ok {
+							val = v
 						}
 					}
+				}
+				if key != "" {
+					result[key] = val
 				}
 			}
 

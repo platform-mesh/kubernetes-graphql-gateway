@@ -7,7 +7,6 @@ import (
 	"github.com/google/cel-go/cel"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/apis/v1alpha1"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/controllers/reconciler"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/schemahandler"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -49,7 +48,6 @@ func New(
 	mgr mcmanager.Manager,
 	opts controller.TypedOptions[mcreconcile.Request],
 	schemaHandler schemahandler.Handler,
-	schemaResolver *apischema.Resolver,
 	anchorResource string,
 	resourceGVR string,
 	clusterMetadataFunc v1alpha1.ClusterMetadataFunc,
@@ -58,7 +56,7 @@ func New(
 	r := &Reconciler{
 		manager:        mgr,
 		opts:           opts,
-		reconciler:     reconciler.NewReconciler(schemaHandler, schemaResolver),
+		reconciler:     reconciler.NewReconciler(schemaHandler),
 		anchorResource: anchorResource,
 
 		clusterMetadataFunc:    clusterMetadataFunc,

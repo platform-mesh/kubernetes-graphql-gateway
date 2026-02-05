@@ -1,7 +1,6 @@
 package resolver
 
 import (
-	"context"
 	"fmt"
 	"reflect"
 	"strings"
@@ -52,7 +51,7 @@ type SubscriptionMetadata struct {
 	ResourceVersion string `json:"resourceVersion,omitempty"`
 }
 
-func (r *Service) SubscribeItem(_ context.Context, gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
+func (r *Service) SubscribeItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
 	return func(p graphql.ResolveParams) (any, error) {
 		_, span := otel.Tracer("").Start(p.Context, "SubscribeItem", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
@@ -63,7 +62,7 @@ func (r *Service) SubscribeItem(_ context.Context, gvk schema.GroupVersionKind, 
 	}
 }
 
-func (r *Service) SubscribeItems(_ context.Context, gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
+func (r *Service) SubscribeItems(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
 	return func(p graphql.ResolveParams) (any, error) {
 		_, span := otel.Tracer("").Start(p.Context, "SubscribeItems", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()

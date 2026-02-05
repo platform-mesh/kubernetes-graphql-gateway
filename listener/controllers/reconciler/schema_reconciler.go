@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/platform-mesh/kubernetes-graphql-gateway/apis/v1alpha1"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/schemahandler"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -23,17 +22,12 @@ var (
 )
 
 type Reconciler struct {
-	schemaHandler  schemahandler.Handler
-	schemaResolver *apischema.Resolver
+	schemaHandler schemahandler.Handler
 }
 
-func NewReconciler(
-	ioHandler schemahandler.Handler,
-	schemaResolver *apischema.Resolver,
-) *Reconciler {
+func NewReconciler(ioHandler schemahandler.Handler) *Reconciler {
 	return &Reconciler{
-		schemaHandler:  ioHandler,
-		schemaResolver: schemaResolver,
+		schemaHandler: ioHandler,
 	}
 }
 
@@ -67,7 +61,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, schemaPaths []string, cfg *r
 			RESTMapper:      restMapper,
 		}
 
-		currentSchema, err := generateSchemaWithMetadata(ctx, params, r.schemaResolver, metadata)
+		currentSchema, err := generateSchemaWithMetadata(ctx, params, metadata)
 		if err != nil {
 			logger.Error(err, "Failed to generate schema with metadata")
 			return fmt.Errorf("failed to generate schema with metadata: %w", err)
