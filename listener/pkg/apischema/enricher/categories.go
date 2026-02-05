@@ -7,7 +7,7 @@ import (
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	runtimeSchema "k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -32,11 +32,14 @@ func (e *Categories) Enrich(ctx context.Context, schemas *apischema.SchemaSet) e
 	logger := log.FromContext(ctx)
 
 	for _, apiResList := range e.resources {
-		gv, err := runtimeSchema.ParseGroupVersion(apiResList.GroupVersion)
+		gv, err := schema.ParseGroupVersion(apiResList.GroupVersion)
 		if err != nil {
-			logger.V(4).Info("failed to parse group version",
-				"groupVersion", apiResList.GroupVersion,
-				"error", err)
+			logger.V(4).
+				WithValues(
+					"groupVersion", apiResList.GroupVersion,
+					"error", err,
+				).
+				Info("failed to parse group version")
 			continue
 		}
 

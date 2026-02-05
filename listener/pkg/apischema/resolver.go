@@ -46,12 +46,12 @@ func (r *Resolver) Resolve(ctx context.Context, oc openapi.Client) ([]byte, erro
 
 	logger.Info("loaded schemas", "count", schemas.Size())
 
-	// 2. Run enrichers in order
+	// 2. Run enrichers
 	for _, e := range r.enrichers {
 		if err := e.Enrich(ctx, schemas); err != nil {
 			return nil, fmt.Errorf("enricher %s failed: %w", e.Name(), err)
 		}
-		logger.V(3).Info("applied enricher", "name", e.Name())
+		logger.V(4).Info("applied enricher", "name", e.Name())
 	}
 
 	// 3. Marshal output

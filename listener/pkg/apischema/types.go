@@ -113,7 +113,7 @@ func (s *SchemaSet) Marshal() ([]byte, error) {
 func NewSchemaSetFromMap(schemas map[string]*spec.Schema) *SchemaSet {
 	entries := make(map[string]*SchemaEntry, len(schemas))
 	for k, v := range schemas {
-		gvk, _ := extractGVK(v)
+		gvk, _ := ExtractGVK(v)
 		entries[k] = &SchemaEntry{
 			Key:    k,
 			Schema: v,

@@ -110,7 +110,7 @@ func TestExtractGVK(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			gvk, err := apischema.ExtractGVKFromSchema(tc.schema)
+			gvk, err := apischema.ExtractGVK(tc.schema)
 
 			if tc.wantErr {
 				assert.Error(t, err)

@@ -63,7 +63,7 @@ func TestResolveSchema(t *testing.T) {
 				openAPIClient.EXPECT().Paths().Return(openAPIPaths, nil)
 			}
 
-			got, err := apischema.ResolveSchema(t.Context(), openAPIClient)
+			got, err := apischema.NewResolver().Resolve(t.Context(), openAPIClient)
 			if tc.wantErr {
 				assert.Error(t, err)
 				return

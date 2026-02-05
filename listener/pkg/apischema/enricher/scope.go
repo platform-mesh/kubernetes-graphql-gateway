@@ -39,9 +39,10 @@ func (e *Scope) Enrich(ctx context.Context, schemas *apischema.SchemaSet) error 
 
 		namespaced, err := apiutil.IsGVKNamespaced(entry.GVK.ToRuntimeGVK(), e.mapper)
 		if err != nil {
-			logger.V(4).Info("failed to determine scope",
+			logger.V(4).WithValues(
 				"gvk", entry.GVK,
-				"error", err)
+				"error", err,
+			).Info("failed to determine scope")
 			continue
 		}
 

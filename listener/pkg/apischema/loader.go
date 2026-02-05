@@ -16,6 +16,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
+var (
+	// ErrGetOpenAPIPaths indicates failure to retrieve OpenAPI paths from the API server.
+	ErrGetOpenAPIPaths = errors.New("failed to get OpenAPI paths")
+
+	// ErrInvalidGVKFormat indicates the x-kubernetes-group-version-kind extension has an unexpected format.
+	ErrInvalidGVKFormat = errors.New("invalid GVK extension format")
+)
+
 // SchemaLoader loads OpenAPI schemas from a Kubernetes API server.
 type SchemaLoader struct{}
 
@@ -82,7 +90,7 @@ func (l *SchemaLoader) loadPath(
 		// Walk and normalize refs
 		walked := walker.WalkSchema(schema)
 
-		gvk, err := extractGVK(walked)
+		gvk, err := ExtractGVK(walked)
 		if err != nil {
 			logger.V(4).Info("failed to extract GVK",
 				"key", key,
@@ -101,9 +109,9 @@ func (l *SchemaLoader) loadPath(
 	return entries, errs
 }
 
-// extractGVK extracts GVK from schema extensions using type assertion.
+// ExtractGVK extracts GVK from schema extensions using type assertion.
 // Returns nil if schema has no GVK extension (e.g., sub-resources).
-func extractGVK(schema *spec.Schema) (*GroupVersionKind, error) {
+func ExtractGVK(schema *spec.Schema) (*GroupVersionKind, error) {
 	if schema.Extensions == nil {
 		return nil, nil
 	}
