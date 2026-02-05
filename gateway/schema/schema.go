@@ -14,7 +14,6 @@ import (
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -35,12 +34,11 @@ type Provider interface {
 }
 
 type Gateway struct {
-	resolver           resolver.Provider
-	graphqlSchema      graphql.Schema
-	definitions        map[string]*spec.Schema
-	typesCache         map[string]*graphql.Object
-	inputTypesCache    map[string]*graphql.InputObject
-	enhancedTypesCache map[string]*graphql.Object // Cache for enhanced *Ref types
+	resolver        resolver.Provider
+	graphqlSchema   graphql.Schema
+	definitions     map[string]*spec.Schema
+	typesCache      map[string]*graphql.Object
+	inputTypesCache map[string]*graphql.InputObject
 	// Prevents naming conflict in case of the same Kind name in different groups/versions
 	typeNameRegistry map[string]string // map[Kind]GroupVersion
 
@@ -50,13 +48,12 @@ type Gateway struct {
 
 func New(definitions map[string]*spec.Schema, resolverProvider resolver.Provider) (*Gateway, error) {
 	g := &Gateway{
-		resolver:           resolverProvider,
-		definitions:        definitions,
-		typesCache:         make(map[string]*graphql.Object),
-		inputTypesCache:    make(map[string]*graphql.InputObject),
-		enhancedTypesCache: make(map[string]*graphql.Object),
-		typeNameRegistry:   make(map[string]string),
-		typeByCategory:     make(map[string][]resolver.TypeByCategory),
+		resolver:         resolverProvider,
+		definitions:      definitions,
+		typesCache:       make(map[string]*graphql.Object),
+		inputTypesCache:  make(map[string]*graphql.InputObject),
+		typeNameRegistry: make(map[string]string),
+		typeByCategory:   make(map[string][]resolver.TypeByCategory),
 	}
 
 	err := g.generateGraphqlSchema(context.TODO())
@@ -115,75 +112,6 @@ func (g *Gateway) generateGraphqlSchema(ctx context.Context) error {
 	g.graphqlSchema = newSchema
 
 	return nil
-}
-
-// highestSemverVersion finds the highest semantic version among a group of resources with the same Kind.
-// It extracts the version from each GroupVersionKind string and compares them using Kubernetes version priority.
-// Returns the full GroupVersionKind string of the resource with the highest version.
-func highestSemverVersion(currentKind string, otherVersions map[string]*spec.Schema, definitions map[string]*spec.Schema) string {
-	highestKey := currentKind
-	highestVersion := ""
-
-	// Extract version from current kind
-	if gvk, err := getGroupVersionKindFromDefinitions(currentKind, definitions); err == nil {
-		highestVersion = gvk.Version
-	}
-
-	// Compare with other versions
-	for versionKey := range otherVersions {
-		gvk, err := getGroupVersionKindFromDefinitions(versionKey, definitions)
-		if err != nil {
-			continue
-		}
-
-		// Compare versions using Kubernetes version comparison
-		// CompareKubeAwareVersionStrings returns positive if v1 > v2, 0 if equal, negative if v1 < v2
-		if version.CompareKubeAwareVersionStrings(gvk.Version, highestVersion) > 0 {
-			highestVersion = gvk.Version
-			highestKey = versionKey
-		}
-	}
-
-	return highestKey
-}
-
-// hasAnotherVersion checks if there are other versions of the same resource (same Group and Kind, different Version).
-// It returns true if other versions exist, and a map of all other versions found.
-func hasAnotherVersion(groupVersionKind string, allKinds map[string]*spec.Schema, definitions map[string]*spec.Schema) (bool, map[string]*spec.Schema) {
-	// Get the GVK for the current resource
-	currentGVK, err := getGroupVersionKindFromDefinitions(groupVersionKind, definitions)
-	if err != nil {
-		// If we can't parse the current GVK, we can't determine if there are other versions
-		return false, nil
-	}
-
-	otherVersions := map[string]*spec.Schema{}
-	hasOtherVersion := false
-
-	// Check all other resources to find ones with the same Group and Kind but different Version
-	for otherResourceKey, otherSchema := range allKinds {
-		// Skip the current resource
-		if otherResourceKey == groupVersionKind {
-			continue
-		}
-
-		// Get the GVK for the other resource
-		otherGVK, err := getGroupVersionKindFromDefinitions(otherResourceKey, definitions)
-		if err != nil {
-			// Skip resources we can't parse
-			continue
-		}
-
-		// Check if it's the same Group and Kind but different Version
-		if otherGVK.Group == currentGVK.Group &&
-			otherGVK.Kind == currentGVK.Kind &&
-			otherGVK.Version != currentGVK.Version {
-			hasOtherVersion = true
-			otherVersions[otherResourceKey] = otherSchema
-		}
-	}
-
-	return hasOtherVersion, otherVersions
 }
 
 func (g *Gateway) isRootGroup(group string) bool {
@@ -553,9 +481,6 @@ func (g *Gateway) generateGraphQLFields(resourceScheme *spec.Schema, typePrefix 
 			Type: inputFieldType,
 		}
 	}
-
-	// Add relation fields for any *Ref fields in this schema
-	g.addRelationFields(fields, resourceScheme.Properties)
 
 	return fields, inputFields, nil
 }

@@ -48,7 +48,6 @@ type Provider interface {
 	CustomQueriesProvider
 	CommonResolver() graphql.FieldResolveFn
 	SanitizeGroupName(string) string
-	RelationResolver(fieldName string, gvk schema.GroupVersionKind) graphql.FieldResolveFn
 }
 
 type CrudProvider interface {
