@@ -4,13 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"regexp"
 	"strings"
 
 	"github.com/gobuffalo/flect"
 	"github.com/graphql-go/graphql"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/apis"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/resolver"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/schema/types"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -34,26 +34,27 @@ type Provider interface {
 }
 
 type Gateway struct {
-	resolver        resolver.Provider
-	graphqlSchema   graphql.Schema
-	definitions     map[string]*spec.Schema
-	typesCache      map[string]*graphql.Object
-	inputTypesCache map[string]*graphql.InputObject
-	// Prevents naming conflict in case of the same Kind name in different groups/versions
-	typeNameRegistry map[string]string // map[Kind]GroupVersion
+	resolver      resolver.Provider
+	graphqlSchema graphql.Schema
+	definitions   map[string]*spec.Schema
+
+	// Type management via types package
+	typeRegistry  *types.Registry
+	typeConverter *types.Converter
 
 	// categoryRegistry stores resources by category for typeByCategory query
 	typeByCategory map[string][]resolver.TypeByCategory
 }
 
 func New(definitions map[string]*spec.Schema, resolverProvider resolver.Provider) (*Gateway, error) {
+	registry := types.NewRegistry(resolverProvider.SanitizeGroupName)
+
 	g := &Gateway{
-		resolver:         resolverProvider,
-		definitions:      definitions,
-		typesCache:       make(map[string]*graphql.Object),
-		inputTypesCache:  make(map[string]*graphql.InputObject),
-		typeNameRegistry: make(map[string]string),
-		typeByCategory:   make(map[string][]resolver.TypeByCategory),
+		resolver:       resolverProvider,
+		definitions:    definitions,
+		typeRegistry:   registry,
+		typeConverter:  types.NewConverter(registry, definitions),
+		typeByCategory: make(map[string][]resolver.TypeByCategory),
 	}
 
 	err := g.generateGraphqlSchema(context.TODO())
@@ -401,23 +402,7 @@ func (g *Gateway) processSingleResource(
 }
 
 func (g *Gateway) getUniqueTypeName(gvk *schema.GroupVersionKind) string {
-	kind := gvk.Kind
-	// Check if the kind name has already been used for a different group/version
-	if existingGroupVersion, exists := g.typeNameRegistry[kind]; exists {
-		if existingGroupVersion != gvk.GroupVersion().String() {
-			// Conflict detected, append group and version to the kind for uniqueness
-			sanitizedGroup := ""
-			if !g.isRootGroup(gvk.Group) {
-				sanitizedGroup = g.resolver.SanitizeGroupName(gvk.Group)
-			}
-			return flect.Pascalize(sanitizedGroup+"_"+gvk.Version) + kind
-		}
-	} else {
-		// No conflict, register the kind with its group and version
-		g.typeNameRegistry[kind] = gvk.GroupVersion().String()
-	}
-
-	return kind
+	return g.typeRegistry.GetUniqueTypeName(gvk)
 }
 
 func (g *Gateway) getNames(gvk *schema.GroupVersionKind) (singular string, plural string) {
@@ -461,156 +446,7 @@ func (g *Gateway) getDefinitionsByGroup(filteredDefinitions map[string]*spec.Sch
 }
 
 func (g *Gateway) generateGraphQLFields(resourceScheme *spec.Schema, typePrefix string, fieldPath []string, processingTypes map[string]bool) (graphql.Fields, graphql.InputObjectConfigFieldMap, error) {
-	fields := graphql.Fields{}
-	inputFields := graphql.InputObjectConfigFieldMap{}
-
-	for fieldName, fieldSpec := range resourceScheme.Properties {
-		sanitizedFieldName := sanitizeFieldName(fieldName)
-		currentFieldPath := append(fieldPath, fieldName)
-
-		fieldType, inputFieldType, err := g.convertSwaggerTypeToGraphQL(fieldSpec, typePrefix, currentFieldPath, processingTypes)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		fields[sanitizedFieldName] = &graphql.Field{
-			Type: fieldType,
-		}
-
-		inputFields[sanitizedFieldName] = &graphql.InputObjectFieldConfig{
-			Type: inputFieldType,
-		}
-	}
-
-	return fields, inputFields, nil
-}
-
-func (g *Gateway) convertSwaggerTypeToGraphQL(schema spec.Schema, typePrefix string, fieldPath []string, processingTypes map[string]bool) (graphql.Output, graphql.Input, error) {
-	if len(schema.Type) == 0 {
-		// Handle $ref types
-		if len(schema.AllOf) == 0 {
-			return graphql.String, graphql.String, nil
-		}
-
-		refKey := schema.AllOf[0].Ref.String()
-
-		// Check if type is already being processed
-		if processingTypes[refKey] {
-			// Return existing type to prevent infinite recursion
-			if existingType, exists := g.typesCache[refKey]; exists && existingType != nil {
-				existingInputType := g.inputTypesCache[refKey]
-				return existingType, existingInputType, nil
-			}
-
-			// Return placeholder types to prevent recursion
-			return graphql.String, graphql.String, nil
-		}
-
-		if refDef, ok := g.definitions[refKey]; ok {
-			// Mark as processing
-			processingTypes[refKey] = true
-			defer delete(processingTypes, refKey)
-
-			fieldType, inputFieldType, err := g.convertSwaggerTypeToGraphQL(*refDef, refKey, fieldPath, processingTypes)
-			if err != nil {
-				return nil, nil, err
-			}
-
-			// Store the types
-			if objType, ok := fieldType.(*graphql.Object); ok {
-				g.typesCache[refKey] = objType
-			}
-			if inputObjType, ok := inputFieldType.(*graphql.InputObject); ok {
-				g.inputTypesCache[refKey] = inputObjType
-			}
-
-			return fieldType, inputFieldType, nil
-		} else {
-			// Definition not found, return string
-			return graphql.String, graphql.String, nil
-		}
-
-	}
-
-	switch schema.Type[0] {
-	case "string":
-		return graphql.String, graphql.String, nil
-	case "integer":
-		return graphql.Int, graphql.Int, nil
-	case "number":
-		return graphql.Float, graphql.Float, nil
-	case "boolean":
-		return graphql.Boolean, graphql.Boolean, nil
-	case "array":
-		if schema.Items != nil && schema.Items.Schema != nil {
-			itemType, inputItemType, err := g.convertSwaggerTypeToGraphQL(*schema.Items.Schema, typePrefix, fieldPath, processingTypes)
-			if err != nil {
-				return nil, nil, err
-			}
-			return graphql.NewList(itemType), graphql.NewList(inputItemType), nil
-		}
-		return graphql.NewList(graphql.String), graphql.NewList(graphql.String), nil
-	case "object":
-		return g.handleObjectFieldSpecType(schema, typePrefix, fieldPath, processingTypes)
-	default:
-		// Handle unexpected types or additional properties
-		return graphql.String, graphql.String, nil
-	}
-}
-
-func (g *Gateway) handleObjectFieldSpecType(fieldSpec spec.Schema, typePrefix string, fieldPath []string, processingTypes map[string]bool) (graphql.Output, graphql.Input, error) {
-	if len(fieldSpec.Properties) > 0 {
-		typeName := g.generateTypeName(typePrefix, fieldPath)
-
-		// Check if type already generated
-		if existingType, exists := g.typesCache[typeName]; exists && existingType != nil {
-			return existingType, g.inputTypesCache[typeName], nil
-		}
-
-		// If type is being processed (nil in cache), return placeholder to prevent recursion
-		if _, exists := g.typesCache[typeName]; exists {
-			return graphql.String, graphql.String, nil
-		}
-
-		// Store placeholder to prevent recursion
-		g.typesCache[typeName] = nil
-		g.inputTypesCache[typeName] = nil
-
-		nestedFields, nestedInputFields, err := g.generateGraphQLFields(&fieldSpec, typeName, fieldPath, processingTypes)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		newType := graphql.NewObject(graphql.ObjectConfig{
-			Name:   sanitizeFieldName(typeName),
-			Fields: nestedFields,
-		})
-
-		newInputType := graphql.NewInputObject(graphql.InputObjectConfig{
-			Name:   sanitizeFieldName(typeName) + "Input",
-			Fields: nestedInputFields,
-		})
-
-		// Store the generated types
-		g.typesCache[typeName] = newType
-		g.inputTypesCache[typeName] = newInputType
-
-		return newType, newInputType, nil
-	} else if fieldSpec.AdditionalProperties != nil && fieldSpec.AdditionalProperties.Schema != nil {
-		// Hagndle map types
-		if len(fieldSpec.AdditionalProperties.Schema.Type) == 1 && fieldSpec.AdditionalProperties.Schema.Type[0] == "string" {
-			// This is a map[string]string
-			return stringMapScalar, stringMapScalar, nil
-		}
-	}
-
-	// It's an empty object, serialize as JSON string
-	return jsonStringScalar, jsonStringScalar, nil
-}
-
-func (g *Gateway) generateTypeName(typePrefix string, fieldPath []string) string {
-	name := typePrefix + strings.Join(fieldPath, "")
-	return name
+	return g.typeConverter.ConvertFields(resourceScheme, typePrefix, fieldPath, processingTypes)
 }
 
 // parseGVKExtension parses the x-kubernetes-group-version-kind extension from a resource schema.
@@ -728,16 +564,4 @@ func (g *Gateway) getScope(resourceURI string) (apiextensionsv1.ResourceScope, e
 	}
 
 	return apiextensionsv1.ResourceScope(scope), nil
-}
-
-func sanitizeFieldName(name string) string {
-	// Replace any invalid characters with '_'
-	name = regexp.MustCompile(`[^_a-zA-Z0-9]`).ReplaceAllString(name, "_")
-
-	// If the name doesn't start with a letter or underscore, prepend '_'
-	if !regexp.MustCompile(`^[_a-zA-Z]`).MatchString(name) {
-		name = "_" + name
-	}
-
-	return name
 }

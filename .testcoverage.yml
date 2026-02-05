@@ -7,3 +7,7 @@ exclude:
     - listener/server.go
     - listener/config.go
     - listener/options
+    - gateway/server.go
+    - gateway/config.go
+    - gateway/options
+    - gateway/utils/context

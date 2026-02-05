@@ -116,8 +116,6 @@ func TestSanitizeFieldNameUtil(t *testing.T) {
 }
 
 func TestGenerateTypeName(t *testing.T) {
-	g := schema.GetGatewayForTest(map[string]string{})
-
 	tests := []struct {
 		name       string
 		typePrefix string
@@ -146,7 +144,7 @@ func TestGenerateTypeName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := g.GenerateTypeNameForTest(tt.typePrefix, tt.fieldPath)
+			got := schema.GenerateTypeNameForTest(tt.typePrefix, tt.fieldPath)
 			if got != tt.expected {
 				t.Errorf("GenerateTypeNameForTest() = %q, want %q", got, tt.expected)
 			}

@@ -1,13 +1,18 @@
 package schema
 
-import "k8s.io/apimachinery/pkg/runtime/schema"
+import (
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/schema/types"
 
-var StringMapScalarForTest = stringMapScalar
-var JSONStringScalarForTest = jsonStringScalar
+	"k8s.io/apimachinery/pkg/runtime/schema"
+)
 
-func GetGatewayForTest(typeNameRegistry map[string]string) *Gateway {
+var StringMapScalarForTest = types.StringMapScalar
+var JSONStringScalarForTest = types.JSONStringScalar
+
+func GetGatewayForTest() *Gateway {
+	registry := types.NewRegistry(func(s string) string { return s })
 	return &Gateway{
-		typeNameRegistry: typeNameRegistry,
+		typeRegistry: registry,
 	}
 }
 
@@ -15,10 +20,10 @@ func (g *Gateway) GetNamesForTest(gvk *schema.GroupVersionKind) (singular, plura
 	return g.getNames(gvk)
 }
 
-func (g *Gateway) GenerateTypeNameForTest(typePrefix string, fieldPath []string) string {
-	return g.generateTypeName(typePrefix, fieldPath)
+func GenerateTypeNameForTest(typePrefix string, fieldPath []string) string {
+	return types.GenerateTypeName(typePrefix, fieldPath)
 }
 
 func SanitizeFieldNameForTest(name string) string {
-	return sanitizeFieldName(name)
+	return types.SanitizeFieldName(name)
 }

@@ -1,4 +1,4 @@
-package schema
+package types
 
 import (
 	"encoding/json"
@@ -7,7 +7,8 @@ import (
 	"github.com/graphql-go/graphql/language/ast"
 )
 
-var jsonStringScalar = graphql.NewScalar(graphql.ScalarConfig{
+// JSONStringScalar is a GraphQL scalar for JSON-serialized string representation of any object.
+var JSONStringScalar = graphql.NewScalar(graphql.ScalarConfig{
 	Name:        "JSONString",
 	Description: "A JSON-serialized string representation of any object.",
 	Serialize: func(value any) any {
@@ -43,7 +44,8 @@ var jsonStringScalar = graphql.NewScalar(graphql.ScalarConfig{
 	},
 })
 
-var stringMapScalar = graphql.NewScalar(graphql.ScalarConfig{
+// StringMapScalar is a GraphQL scalar for map[string]string input types.
+var StringMapScalar = graphql.NewScalar(graphql.ScalarConfig{
 	Name:        "StringMapInput",
 	Description: "Input type for a map from strings to strings.",
 	Serialize: func(value any) any {
