@@ -34,15 +34,6 @@ func TestRegistry_RegisterAndGet(t *testing.T) {
 		t.Errorf("Get() input = %v, want %v", gotInput, inputType)
 	}
 
-	// Test GetOutput
-	if got := registry.GetOutput("test-key"); got != outputType {
-		t.Errorf("GetOutput() = %v, want %v", got, outputType)
-	}
-
-	// Test GetInput
-	if got := registry.GetInput("test-key"); got != inputType {
-		t.Errorf("GetInput() = %v, want %v", got, inputType)
-	}
 }
 
 func TestRegistry_GetNonExistent(t *testing.T) {
@@ -138,15 +129,15 @@ func TestRegistry_GetUniqueTypeName_EmptyGroup(t *testing.T) {
 	}
 }
 
-func TestRegistry_HasType(t *testing.T) {
+func TestRegistry_IsProcessing_AfterMark(t *testing.T) {
 	registry := types.NewRegistry(func(s string) string { return s })
 
-	if registry.HasType("test-key") {
-		t.Error("HasType() should return false for non-existent key")
+	if registry.IsProcessing("test-key") {
+		t.Error("IsProcessing() should return false for non-existent key")
 	}
 
 	registry.MarkProcessing("test-key")
-	if !registry.HasType("test-key") {
-		t.Error("HasType() should return true after MarkProcessing()")
+	if !registry.IsProcessing("test-key") {
+		t.Error("IsProcessing() should return true after MarkProcessing()")
 	}
 }

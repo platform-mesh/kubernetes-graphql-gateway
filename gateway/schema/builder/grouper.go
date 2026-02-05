@@ -81,9 +81,8 @@ func (g *Grouper) GetGroupVersionKind(resourceKey string) (*schema.GroupVersionK
 		return nil, errors.New("no GVK extension found")
 	}
 
-	runtimeGVK := gvk.ToRuntimeGVK()
-	runtimeGVK.Group = g.resolver.SanitizeGroupName(runtimeGVK.Group)
-	return &runtimeGVK, nil
+	gvk.Group = g.resolver.SanitizeGroupName(gvk.Group)
+	return gvk, nil
 }
 
 func (g *Grouper) GetScope(resourceURI string) (apiextensionsv1.ResourceScope, error) {

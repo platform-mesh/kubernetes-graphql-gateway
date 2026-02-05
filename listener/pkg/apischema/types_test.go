@@ -7,6 +7,7 @@ import (
 	"github.com/platform-mesh/kubernetes-graphql-gateway/apischema"
 	"github.com/stretchr/testify/assert"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
@@ -54,7 +55,7 @@ func TestSchemaSet_O1_Lookups(t *testing.T) {
 	})
 
 	t.Run("Get by GVK - core Pod", func(t *testing.T) {
-		entry, ok := schemas.GetByGVK(apischema.GroupVersionKind{
+		entry, ok := schemas.GetByGVK(schema.GroupVersionKind{
 			Group:   "",
 			Version: "v1",
 			Kind:    "Pod",
@@ -64,7 +65,7 @@ func TestSchemaSet_O1_Lookups(t *testing.T) {
 	})
 
 	t.Run("Get by GVK - apps Deployment", func(t *testing.T) {
-		entry, ok := schemas.GetByGVK(apischema.GroupVersionKind{
+		entry, ok := schemas.GetByGVK(schema.GroupVersionKind{
 			Group:   "apps",
 			Version: "v1",
 			Kind:    "Deployment",
@@ -102,16 +103,3 @@ func TestSchemaSet_O1_Lookups(t *testing.T) {
 	})
 }
 
-func TestGroupVersionKind_ToRuntimeGVK(t *testing.T) {
-	gvk := apischema.GroupVersionKind{
-		Group:   "apps",
-		Version: "v1",
-		Kind:    "Deployment",
-	}
-
-	runtimeGVK := gvk.ToRuntimeGVK()
-
-	assert.Equal(t, "apps", runtimeGVK.Group)
-	assert.Equal(t, "v1", runtimeGVK.Version)
-	assert.Equal(t, "Deployment", runtimeGVK.Kind)
-}

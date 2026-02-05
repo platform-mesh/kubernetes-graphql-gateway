@@ -38,7 +38,7 @@ func New(definitions map[string]*spec.Schema, resolverProvider resolver.Provider
 		definitions:           definitions,
 		resolver:              resolverProvider,
 		typeRegistry:          registry,
-		typeConverter:         types.NewConverter(registry, definitions),
+		typeConverter:         types.NewConverter(registry),
 		grouper:               NewGrouper(definitions, resolverProvider),
 		categoryManager:       categoryManager,
 		queryGenerator:        fields.NewQueryGenerator(resolverProvider),
@@ -218,7 +218,7 @@ func (b *Builder) processResource(
 	uniqueTypeName := b.typeRegistry.GetUniqueTypeName(gvk)
 
 	// Generate GraphQL fields
-	gqlFields, inputFields, err := b.typeConverter.ConvertFields(resourceScheme, uniqueTypeName, []string{}, make(map[string]bool))
+	gqlFields, inputFields, err := b.typeConverter.ConvertFields(resourceScheme, b.definitions, uniqueTypeName)
 	if err != nil {
 		logger.WithValues("resource", singular).Error(err, "Error generating fields")
 		return

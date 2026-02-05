@@ -59,28 +59,6 @@ func (r *Registry) Get(key string) (*graphql.Object, *graphql.InputObject) {
 	return entry.Output, entry.Input
 }
 
-func (r *Registry) GetOutput(key string) *graphql.Object {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	entry, exists := r.types[key]
-	if !exists {
-		return nil
-	}
-	return entry.Output
-}
-
-func (r *Registry) GetInput(key string) *graphql.InputObject {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	entry, exists := r.types[key]
-	if !exists {
-		return nil
-	}
-	return entry.Input
-}
-
 func (r *Registry) IsProcessing(key string) bool {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -108,17 +86,6 @@ func (r *Registry) UnmarkProcessing(key string) {
 	}
 }
 
-func (r *Registry) GetState(key string) ConversionState {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	entry, exists := r.types[key]
-	if !exists {
-		return StateNotStarted
-	}
-	return entry.State
-}
-
 // GetUniqueTypeName returns a unique type name for a GVK, handling conflicts
 // when the same Kind exists in different API groups.
 func (r *Registry) GetUniqueTypeName(gvk *schema.GroupVersionKind) string {
@@ -141,14 +108,6 @@ func (r *Registry) GetUniqueTypeName(gvk *schema.GroupVersionKind) string {
 	}
 
 	return kind
-}
-
-func (r *Registry) HasType(key string) bool {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	_, exists := r.types[key]
-	return exists
 }
 
 func (r *Registry) getOrCreateEntry(key string) *TypeEntry {

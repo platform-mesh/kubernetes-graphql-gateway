@@ -37,7 +37,7 @@ func generateSchemaWithMetadata(
 	apiResources, err := params.DiscoveryClient.ServerPreferredResources()
 	if err != nil {
 		// Log but don't fail - some resources may still be available
-		logger.V(2).Info("partial error getting server preferred resources", "error", err)
+		logger.Info("partial error getting server preferred resources", "error", err)
 		if apiResources == nil {
 			return nil, fmt.Errorf("failed to get server preferred resources: %w", err)
 		}

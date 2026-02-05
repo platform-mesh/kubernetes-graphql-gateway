@@ -7,6 +7,7 @@ import (
 	"github.com/platform-mesh/kubernetes-graphql-gateway/apischema"
 	"github.com/stretchr/testify/assert"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
@@ -14,7 +15,7 @@ func TestExtractGVK(t *testing.T) {
 	tests := []struct {
 		name    string
 		schema  *spec.Schema
-		wantGVK *apischema.GroupVersionKind
+		wantGVK *schema.GroupVersionKind
 		wantErr bool
 	}{
 		{
@@ -32,7 +33,7 @@ func TestExtractGVK(t *testing.T) {
 					},
 				},
 			},
-			wantGVK: &apischema.GroupVersionKind{
+			wantGVK: &schema.GroupVersionKind{
 				Group:   "apps",
 				Version: "v1",
 				Kind:    "Deployment",
@@ -54,7 +55,7 @@ func TestExtractGVK(t *testing.T) {
 					},
 				},
 			},
-			wantGVK: &apischema.GroupVersionKind{
+			wantGVK: &schema.GroupVersionKind{
 				Group:   "",
 				Version: "v1",
 				Kind:    "Pod",

@@ -70,7 +70,7 @@ func TestGenerateTypeName(t *testing.T) {
 			name:       "simple_case",
 			typePrefix: "Pod",
 			fieldPath:  []string{"spec", "containers"},
-			expected:   "Podspeccontainers",
+			expected:   "PodSpecContainers",
 		},
 		{
 			name:       "empty_field_path",
@@ -82,13 +82,13 @@ func TestGenerateTypeName(t *testing.T) {
 			name:       "single_field",
 			typePrefix: "ConfigMap",
 			fieldPath:  []string{"data"},
-			expected:   "ConfigMapdata",
+			expected:   "ConfigMapData",
 		},
 		{
 			name:       "nested_path",
 			typePrefix: "Deployment",
 			fieldPath:  []string{"spec", "template", "spec", "containers"},
-			expected:   "Deploymentspectemplatespeccontainers",
+			expected:   "DeploymentSpecTemplateSpecContainers",
 		},
 	}
 

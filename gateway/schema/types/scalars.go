@@ -62,9 +62,8 @@ var StringMapScalar = graphql.NewScalar(graphql.ScalarConfig{
 				for _, item := range arr {
 					if obj, ok := item.(map[string]any); ok {
 						if key, keyOk := obj["key"].(string); keyOk {
-							if val, valOk := obj["value"].(string); valOk {
-								result[key] = val
-							}
+							val, _ := obj["value"].(string)
+							result[key] = val
 						}
 					}
 				}
@@ -83,19 +82,21 @@ var StringMapScalar = graphql.NewScalar(graphql.ScalarConfig{
 					return nil
 				}
 
+				var key, val string
 				for _, field := range obj.Fields {
 					switch field.Name.Value {
 					case "key":
-						if key, ok := field.Value.GetValue().(string); ok {
-							result[key] = ""
+						if k, ok := field.Value.GetValue().(string); ok {
+							key = k
 						}
 					case "value":
-						if val, ok := field.Value.GetValue().(string); ok {
-							for key := range result {
-								result[key] = val
-							}
+						if v, ok := field.Value.GetValue().(string); ok {
+							val = v
 						}
 					}
+				}
+				if key != "" {
+					result[key] = val
 				}
 			}
 

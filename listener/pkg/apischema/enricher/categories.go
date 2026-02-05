@@ -48,7 +48,7 @@ func (e *Categories) Enrich(ctx context.Context, schemas *apischema.SchemaSet) e
 				continue
 			}
 
-			entry, ok := schemas.GetByGVK(apischema.GroupVersionKind{
+			entry, ok := schemas.GetByGVK(schema.GroupVersionKind{
 				Group:   gv.Group,
 				Version: gv.Version,
 				Kind:    res.Kind,

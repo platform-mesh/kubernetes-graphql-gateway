@@ -37,7 +37,7 @@ func (e *Scope) Enrich(ctx context.Context, schemas *apischema.SchemaSet) error 
 			continue
 		}
 
-		namespaced, err := apiutil.IsGVKNamespaced(entry.GVK.ToRuntimeGVK(), e.mapper)
+		namespaced, err := apiutil.IsGVKNamespaced(*entry.GVK, e.mapper)
 		if err != nil {
 			logger.V(4).WithValues(
 				"gvk", entry.GVK,

@@ -6,6 +6,7 @@ import (
 	"github.com/platform-mesh/kubernetes-graphql-gateway/apis"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
@@ -22,12 +23,12 @@ var (
 
 // ExtractGVK extracts GVK from schema extensions using type assertion.
 // Returns nil if schema has no GVK extension (e.g., sub-resources).
-func ExtractGVK(schema *spec.Schema) (*GroupVersionKind, error) {
-	if schema == nil || schema.Extensions == nil {
+func ExtractGVK(s *spec.Schema) (*schema.GroupVersionKind, error) {
+	if s == nil || s.Extensions == nil {
 		return nil, nil
 	}
 
-	gvksVal, ok := schema.Extensions[apis.GVKExtensionKey]
+	gvksVal, ok := s.Extensions[apis.GVKExtensionKey]
 	if !ok {
 		return nil, nil
 	}
@@ -45,7 +46,7 @@ func ExtractGVK(schema *spec.Schema) (*GroupVersionKind, error) {
 	return nil, ErrInvalidGVKFormat
 }
 
-func extractFromInterfaceSlice(slice []any) (*GroupVersionKind, error) {
+func extractFromInterfaceSlice(slice []any) (*schema.GroupVersionKind, error) {
 	if len(slice) != 1 {
 		return nil, nil // Skip schemas with multiple or zero GVKs
 	}
@@ -58,7 +59,7 @@ func extractFromInterfaceSlice(slice []any) (*GroupVersionKind, error) {
 	return gvkFromMap(gvkMap), nil
 }
 
-func extractFromMapSlice(slice []map[string]any) (*GroupVersionKind, error) {
+func extractFromMapSlice(slice []map[string]any) (*schema.GroupVersionKind, error) {
 	if len(slice) != 1 {
 		return nil, nil
 	}
@@ -67,8 +68,8 @@ func extractFromMapSlice(slice []map[string]any) (*GroupVersionKind, error) {
 }
 
 // gvkFromMap extracts a GroupVersionKind from a map with group/version/kind keys.
-func gvkFromMap(m map[string]any) *GroupVersionKind {
-	return &GroupVersionKind{
+func gvkFromMap(m map[string]any) *schema.GroupVersionKind {
+	return &schema.GroupVersionKind{
 		Group:   mapValue[string](m, "group"),
 		Version: mapValue[string](m, "version"),
 		Kind:    mapValue[string](m, "kind"),
@@ -107,16 +108,4 @@ func ExtractScope(schema *spec.Schema) (apiextensionsv1.ResourceScope, error) {
 	default:
 		return "", ErrInvalidScopeFormat
 	}
-}
-
-// HasGVK returns true if the schema has a valid GVK extension.
-func HasGVK(schema *spec.Schema) bool {
-	gvk, err := ExtractGVK(schema)
-	return err == nil && gvk != nil && gvk.Kind != ""
-}
-
-// HasScope returns true if the schema has a scope extension.
-func HasScope(schema *spec.Schema) bool {
-	_, err := ExtractScope(schema)
-	return err == nil
 }
