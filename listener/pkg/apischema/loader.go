@@ -6,7 +6,7 @@ import (
 	"errors"
 	"maps"
 
-	"github.com/platform-mesh/kubernetes-graphql-gateway/apis"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/apischema"
 
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/openapi"
@@ -19,9 +19,6 @@ import (
 var (
 	// ErrGetOpenAPIPaths indicates failure to retrieve OpenAPI paths from the API server.
 	ErrGetOpenAPIPaths = errors.New("failed to get OpenAPI paths")
-
-	// ErrInvalidGVKFormat indicates the x-kubernetes-group-version-kind extension has an unexpected format.
-	ErrInvalidGVKFormat = errors.New("invalid GVK extension format")
 )
 
 // SchemaLoader loads OpenAPI schemas from a Kubernetes API server.
@@ -34,7 +31,7 @@ func NewSchemaLoader() *SchemaLoader {
 
 // Load fetches and parses all OpenAPI schemas from the client.
 // GVK is extracted once per schema via type assertion
-func (l *SchemaLoader) Load(ctx context.Context, oc openapi.Client) (*SchemaSet, error) {
+func (l *SchemaLoader) Load(ctx context.Context, oc openapi.Client) (*apischema.SchemaSet, error) {
 	logger := log.FromContext(ctx)
 
 	paths, err := oc.Paths()
@@ -42,7 +39,7 @@ func (l *SchemaLoader) Load(ctx context.Context, oc openapi.Client) (*SchemaSet,
 		return nil, errors.Join(ErrGetOpenAPIPaths, err)
 	}
 
-	entries := make(map[string]*SchemaEntry)
+	entries := make(map[string]*apischema.SchemaEntry)
 	walker := createRefWalker()
 
 	for pathKey, path := range paths {
@@ -58,16 +55,16 @@ func (l *SchemaLoader) Load(ctx context.Context, oc openapi.Client) (*SchemaSet,
 
 	logger.Info("loaded schemas", "count", len(entries))
 
-	return NewSchemaSet(entries), nil
+	return apischema.NewSchemaSet(entries), nil
 }
 
 func (l *SchemaLoader) loadPath(
 	ctx context.Context,
 	path openapi.GroupVersion,
 	walker schemamutation.Walker,
-) (map[string]*SchemaEntry, []error) {
+) (map[string]*apischema.SchemaEntry, []error) {
 	logger := log.FromContext(ctx)
-	entries := make(map[string]*SchemaEntry)
+	entries := make(map[string]*apischema.SchemaEntry)
 	var errs []error
 
 	schemaBytes, err := path.Schema(discovery.AcceptV2)
@@ -90,7 +87,7 @@ func (l *SchemaLoader) loadPath(
 		// Walk and normalize refs
 		walked := walker.WalkSchema(schema)
 
-		gvk, err := ExtractGVK(walked)
+		gvk, err := apischema.ExtractGVK(walked)
 		if err != nil {
 			logger.V(4).Info("failed to extract GVK",
 				"key", key,
@@ -99,7 +96,7 @@ func (l *SchemaLoader) loadPath(
 			continue
 		}
 
-		entries[key] = &SchemaEntry{
+		entries[key] = &apischema.SchemaEntry{
 			Key:    key,
 			Schema: walked,
 			GVK:    gvk,
@@ -107,72 +104,6 @@ func (l *SchemaLoader) loadPath(
 	}
 
 	return entries, errs
-}
-
-// ExtractGVK extracts GVK from schema extensions using type assertion.
-// Returns nil if schema has no GVK extension (e.g., sub-resources).
-func ExtractGVK(schema *spec.Schema) (*GroupVersionKind, error) {
-	if schema.Extensions == nil {
-		return nil, nil
-	}
-
-	gvksVal, ok := schema.Extensions[apis.GVKExtensionKey]
-	if !ok {
-		return nil, nil
-	}
-
-	// Try direct type assertion path first (most common)
-	if gvkSlice, ok := gvksVal.([]any); ok {
-		return extractFromInterfaceSlice(gvkSlice)
-	}
-
-	// Fallback: might be []map[string]any already
-	if mapSlice, ok := gvksVal.([]map[string]any); ok {
-		return extractFromMapSlice(mapSlice)
-	}
-
-	return nil, ErrInvalidGVKFormat
-}
-
-func extractFromInterfaceSlice(slice []any) (*GroupVersionKind, error) {
-	if len(slice) != 1 {
-		return nil, nil // Skip schemas with multiple or zero GVKs
-	}
-
-	gvkMap, ok := slice[0].(map[string]any)
-	if !ok {
-		return nil, ErrInvalidGVKFormat
-	}
-
-	return gvkFromMap(gvkMap), nil
-}
-
-func extractFromMapSlice(slice []map[string]any) (*GroupVersionKind, error) {
-	if len(slice) != 1 {
-		return nil, nil
-	}
-
-	return gvkFromMap(slice[0]), nil
-}
-
-// gvkFromMap extracts a GroupVersionKind from a map with group/version/kind keys.
-func gvkFromMap(m map[string]any) *GroupVersionKind {
-	return &GroupVersionKind{
-		Group:   mapValue[string](m, "group"),
-		Version: mapValue[string](m, "version"),
-		Kind:    mapValue[string](m, "kind"),
-	}
-}
-
-// mapValue extracts a typed value from a map, returning the zero value if not found or wrong type.
-func mapValue[T any](m map[string]any, key string) T {
-	var zero T
-	if v, ok := m[key]; ok {
-		if typed, ok := v.(T); ok {
-			return typed
-		}
-	}
-	return zero
 }
 
 // createRefWalker creates a schema walker that normalizes $ref pointers.

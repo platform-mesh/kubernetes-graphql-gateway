@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/platform-mesh/kubernetes-graphql-gateway/apis"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/apischema"
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/kube-openapi/pkg/validation/spec"

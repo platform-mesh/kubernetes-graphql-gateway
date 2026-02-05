@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/platform-mesh/kubernetes-graphql-gateway/apis"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/apischema"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/meta"

@@ -1,0 +1,74 @@
+package extensions
+
+import (
+	"errors"
+	"fmt"
+
+	"github.com/platform-mesh/kubernetes-graphql-gateway/apis"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/resolver"
+
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kube-openapi/pkg/validation/spec"
+)
+
+// CategoryManager handles resource categorization for typeByCategory query.
+type CategoryManager struct {
+	definitions    map[string]*spec.Schema
+	typeByCategory map[string][]resolver.TypeByCategory
+}
+
+// NewCategoryManager creates a new category manager.
+func NewCategoryManager(definitions map[string]*spec.Schema) *CategoryManager {
+	return &CategoryManager{
+		definitions:    definitions,
+		typeByCategory: make(map[string][]resolver.TypeByCategory),
+	}
+}
+
+// Store records a resource's categories.
+func (m *CategoryManager) Store(
+	resourceKey string,
+	gvk *schema.GroupVersionKind,
+	resourceScope apiextensionsv1.ResourceScope,
+) error {
+	resourceSpec, ok := m.definitions[resourceKey]
+	if !ok || resourceSpec.Extensions == nil {
+		return errors.New("no resource extensions")
+	}
+
+	categoriesRaw, ok := resourceSpec.Extensions[apis.CategoriesExtensionKey]
+	if !ok {
+		return fmt.Errorf("%s extension not found", apis.CategoriesExtensionKey)
+	}
+
+	categoriesRawArray, ok := categoriesRaw.([]any)
+	if !ok {
+		return fmt.Errorf("%s extension is not an array", apis.CategoriesExtensionKey)
+	}
+
+	categories := make([]string, len(categoriesRawArray))
+	for i, v := range categoriesRawArray {
+		if str, ok := v.(string); ok {
+			categories[i] = str
+		} else {
+			return fmt.Errorf("failed to convert %d to string", v)
+		}
+	}
+
+	for _, category := range categories {
+		m.typeByCategory[category] = append(m.typeByCategory[category], resolver.TypeByCategory{
+			Group:   gvk.Group,
+			Version: gvk.Version,
+			Kind:    gvk.Kind,
+			Scope:   string(resourceScope),
+		})
+	}
+
+	return nil
+}
+
+// AllCategories returns the complete category map.
+func (m *CategoryManager) AllCategories() map[string][]resolver.TypeByCategory {
+	return m.typeByCategory
+}

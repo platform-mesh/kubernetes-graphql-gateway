@@ -7,7 +7,7 @@ import (
 
 	"github.com/graphql-go/graphql/language/ast"
 	"github.com/graphql-go/graphql/language/kinds"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/schema"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/schema/types"
 )
 
 func TestStringMapScalar_ParseValue(t *testing.T) {
@@ -30,7 +30,7 @@ func TestStringMapScalar_ParseValue(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		out := schema.StringMapScalarForTest.ParseValue(test.input)
+		out := types.StringMapScalar.ParseValue(test.input)
 		if !reflect.DeepEqual(out, test.expected) {
 			t.Errorf("ParseValue(%v) = %v; want %v", test.input, out, test.expected)
 		}
@@ -69,7 +69,7 @@ func TestStringMapScalar_ParseLiteral(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			out := schema.StringMapScalarForTest.ParseLiteral(tt.input)
+			out := types.StringMapScalar.ParseLiteral(tt.input)
 			if !reflect.DeepEqual(out, tt.expected) {
 				t.Errorf("ParseLiteral() = %v, want %v", out, tt.expected)
 			}
@@ -107,7 +107,7 @@ func TestSanitizeFieldNameUtil(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := schema.SanitizeFieldNameForTest(tt.input)
+			got := types.SanitizeFieldName(tt.input)
 			if got != tt.expected {
 				t.Errorf("SanitizeFieldNameForTest(%q) = %q, want %q", tt.input, got, tt.expected)
 			}
@@ -144,7 +144,7 @@ func TestGenerateTypeName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := schema.GenerateTypeNameForTest(tt.typePrefix, tt.fieldPath)
+			got := types.GenerateTypeName(tt.typePrefix, tt.fieldPath)
 			if got != tt.expected {
 				t.Errorf("GenerateTypeNameForTest() = %q, want %q", got, tt.expected)
 			}
@@ -165,7 +165,7 @@ func TestJSONStringScalar_ProperSerialization(t *testing.T) {
 	}
 
 	// Test the JSONString scalar serialization
-	result := schema.JSONStringScalarForTest.Serialize(testObject)
+	result := types.JSONStringScalar.Serialize(testObject)
 
 	if result == nil {
 		t.Fatal("JSONStringScalar.Serialize returned nil")

@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/platform-mesh/kubernetes-graphql-gateway/apischema"
+
 	"k8s.io/client-go/openapi"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -22,7 +24,7 @@ type Enricher interface {
 
 	// Enrich modifies schemas in the set.
 	// Returns error if enrichment fails critically.
-	Enrich(ctx context.Context, schemas *SchemaSet) error
+	Enrich(ctx context.Context, schemas *apischema.SchemaSet) error
 }
 
 // NewResolver creates a new Resolver with the given enrichers.

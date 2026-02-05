@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	apischema "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
+	listenerapischema "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
 	apischemaMocks "github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -40,7 +40,7 @@ func TestResolveSchema(t *testing.T) {
 		},
 		{
 			name:       "openapi_path_error",
-			openAPIErr: apischema.ErrGetOpenAPIPaths,
+			openAPIErr: listenerapischema.ErrGetOpenAPIPaths,
 			wantErr:    true,
 			setSchema:  nil,
 		},
@@ -63,7 +63,7 @@ func TestResolveSchema(t *testing.T) {
 				openAPIClient.EXPECT().Paths().Return(openAPIPaths, nil)
 			}
 
-			got, err := apischema.NewResolver().Resolve(t.Context(), openAPIClient)
+			got, err := listenerapischema.NewResolver().Resolve(t.Context(), openAPIClient)
 			if tc.wantErr {
 				assert.Error(t, err)
 				return
