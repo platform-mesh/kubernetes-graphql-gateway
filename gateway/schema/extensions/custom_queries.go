@@ -9,13 +9,11 @@ const (
 	typeByCategoryFieldName = "typeByCategory"
 )
 
-// CustomQueryGenerator generates custom query fields for the schema.
 type CustomQueryGenerator struct {
 	resolver        resolver.Provider
 	categoryManager *CategoryManager
 }
 
-// NewCustomQueryGenerator creates a new custom query generator.
 func NewCustomQueryGenerator(resolver resolver.Provider, categoryManager *CategoryManager) *CustomQueryGenerator {
 	return &CustomQueryGenerator{
 		resolver:        resolver,
@@ -23,7 +21,6 @@ func NewCustomQueryGenerator(resolver resolver.Provider, categoryManager *Catego
 	}
 }
 
-// AddTypeByCategoryQuery adds the typeByCategory query to root query fields.
 func (g *CustomQueryGenerator) AddTypeByCategoryQuery(rootQueryFields graphql.Fields) {
 	resourceType := graphql.NewObject(graphql.ObjectConfig{
 		Name: typeByCategoryFieldName + "Object",

@@ -245,7 +245,6 @@ func (b *Builder) processResource(
 	}
 
 	rc := &fields.ResourceContext{
-		Ctx:            ctx,
 		GVK:            *gvk,
 		Scope:          resourceScope,
 		UniqueTypeName: uniqueTypeName,

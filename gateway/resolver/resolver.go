@@ -2,7 +2,6 @@ package resolver
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -51,14 +50,14 @@ type Provider interface {
 }
 
 type CrudProvider interface {
-	ListItems(ctx context.Context, gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn
-	GetItem(ctx context.Context, gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn
-	GetItemAsYAML(ctx context.Context, gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn
-	CreateItem(ctx context.Context, gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn
-	UpdateItem(ctx context.Context, gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn
-	DeleteItem(ctx context.Context, gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn
-	SubscribeItem(ctx context.Context, gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn
-	SubscribeItems(ctx context.Context, gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn
+	ListItems(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn
+	GetItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn
+	GetItemAsYAML(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn
+	CreateItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn
+	UpdateItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn
+	DeleteItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn
+	SubscribeItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn
+	SubscribeItems(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn
 }
 
 type CustomQueriesProvider interface {
@@ -81,8 +80,7 @@ func New(runtimeClient client.WithWatch) *Service {
 	}
 }
 
-// ListItems returns a GraphQL CommonResolver function that lists Kubernetes resources of the given GroupVersionKind.
-func (r *Service) ListItems(ctx context.Context, gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
+func (r *Service) ListItems(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
 	return func(p graphql.ResolveParams) (any, error) {
 		logger := log.FromContext(p.Context)
 		ctx, span := otel.Tracer("").Start(p.Context, LIST_ITEMS, trace.WithAttributes(attribute.String("kind", gvk.Kind)))
@@ -180,11 +178,9 @@ func (r *Service) ListItems(ctx context.Context, gvk schema.GroupVersionKind, sc
 	}
 }
 
-// GetItem returns a GraphQL CommonResolver function that retrieves a single Kubernetes resource of the given GroupVersionKind.
-func (r *Service) GetItem(ctx context.Context, gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
+func (r *Service) GetItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
 	return func(p graphql.ResolveParams) (any, error) {
 		logger := log.FromContext(p.Context)
-
 		ctx, span := otel.Tracer("").Start(p.Context, "GetItem", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
 
@@ -230,13 +226,12 @@ func (r *Service) GetItem(ctx context.Context, gvk schema.GroupVersionKind, scop
 	}
 }
 
-func (r *Service) GetItemAsYAML(ctx context.Context, gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
+func (r *Service) GetItemAsYAML(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
 	return func(p graphql.ResolveParams) (any, error) {
-		var span trace.Span
-		ctx, span = otel.Tracer("").Start(p.Context, "GetItemAsYAML", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
+		_, span := otel.Tracer("").Start(p.Context, "GetItemAsYAML", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
 
-		out, err := r.GetItem(ctx, gvk, scope)(p)
+		out, err := r.GetItem(gvk, scope)(p)
 		if err != nil {
 			return "", err
 		}
@@ -250,7 +245,7 @@ func (r *Service) GetItemAsYAML(ctx context.Context, gvk schema.GroupVersionKind
 	}
 }
 
-func (r *Service) CreateItem(ctx context.Context, gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
+func (r *Service) CreateItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
 	return func(p graphql.ResolveParams) (any, error) {
 		ctx, span := otel.Tracer("").Start(p.Context, "CreateItem", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
@@ -296,7 +291,7 @@ func (r *Service) CreateItem(ctx context.Context, gvk schema.GroupVersionKind, s
 	}
 }
 
-func (r *Service) UpdateItem(ctx context.Context, gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
+func (r *Service) UpdateItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
 	return func(p graphql.ResolveParams) (any, error) {
 		logger := log.FromContext(p.Context)
 		ctx, span := otel.Tracer("").Start(p.Context, "UpdateItem", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
@@ -358,8 +353,7 @@ func (r *Service) UpdateItem(ctx context.Context, gvk schema.GroupVersionKind, s
 	}
 }
 
-// DeleteItem returns a CommonResolver function for deleting a resource.
-func (r *Service) DeleteItem(ctx context.Context, gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
+func (r *Service) DeleteItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
 	return func(p graphql.ResolveParams) (any, error) {
 		logger := log.FromContext(p.Context)
 		ctx, span := otel.Tracer("").Start(p.Context, "DeleteItem", trace.WithAttributes(attribute.String("kind", gvk.Kind)))

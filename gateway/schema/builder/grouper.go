@@ -14,13 +14,11 @@ import (
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
-// Grouper handles grouping of OpenAPI definitions by API group and version.
 type Grouper struct {
 	definitions map[string]*spec.Schema
 	resolver    resolver.Provider
 }
 
-// NewGrouper creates a new definition grouper.
 func NewGrouper(definitions map[string]*spec.Schema, resolver resolver.Provider) *Grouper {
 	return &Grouper{
 		definitions: definitions,
@@ -28,14 +26,11 @@ func NewGrouper(definitions map[string]*spec.Schema, resolver resolver.Provider)
 	}
 }
 
-// GroupByAPIGroup groups definitions by their Kubernetes API group.
-// Returns a map of group name to map of resource key to schema.
 func (g *Grouper) GroupByAPIGroup() (map[string]map[string]*spec.Schema, error) {
 	groups := map[string]map[string]*spec.Schema{}
 	for key, definition := range g.definitions {
 		gvk, err := g.GetGroupVersionKind(key)
 		if err != nil {
-			// Skip definitions without valid GVK - helper types
 			continue
 		}
 
@@ -44,7 +39,6 @@ func (g *Grouper) GroupByAPIGroup() (map[string]map[string]*spec.Schema, error) 
 		}
 
 		if _, err := g.GetScope(key); err != nil {
-			// Skip definitions without scope - helper types
 			continue
 		}
 
@@ -58,7 +52,6 @@ func (g *Grouper) GroupByAPIGroup() (map[string]map[string]*spec.Schema, error) 
 	return groups, nil
 }
 
-// GroupByVersion groups resources within a group by their API version.
 func (g *Grouper) GroupByVersion(groupedResources map[string]*spec.Schema) map[string]map[string]*spec.Schema {
 	versions := map[string]map[string]*spec.Schema{}
 	for resourceKey, resourceScheme := range groupedResources {
@@ -74,7 +67,6 @@ func (g *Grouper) GroupByVersion(groupedResources map[string]*spec.Schema) map[s
 	return versions
 }
 
-// GetGroupVersionKind retrieves the GVK for a resource key.
 func (g *Grouper) GetGroupVersionKind(resourceKey string) (*schema.GroupVersionKind, error) {
 	resourceSpec, ok := g.definitions[resourceKey]
 	if !ok {
@@ -89,13 +81,11 @@ func (g *Grouper) GetGroupVersionKind(resourceKey string) (*schema.GroupVersionK
 		return nil, errors.New("no GVK extension found")
 	}
 
-	// Convert to runtime GVK and sanitize the group name for GraphQL compatibility
 	runtimeGVK := gvk.ToRuntimeGVK()
 	runtimeGVK.Group = g.resolver.SanitizeGroupName(runtimeGVK.Group)
 	return &runtimeGVK, nil
 }
 
-// GetScope retrieves the resource scope (Namespaced or Cluster).
 func (g *Grouper) GetScope(resourceURI string) (apiextensionsv1.ResourceScope, error) {
 	resourceSpec, ok := g.definitions[resourceURI]
 	if !ok {
@@ -105,24 +95,20 @@ func (g *Grouper) GetScope(resourceURI string) (apiextensionsv1.ResourceScope, e
 	return apischema.ExtractScope(resourceSpec)
 }
 
-// GetNames returns singular and plural names for a GVK.
 func (g *Grouper) GetNames(gvk *schema.GroupVersionKind) (singular, plural string) {
 	singular = gvk.Kind
 	plural = flect.Pluralize(singular)
 	return singular, plural
 }
 
-// IsRootGroup returns true if the group is the core API group.
 func (g *Grouper) IsRootGroup(group string) bool {
 	return group == ""
 }
 
-// ShouldSkipKind returns true if the kind should be skipped (e.g., List types).
 func (g *Grouper) ShouldSkipKind(kind string) bool {
 	return strings.HasSuffix(kind, "List")
 }
 
-// CreateGroupType creates a GraphQL object type for a group.
 func (g *Grouper) CreateGroupType(sanitizedGroup, suffix string) *graphql.Object {
 	return graphql.NewObject(graphql.ObjectConfig{
 		Name:   flect.Pascalize(sanitizedGroup) + suffix,
@@ -130,7 +116,6 @@ func (g *Grouper) CreateGroupType(sanitizedGroup, suffix string) *graphql.Object
 	})
 }
 
-// CreateVersionType creates a GraphQL object type for a version within a group.
 func (g *Grouper) CreateVersionType(sanitizedGroup, version, suffix string) *graphql.Object {
 	return graphql.NewObject(graphql.ObjectConfig{
 		Name:   flect.Pascalize(sanitizedGroup+"_"+version) + suffix,

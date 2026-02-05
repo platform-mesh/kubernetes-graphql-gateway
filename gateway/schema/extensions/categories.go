@@ -12,13 +12,11 @@ import (
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
-// CategoryManager handles resource categorization for typeByCategory query.
 type CategoryManager struct {
 	definitions    map[string]*spec.Schema
 	typeByCategory map[string][]resolver.TypeByCategory
 }
 
-// NewCategoryManager creates a new category manager.
 func NewCategoryManager(definitions map[string]*spec.Schema) *CategoryManager {
 	return &CategoryManager{
 		definitions:    definitions,
@@ -26,7 +24,6 @@ func NewCategoryManager(definitions map[string]*spec.Schema) *CategoryManager {
 	}
 }
 
-// Store records a resource's categories.
 func (m *CategoryManager) Store(
 	resourceKey string,
 	gvk *schema.GroupVersionKind,
@@ -68,7 +65,6 @@ func (m *CategoryManager) Store(
 	return nil
 }
 
-// AllCategories returns the complete category map.
 func (m *CategoryManager) AllCategories() map[string][]resolver.TypeByCategory {
 	return m.typeByCategory
 }
