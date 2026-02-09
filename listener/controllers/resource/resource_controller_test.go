@@ -75,6 +75,7 @@ func (suite *ResourceControllerTestSuite) SetupSuite() {
 		listenerConfig.SchemaHandler,
 		listenerConfig.Options.AnchorResource,
 		listenerConfig.Options.ResourceGVR,
+		listenerConfig.Options.AdditonalPathAnnotationKey,
 		listenerConfig.Options.ClusterMetadataFunc,
 		listenerConfig.Options.ClusterURLResolverFunc,
 	)

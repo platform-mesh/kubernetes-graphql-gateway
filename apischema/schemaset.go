@@ -2,6 +2,7 @@ package apischema
 
 import (
 	"encoding/json"
+	"maps"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -68,7 +69,7 @@ func (s *SchemaSet) FindByKind(kind string) []*SchemaEntry {
 
 // All returns all schema entries.
 func (s *SchemaSet) All() map[string]*SchemaEntry {
-	return s.entries
+	return maps.Clone(s.entries)
 }
 
 // Size returns the number of schema entries.

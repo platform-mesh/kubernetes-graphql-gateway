@@ -40,6 +40,7 @@ func NewServer(ctx context.Context, c *Config) (*Server, error) {
 		s.Config.SchemaHandler,
 		c.Options.AnchorResource,
 		c.Options.ResourceGVR,
+		c.Options.AdditonalPathAnnotationKey,
 		c.Options.ClusterMetadataFunc,
 		c.Options.ClusterURLResolverFunc,
 	)
