@@ -34,11 +34,13 @@ func (c *Converter) convertFields(resourceScheme *spec.Schema, definitions map[s
 		}
 
 		fields[sanitizedFieldName] = &graphql.Field{
-			Type: fieldType,
+			Type:        fieldType,
+			Description: fieldSpec.Description,
 		}
 
 		inputFields[sanitizedFieldName] = &graphql.InputObjectFieldConfig{
-			Type: inputFieldType,
+			Type:        inputFieldType,
+			Description: fieldSpec.Description,
 		}
 	}
 
@@ -147,20 +149,22 @@ func (c *Converter) handleNestedObject(fieldSpec spec.Schema, definitions map[st
 
 	c.registry.MarkProcessing(typeName)
 
-	nestedFields, nestedInputFields, err := c.convertFields(&fieldSpec, definitions, typeName, fieldPath)
+	nestedFields, nestedInputFields, err := c.convertFields(&fieldSpec, definitions, typeName, []string{})
 	if err != nil {
 		c.registry.UnmarkProcessing(typeName)
 		return nil, nil, err
 	}
 
 	newType := graphql.NewObject(graphql.ObjectConfig{
-		Name:   SanitizeFieldName(typeName),
-		Fields: nestedFields,
+		Name:        SanitizeFieldName(typeName),
+		Description: fieldSpec.Description,
+		Fields:      nestedFields,
 	})
 
 	newInputType := graphql.NewInputObject(graphql.InputObjectConfig{
-		Name:   SanitizeFieldName(typeName) + "Input",
-		Fields: nestedInputFields,
+		Name:        SanitizeFieldName(typeName) + "Input",
+		Description: fieldSpec.Description,
+		Fields:      nestedInputFields,
 	})
 
 	c.registry.Register(typeName, newType, newInputType)

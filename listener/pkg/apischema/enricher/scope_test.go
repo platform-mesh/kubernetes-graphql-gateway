@@ -50,11 +50,13 @@ func TestScopeEnricher(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Check Pod is namespaced
-	podEntry, _ := schemas.Get("v1.Pod")
+	podEntry, ok := schemas.Get("v1.Pod")
+	assert.True(t, ok, "expected v1.Pod to exist in schema set")
 	assert.Equal(t, apiextensionsv1.NamespaceScoped, podEntry.Schema.Extensions[apis.ScopeExtensionKey])
 
 	// Check Node is cluster-scoped
-	nodeEntry, _ := schemas.Get("v1.Node")
+	nodeEntry, ok := schemas.Get("v1.Node")
+	assert.True(t, ok, "expected v1.Node to exist in schema set")
 	assert.Equal(t, apiextensionsv1.ClusterScoped, nodeEntry.Schema.Extensions[apis.ScopeExtensionKey])
 }
 

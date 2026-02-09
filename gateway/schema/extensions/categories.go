@@ -49,7 +49,7 @@ func (m *CategoryManager) Store(
 		if str, ok := v.(string); ok {
 			categories[i] = str
 		} else {
-			return fmt.Errorf("failed to convert %d to string", v)
+			return fmt.Errorf("failed to convert %v to string", v)
 		}
 	}
 

@@ -399,7 +399,7 @@ func getFieldValue(obj *unstructured.Unstructured, fieldPath string) (any, bool,
 	return current, true, nil
 }
 
-func CreateSubscriptionResolver(isSingle bool) graphql.FieldResolveFn {
+func CreateSubscriptionResolver() graphql.FieldResolveFn {
 	return func(p graphql.ResolveParams) (any, error) {
 		source := p.Source
 

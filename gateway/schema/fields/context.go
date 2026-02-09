@@ -21,7 +21,3 @@ type ResourceContext struct {
 func (r *ResourceContext) IsNamespaceScoped() bool {
 	return r.Scope == apiextensionsv1.NamespaceScoped
 }
-
-func (r *ResourceContext) IsRootGroup() bool {
-	return r.GVK.Group == ""
-}

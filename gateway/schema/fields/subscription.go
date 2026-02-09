@@ -56,7 +56,7 @@ func (g *SubscriptionGenerator) Generate(rc *ResourceContext, target graphql.Fie
 			WithSubscribeToAll().
 			WithResourceVersion().
 			Complete(),
-		Resolve:     resolver.CreateSubscriptionResolver(true),
+		Resolve:     resolver.CreateSubscriptionResolver(),
 		Subscribe:   g.resolver.SubscribeItem(rc.GVK, rc.Scope),
 		Description: fmt.Sprintf("Subscribe to changes of %s", rc.SingularName),
 	}
@@ -67,7 +67,7 @@ func (g *SubscriptionGenerator) Generate(rc *ResourceContext, target graphql.Fie
 			WithSubscribeToAll().
 			WithResourceVersion().
 			Complete(),
-		Resolve:     resolver.CreateSubscriptionResolver(false),
+		Resolve:     resolver.CreateSubscriptionResolver(),
 		Subscribe:   g.resolver.SubscribeItems(rc.GVK, rc.Scope),
 		Description: fmt.Sprintf("Subscribe to changes of %s", rc.PluralName),
 	}
