@@ -30,7 +30,7 @@ require (
 	github.com/stretchr/testify v1.11.1
 	go.opentelemetry.io/otel v1.40.0
 	go.opentelemetry.io/otel/trace v1.40.0
-	golang.org/x/text v0.33.0
+	golang.org/x/text v0.34.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.33.3
 	k8s.io/apiextensions-apiserver v0.33.3
