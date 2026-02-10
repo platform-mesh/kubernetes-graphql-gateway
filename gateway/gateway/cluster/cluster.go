@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -36,6 +37,7 @@ type Cluster struct {
 // New creates a new Cluster from a schema string.
 // The schemaJSON parameter should be the JSON content of the schema.
 func New(
+	ctx context.Context,
 	name string,
 	schemaJSON string,
 	config ClusterConfig,
@@ -55,11 +57,9 @@ func New(
 	}
 
 	// Create GraphQL schema and handler
-	// Create resolver
 	resolverProvider := resolver.New(cluster.client)
 
-	// Create schema gateway
-	schemaGateway, err := schema.New(schemaData.Components.Schemas, resolverProvider)
+	schemaProvider, err := schema.New(ctx, schemaData.Components.Schemas, resolverProvider)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create GraphQL schema: %w", err)
 	}
@@ -70,7 +70,7 @@ func New(
 		Playground: config.GraphQLPlayground,
 		GraphiQL:   config.GraphQLGraphiQL,
 	})
-	cluster.handler = cluster.graphqlServer.CreateHandler(schemaGateway.GetSchema())
+	cluster.handler = cluster.graphqlServer.CreateHandler(schemaProvider.GetSchema())
 
 	log.Info().
 		Str("cluster", name).

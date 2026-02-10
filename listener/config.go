@@ -7,7 +7,6 @@ import (
 
 	gatewayv1alpha1 "github.com/platform-mesh/kubernetes-graphql-gateway/apis/v1alpha1"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/options"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/schemahandler"
 	kcpprovider "github.com/platform-mesh/kubernetes-graphql-gateway/providers/kcp"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/sdk"
@@ -49,8 +48,7 @@ type Config struct {
 
 	ReconcilerGVK schema.GroupVersionKind
 
-	SchemaHandler  schemahandler.Handler
-	SchemaResolver *apischema.Resolver
+	SchemaHandler schemahandler.Handler
 
 	// ResourceReconcilerClusterMetadataFunc allows to provide cluster metadata for a given cluster name
 	// when reconciling anchor namespaces.
@@ -178,9 +176,6 @@ func NewConfig(options *options.CompletedOptions) (*Config, error) {
 		}()
 
 	}
-
-	// Initialize schema resolver
-	config.SchemaResolver = apischema.NewResolver()
 
 	return config, nil
 }

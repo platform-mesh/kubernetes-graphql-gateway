@@ -38,9 +38,9 @@ func NewServer(ctx context.Context, c *Config) (*Server, error) {
 		s.Config.Manager,
 		opts,
 		s.Config.SchemaHandler,
-		s.Config.SchemaResolver,
 		c.Options.AnchorResource,
 		c.Options.ResourceGVR,
+		c.Options.AdditonalPathAnnotationKey,
 		c.Options.ClusterMetadataFunc,
 		c.Options.ClusterURLResolverFunc,
 	)

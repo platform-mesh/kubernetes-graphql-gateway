@@ -56,7 +56,7 @@ func (cr *ClusterRegistry) OnSchemaChanged(ctx context.Context, clusterName stri
 	}
 
 	// Create new cluster from schema
-	cl, err := cluster.New(clusterName, schema, cluster.ClusterConfig{
+	cl, err := cluster.New(ctx, clusterName, schema, cluster.ClusterConfig{
 		DevelopmentDisableAuth: cr.config.DevelopmentDisableAuth,
 		GraphQLPretty:          cr.config.GraphQLPretty,
 		GraphQLPlayground:      cr.config.GraphQLPlayground,

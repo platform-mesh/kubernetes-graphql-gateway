@@ -8,6 +8,7 @@ import (
 
 	"github.com/platform-mesh/kubernetes-graphql-gateway/apis/v1alpha1"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema/enricher"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/schemahandler"
 
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -36,10 +37,9 @@ var (
 
 // ClusterAccessReconciler reconciles ClusterAccess resources and generates schemas
 type ClusterAccessReconciler struct {
-	manager        mcmanager.Manager
-	opts           controller.TypedOptions[mcreconcile.Request]
-	ioHandler      schemahandler.Handler
-	schemaResolver *apischema.Resolver
+	manager   mcmanager.Manager
+	opts      controller.TypedOptions[mcreconcile.Request]
+	ioHandler schemahandler.Handler
 }
 
 // NewClusterAccessReconciler returns a new ClusterAccessReconciler
@@ -48,13 +48,11 @@ func NewClusterAccessReconciler(
 	mgr mcmanager.Manager,
 	opts controller.TypedOptions[mcreconcile.Request],
 	ioHandler schemahandler.Handler,
-	schemaResolver *apischema.Resolver,
 ) (*ClusterAccessReconciler, error) {
 	r := &ClusterAccessReconciler{
-		manager:        mgr,
-		opts:           opts,
-		ioHandler:      ioHandler,
-		schemaResolver: schemaResolver,
+		manager:   mgr,
+		opts:      opts,
+		ioHandler: ioHandler,
 	}
 
 	return r, nil
@@ -121,15 +119,31 @@ func (r *ClusterAccessReconciler) Reconcile(ctx context.Context, req mcreconcile
 		return ctrl.Result{}, err
 	}
 
-	// Create schema resolver for target cluster and resolve schema
-	JSON, err := r.schemaResolver.Resolve(ctx, targetDiscovery, targetRM)
+	// Get preferred resources for categories enricher
+	apiResources, err := targetDiscovery.ServerPreferredResources()
+	if err != nil {
+		// Log but don't fail - some resources may still be available
+		logger.V(2).Info("partial error getting server preferred resources", "error", err)
+		if apiResources == nil {
+			return ctrl.Result{}, fmt.Errorf("failed to get server preferred resources: %w", err)
+		}
+	}
+
+	// Create resolver with enrichers configured for this cluster
+	resolver := apischema.NewResolver(
+		enricher.NewScope(targetRM),
+		enricher.NewCategories(apiResources),
+	)
+
+	// Resolve schema from target cluster
+	schemaJSON, err := resolver.Resolve(ctx, targetDiscovery.OpenAPIV3())
 	if err != nil {
 		logger.Error(err, "Failed to resolve schema", "clusterAccess", ca.Name)
 		return ctrl.Result{}, err
 	}
 
 	// Inject cluster metadata into the schema
-	schemaWithMetadata, err := injectClusterMetadata(ctx, JSON, *ca)
+	schemaWithMetadata, err := injectClusterMetadata(ctx, schemaJSON, *ca)
 	if err != nil {
 		logger.Error(err, "Failed to inject cluster metadata", "clusterAccess", ca.Name)
 		return ctrl.Result{}, err

@@ -7,7 +7,6 @@ import (
 	"github.com/google/cel-go/cel"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/apis/v1alpha1"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/controllers/reconciler"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/schemahandler"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -32,11 +31,12 @@ const (
 
 // Reconciler reconciles the anchor resource to trigger schema generation
 type Reconciler struct {
-	manager        mcmanager.Manager
-	opts           controller.TypedOptions[mcreconcile.Request]
-	reconciler     *reconciler.Reconciler
-	anchorResource string
-	resourceGVK    schema.GroupVersionKind
+	manager                     mcmanager.Manager
+	opts                        controller.TypedOptions[mcreconcile.Request]
+	reconciler                  *reconciler.Reconciler
+	anchorResource              string
+	resourceGVK                 schema.GroupVersionKind
+	additionalPathAnnotationKey string
 
 	// Provider specific functions
 	clusterMetadataFunc    v1alpha1.ClusterMetadataFunc
@@ -49,17 +49,18 @@ func New(
 	mgr mcmanager.Manager,
 	opts controller.TypedOptions[mcreconcile.Request],
 	schemaHandler schemahandler.Handler,
-	schemaResolver *apischema.Resolver,
 	anchorResource string,
 	resourceGVR string,
+	additionalPathAnnotationKey string,
 	clusterMetadataFunc v1alpha1.ClusterMetadataFunc,
 	clusterURLResolverFunc v1alpha1.ClusterURLResolver,
 ) (*Reconciler, error) {
 	r := &Reconciler{
-		manager:        mgr,
-		opts:           opts,
-		reconciler:     reconciler.NewReconciler(schemaHandler, schemaResolver),
-		anchorResource: anchorResource,
+		manager:                     mgr,
+		opts:                        opts,
+		reconciler:                  reconciler.NewReconciler(schemaHandler),
+		anchorResource:              anchorResource,
+		additionalPathAnnotationKey: additionalPathAnnotationKey,
 
 		clusterMetadataFunc:    clusterMetadataFunc,
 		clusterURLResolverFunc: clusterURLResolverFunc,
@@ -122,6 +123,13 @@ func (r *Reconciler) Reconcile(ctx context.Context, req mcreconcile.Request) (ct
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, fmt.Errorf("failed to get resource: %w", err)
+	}
+
+	if r.additionalPathAnnotationKey != "" && us.GetAnnotations() != nil {
+		if additionalPath, ok := us.GetAnnotations()[r.additionalPathAnnotationKey]; ok {
+			logger.V(4).Info("Found additional path annotation on anchor resource", "annotationKey", r.additionalPathAnnotationKey, "additionalPath", additionalPath)
+			paths = append(paths, additionalPath)
+		}
 	}
 
 	// This is plugable function to get cluster metadata for the given cluster name.
