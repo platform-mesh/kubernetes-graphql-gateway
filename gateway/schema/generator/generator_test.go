@@ -244,6 +244,20 @@ func TestParseResources(t *testing.T) {
 				sanitizedGroup: "",
 			}},
 		},
+		{
+			name: "group starting with number gets underscore prefix",
+			definitions: map[string]*spec.Schema{
+				"io.example.1password.v1.Secret": schemaWithGVKAndScope("1password.com", "v1", "Secret", apiextensionsv1.NamespaceScoped),
+			},
+			want: []expectedResource{{
+				key:            "io.example.1password.v1.Secret",
+				gvk:            schema.GroupVersionKind{Group: "1password.com", Version: "v1", Kind: "Secret"},
+				scope:          apiextensionsv1.NamespaceScoped,
+				singularName:   "Secret",
+				pluralName:     "Secrets",
+				sanitizedGroup: "_1password_com",
+			}},
+		},
 	}
 
 	for _, tt := range tests {

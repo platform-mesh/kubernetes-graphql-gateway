@@ -17,7 +17,7 @@ type Provider struct {
 }
 
 // New creates a new Provider with a GraphQL schema built from OpenAPI definitions.
-func New(ctx context.Context, definitions map[string]*spec.Schema, resolverProvider resolver.Provider) (*Provider, error) {
+func New(ctx context.Context, definitions map[string]*spec.Schema, resolverProvider *resolver.Service) (*Provider, error) {
 	schema, err := generator.New(definitions, resolverProvider).Generate(ctx)
 	if err != nil {
 		return nil, err

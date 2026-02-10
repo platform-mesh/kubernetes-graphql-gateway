@@ -32,7 +32,7 @@ type Resource struct {
 // SchemaGenerator transforms Kubernetes OpenAPI definitions into a GraphQL schema.
 type SchemaGenerator struct {
 	definitions map[string]*spec.Schema
-	resolver    resolver.Provider
+	resolver    *resolver.Service
 
 	typeRegistry  *types.Registry
 	typeConverter *types.Converter
@@ -46,7 +46,7 @@ type SchemaGenerator struct {
 }
 
 // New creates a new schema generator.
-func New(definitions map[string]*spec.Schema, resolverProvider resolver.Provider) *SchemaGenerator {
+func New(definitions map[string]*spec.Schema, resolverProvider *resolver.Service) *SchemaGenerator {
 	registry := types.NewRegistry()
 	categoryManager := extensions.NewCategoryManager(definitions)
 

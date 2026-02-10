@@ -2,6 +2,7 @@ package resolver
 
 import (
 	"bytes"
+	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -24,40 +25,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-const (
-	LIST_ITEMS       = "ListItems"
-	GET_ITEM         = "GetItem"
-	GET_ITEM_AS_YAML = "GetItemAsYAML"
-	CREATE_ITEM      = "CreateItem"
-	UPDATE_ITEM      = "UpdateItem"
-	DELETE_ITEM      = "DeleteItem"
-	SUBSCRIBE_ITEM   = "SubscribeItem"
-	SUBSCRIBE_ITEMS  = "SubscribeItems"
-)
-
-type Provider interface {
-	CrudProvider
-	CustomQueriesProvider
-	CommonResolver() graphql.FieldResolveFn
-}
-
-type CrudProvider interface {
-	ListItems(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn
-	GetItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn
-	GetItemAsYAML(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn
-	CreateItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn
-	UpdateItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn
-	DeleteItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn
-	SubscribeItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn
-	SubscribeItems(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn
-}
-
-type CustomQueriesProvider interface {
-	TypeByCategory(m map[string][]TypeByCategory) graphql.FieldResolveFn
-}
-
-var _ Provider = &Service{}
-
 type Service struct {
 	runtimeClient client.WithWatch
 }
@@ -71,7 +38,7 @@ func New(runtimeClient client.WithWatch) *Service {
 func (r *Service) ListItems(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
 	return func(p graphql.ResolveParams) (any, error) {
 		logger := log.FromContext(p.Context)
-		ctx, span := otel.Tracer("").Start(p.Context, LIST_ITEMS, trace.WithAttributes(attribute.String("kind", gvk.Kind)))
+		ctx, span := otel.Tracer("").Start(p.Context, "ListItems", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
 
 		logger = logger.WithValues(
@@ -87,8 +54,11 @@ func (r *Service) ListItems(gvk schema.GroupVersionKind, scope v1.ResourceScope)
 
 		var opts []client.ListOption
 
-		// Handle label selector argument
-		if labelSelector, ok := p.Args[LabelSelectorArg].(string); ok && labelSelector != "" {
+		labelSelector, err := GetArg[string](p.Args, LabelSelectorArg, false)
+		if err != nil {
+			return nil, err
+		}
+		if labelSelector != "" {
 			selector, err := labels.Parse(labelSelector)
 			if err != nil {
 				logger.WithValues(LabelSelectorArg, labelSelector).Error(err, "Unable to parse given label selector")
@@ -98,7 +68,7 @@ func (r *Service) ListItems(gvk schema.GroupVersionKind, scope v1.ResourceScope)
 		}
 
 		if isResourceNamespaceScoped(scope) {
-			namespace, err := getStringArg(p.Args, NamespaceArg, false)
+			namespace, err := GetArg[string](p.Args, NamespaceArg, false)
 			if err != nil {
 				return nil, err
 			}
@@ -107,7 +77,7 @@ func (r *Service) ListItems(gvk schema.GroupVersionKind, scope v1.ResourceScope)
 			}
 		}
 
-		limit, err := getIntArg(p.Args, LimitArg, false)
+		limit, err := GetArg[int](p.Args, LimitArg, false)
 		if err != nil {
 			return nil, err
 		}
@@ -115,7 +85,7 @@ func (r *Service) ListItems(gvk schema.GroupVersionKind, scope v1.ResourceScope)
 			opts = append(opts, client.Limit(int64(limit)))
 		}
 
-		continueToken, err := getStringArg(p.Args, ContinueArg, false)
+		continueToken, err := GetArg[string](p.Args, ContinueArg, false)
 		if err != nil {
 			return nil, err
 		}
@@ -124,11 +94,11 @@ func (r *Service) ListItems(gvk schema.GroupVersionKind, scope v1.ResourceScope)
 		}
 
 		if err = r.runtimeClient.List(ctx, list, opts...); err != nil {
-			logger.WithValues("operation", "list").Error(err, "Unable to list objects")
+			logger.Error(err, "Unable to list objects")
 			return nil, pkgErrors.Wrap(err, "unable to list objects")
 		}
 
-		sortBy, err := getStringArg(p.Args, SortByArg, false)
+		sortBy, err := GetArg[string](p.Args, SortByArg, false)
 		if err != nil {
 			return nil, err
 		}
@@ -148,18 +118,11 @@ func (r *Service) ListItems(gvk schema.GroupVersionKind, scope v1.ResourceScope)
 			items[i] = item.Object
 		}
 
-		var ric any
-		if v := list.GetRemainingItemCount(); v != nil {
-			ric = *v
-		} else {
-			ric = nil
-		}
-
 		return map[string]any{
 			"resourceVersion":    list.GetResourceVersion(),
 			"items":              items,
 			"continue":           list.GetContinue(),
-			"remainingItemCount": ric,
+			"remainingItemCount": list.GetRemainingItemCount(),
 		}, nil
 	}
 }
@@ -178,7 +141,7 @@ func (r *Service) GetItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) g
 		)
 
 		// Retrieve required arguments
-		name, err := getStringArg(p.Args, NameArg, true)
+		name, err := GetArg[string](p.Args, NameArg, true)
 		if err != nil {
 			return nil, err
 		}
@@ -192,7 +155,7 @@ func (r *Service) GetItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) g
 		}
 
 		if isResourceNamespaceScoped(scope) {
-			namespace, err := getStringArg(p.Args, NamespaceArg, true)
+			namespace, err := GetArg[string](p.Args, NamespaceArg, true)
 			if err != nil {
 				return nil, err
 			}
@@ -234,7 +197,12 @@ func (r *Service) CreateItem(gvk schema.GroupVersionKind, scope v1.ResourceScope
 		ctx, span := otel.Tracer("").Start(p.Context, "CreateItem", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
 
-		log := log.FromContext(p.Context).WithValues("operation", "create", "kind", gvk.Kind)
+		logger := log.FromContext(p.Context).WithValues(
+			"operation", "create",
+			"group", gvk.Group,
+			"version", gvk.Version,
+			"kind", gvk.Kind,
+		)
 
 		objectInput := p.Args["object"].(map[string]any)
 
@@ -244,7 +212,7 @@ func (r *Service) CreateItem(gvk schema.GroupVersionKind, scope v1.ResourceScope
 		obj.SetGroupVersionKind(gvk)
 
 		if isResourceNamespaceScoped(scope) {
-			namespace, err := getStringArg(p.Args, NamespaceArg, true)
+			namespace, err := GetArg[string](p.Args, NamespaceArg, true)
 			if err != nil {
 				return nil, err
 			}
@@ -255,7 +223,7 @@ func (r *Service) CreateItem(gvk schema.GroupVersionKind, scope v1.ResourceScope
 			return nil, errors.New("object metadata.name is required")
 		}
 
-		dryRunBool, err := getBoolArg(p.Args, DryRunArg, false)
+		dryRunBool, err := GetArg[bool](p.Args, DryRunArg, false)
 		if err != nil {
 			return nil, err
 		}
@@ -265,7 +233,7 @@ func (r *Service) CreateItem(gvk schema.GroupVersionKind, scope v1.ResourceScope
 		}
 
 		if err := r.runtimeClient.Create(ctx, obj, &client.CreateOptions{DryRun: dryRun}); err != nil {
-			log.Error(err, "Failed to create object")
+			logger.Error(err, "Failed to create object")
 			return nil, err
 		}
 
@@ -281,7 +249,7 @@ func (r *Service) UpdateItem(gvk schema.GroupVersionKind, scope v1.ResourceScope
 
 		logger = logger.WithValues("operation", "update", "kind", gvk.Kind)
 
-		name, err := getStringArg(p.Args, NameArg, true)
+		name, err := GetArg[string](p.Args, NameArg, true)
 		if err != nil {
 			return nil, err
 		}
@@ -299,7 +267,7 @@ func (r *Service) UpdateItem(gvk schema.GroupVersionKind, scope v1.ResourceScope
 
 		key := client.ObjectKey{Name: name}
 		if isResourceNamespaceScoped(scope) {
-			namespace, err := getStringArg(p.Args, NamespaceArg, true)
+			namespace, err := GetArg[string](p.Args, NamespaceArg, true)
 			if err != nil {
 				return nil, err
 			}
@@ -313,7 +281,7 @@ func (r *Service) UpdateItem(gvk schema.GroupVersionKind, scope v1.ResourceScope
 			return nil, err
 		}
 
-		dryRunBool, err := getBoolArg(p.Args, DryRunArg, false)
+		dryRunBool, err := GetArg[bool](p.Args, DryRunArg, false)
 		if err != nil {
 			return nil, err
 		}
@@ -341,7 +309,7 @@ func (r *Service) DeleteItem(gvk schema.GroupVersionKind, scope v1.ResourceScope
 
 		logger = logger.WithValues("operation", "delete", "kind", gvk.Kind)
 
-		name, err := getStringArg(p.Args, NameArg, true)
+		name, err := GetArg[string](p.Args, NameArg, true)
 		if err != nil {
 			return nil, err
 		}
@@ -351,14 +319,14 @@ func (r *Service) DeleteItem(gvk schema.GroupVersionKind, scope v1.ResourceScope
 		obj.SetName(name)
 
 		if isResourceNamespaceScoped(scope) {
-			namespace, err := getStringArg(p.Args, NamespaceArg, true)
+			namespace, err := GetArg[string](p.Args, NamespaceArg, true)
 			if err != nil {
 				return nil, err
 			}
 			obj.SetNamespace(namespace)
 		}
 
-		dryRunBool, err := getBoolArg(p.Args, DryRunArg, false)
+		dryRunBool, err := GetArg[bool](p.Args, DryRunArg, false)
 		if err != nil {
 			return nil, err
 		}
@@ -388,56 +356,25 @@ func compareUnstructured(a, b unstructured.Unstructured, fieldPath string) int {
 	aVal, foundA, errA := unstructured.NestedFieldNoCopy(a.Object, segments...)
 	bVal, foundB, errB := unstructured.NestedFieldNoCopy(b.Object, segments...)
 	if errA != nil || errB != nil || !foundA || !foundB {
-		return 0 // fallback if fields are missing or inaccessible
+		return 0
 	}
 
 	switch av := aVal.(type) {
 	case string:
-		if bv, ok := bVal.(string); ok {
-			return strings.Compare(av, bv)
-		}
-	case int64:
-		if bv, ok := bVal.(int64); ok {
-			return compareNumbers(av, bv)
-		}
-	case int32:
-		if bv, ok := bVal.(int32); ok {
-			return compareNumbers(int64(av), int64(bv))
-		} else if bv, ok := bVal.(int64); ok {
-			return compareNumbers(int64(av), bv)
-		}
+		return cmp.Compare(av, bVal.(string))
 	case float64:
-		if bv, ok := bVal.(float64); ok {
-			return compareNumbers(av, bv)
-		}
-	case float32:
-		if bv, ok := bVal.(float32); ok {
-			return compareNumbers(float64(av), float64(bv))
-		} else if bv, ok := bVal.(float64); ok {
-			return compareNumbers(float64(av), bv)
-		}
+		return cmp.Compare(av, bVal.(float64))
+	case int64:
+		return cmp.Compare(av, bVal.(int64))
 	case bool:
-		if bv, ok := bVal.(bool); ok {
-			switch {
-			case av && !bv:
-				return -1
-			case !av && bv:
-				return 1
-			default:
-				return 0
-			}
+		// bool not in cmp.Ordered; false < true
+		if av == bVal.(bool) {
+			return 0
+		} else if bVal.(bool) {
+			return -1
 		}
-	}
-	return 0 // unhandled or non-comparable types
-}
-
-func compareNumbers[T int64 | float64](a, b T) int {
-	switch {
-	case a < b:
-		return -1
-	case a > b:
 		return 1
-	default:
-		return 0
 	}
+
+	return 0
 }

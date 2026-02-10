@@ -6,37 +6,29 @@ import (
 )
 
 type MutationGenerator struct {
-	resolver resolver.Provider
+	resolver *resolver.Service
 }
 
-func NewMutationGenerator(resolver resolver.Provider) *MutationGenerator {
+func NewMutationGenerator(resolver *resolver.Service) *MutationGenerator {
 	return &MutationGenerator{resolver: resolver}
 }
 
 func (g *MutationGenerator) Generate(rc *ResourceContext, target *graphql.Object) {
-	itemArgsBuilder := resolver.NewFieldConfigArguments().WithName()
-	creationArgsBuilder := resolver.NewFieldConfigArguments().WithObject(rc.InputType).WithDryRun()
-
-	if rc.IsNamespaceScoped() {
-		itemArgsBuilder.WithNamespace()
-		creationArgsBuilder.WithNamespace()
-	}
-
 	target.AddFieldConfig("create"+rc.SingularName, &graphql.Field{
 		Type:    rc.ResourceType,
-		Args:    creationArgsBuilder.Complete(),
+		Args:    resolver.CreateArgs(rc.Scope, rc.InputType),
 		Resolve: g.resolver.CreateItem(rc.GVK, rc.Scope),
 	})
 
 	target.AddFieldConfig("update"+rc.SingularName, &graphql.Field{
 		Type:    rc.ResourceType,
-		Args:    creationArgsBuilder.WithName().Complete(),
+		Args:    resolver.UpdateArgs(rc.Scope, rc.InputType),
 		Resolve: g.resolver.UpdateItem(rc.GVK, rc.Scope),
 	})
 
 	target.AddFieldConfig("delete"+rc.SingularName, &graphql.Field{
 		Type:    graphql.Boolean,
-		Args:    itemArgsBuilder.WithDryRun().Complete(),
+		Args:    resolver.DeleteArgs(rc.Scope),
 		Resolve: g.resolver.DeleteItem(rc.GVK, rc.Scope),
 	})
 }

@@ -10,11 +10,11 @@ const (
 )
 
 type CustomQueryGenerator struct {
-	resolver        resolver.Provider
+	resolver        *resolver.Service
 	categoryManager *CategoryManager
 }
 
-func NewCustomQueryGenerator(resolver resolver.Provider, categoryManager *CategoryManager) *CustomQueryGenerator {
+func NewCustomQueryGenerator(resolver *resolver.Service, categoryManager *CategoryManager) *CustomQueryGenerator {
 	return &CustomQueryGenerator{
 		resolver:        resolver,
 		categoryManager: categoryManager,
@@ -34,9 +34,9 @@ func (g *CustomQueryGenerator) AddTypeByCategoryQuery(rootQueryType *graphql.Obj
 
 	rootQueryType.AddFieldConfig(typeByCategoryFieldName, &graphql.Field{
 		Type: graphql.NewNonNull(graphql.NewList(graphql.NewNonNull(resourceType))),
-		Args: resolver.NewFieldConfigArguments().
-			WithName().
-			Complete(),
+		Args: graphql.FieldConfigArgument{
+			resolver.NameArg: resolver.NameArgConfig,
+		},
 		Resolve: g.resolver.TypeByCategory(g.categoryManager.AllCategories()),
 	})
 }

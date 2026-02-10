@@ -91,14 +91,14 @@ func (r *Service) runWatch(
 		"kind", gvk.Kind,
 	)
 
-	labelSelector, err := getStringArg(p.Args, LabelSelectorArg, false)
+	labelSelector, err := GetArg[string](p.Args, LabelSelectorArg, false)
 	if err != nil {
 		logger.Error(err, "Failed to get label selector argument")
 		resultChannel <- errors.Wrap(err, "failed to get label selector argument")
 		return
 	}
 
-	subscribeToAll, err := getBoolArg(p.Args, SubscribeToAllArg, false)
+	subscribeToAll, err := GetArg[bool](p.Args, SubscribeToAllArg, false)
 	if err != nil {
 		logger.Error(err, "Failed to get subscribeToAll argument")
 		resultChannel <- errors.Wrap(err, "failed to get subscribeToAll argument")
@@ -106,7 +106,7 @@ func (r *Service) runWatch(
 	}
 
 	// optional resourceVersion to continue subscription from
-	resourceVersion, err := getStringArg(p.Args, ResourceVersionArg, false)
+	resourceVersion, err := GetArg[string](p.Args, ResourceVersionArg, false)
 	if err != nil {
 		logger.Error(err, "Failed to get resourceVersion argument")
 		resultChannel <- errors.Wrap(err, "failed to get resourceVersion argument")
@@ -125,7 +125,7 @@ func (r *Service) runWatch(
 	var namespace string
 	if isResourceNamespaceScoped(scope) {
 		isNamespaceRequired := singleItem
-		namespace, err = getStringArg(p.Args, NamespaceArg, isNamespaceRequired)
+		namespace, err = GetArg[string](p.Args, NamespaceArg, isNamespaceRequired)
 		if err != nil {
 			logger.Error(err, "Failed to get namespace argument")
 			resultChannel <- errors.Wrap(err, "failed to get namespace argument")
@@ -148,7 +148,7 @@ func (r *Service) runWatch(
 
 	var name string
 	if singleItem {
-		name, err = getStringArg(p.Args, NameArg, true)
+		name, err = GetArg[string](p.Args, NameArg, true)
 		if err != nil {
 			logger.Error(err, "Failed to get name argument")
 			resultChannel <- errors.Wrap(err, "failed to get name argument")
