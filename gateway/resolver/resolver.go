@@ -5,13 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"regexp"
 	"sort"
 	"strings"
 
 	"github.com/graphql-go/graphql"
 	pkgErrors "github.com/pkg/errors"
-	"github.com/platform-mesh/golang-commons/logger"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -37,16 +35,10 @@ const (
 	SUBSCRIBE_ITEMS  = "SubscribeItems"
 )
 
-var (
-	invalidGroupCharRegex = regexp.MustCompile(`[^_a-zA-Z0-9]`)
-	validGroupStartRegex  = regexp.MustCompile(`^[_a-zA-Z]`)
-)
-
 type Provider interface {
 	CrudProvider
 	CustomQueriesProvider
 	CommonResolver() graphql.FieldResolveFn
-	SanitizeGroupName(string) string
 }
 
 type CrudProvider interface {
@@ -67,15 +59,11 @@ type CustomQueriesProvider interface {
 var _ Provider = &Service{}
 
 type Service struct {
-	log *logger.Logger
-	// groupNames stores relation between sanitized group names and original group names that are used in the Kubernetes API
-	groupNames    map[string]string // map[sanitizedGroupName]originalGroupName
 	runtimeClient client.WithWatch
 }
 
 func New(runtimeClient client.WithWatch) *Service {
 	return &Service{
-		groupNames:    make(map[string]string),
 		runtimeClient: runtimeClient,
 	}
 }
@@ -85,8 +73,6 @@ func (r *Service) ListItems(gvk schema.GroupVersionKind, scope v1.ResourceScope)
 		logger := log.FromContext(p.Context)
 		ctx, span := otel.Tracer("").Start(p.Context, LIST_ITEMS, trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
-
-		gvk.Group = r.getOriginalGroupName(gvk.Group)
 
 		logger = logger.WithValues(
 			"operation", "list",
@@ -184,8 +170,6 @@ func (r *Service) GetItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) g
 		ctx, span := otel.Tracer("").Start(p.Context, "GetItem", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
 
-		gvk.Group = r.getOriginalGroupName(gvk.Group)
-
 		logger = logger.WithValues(
 			"operation", "get",
 			"group", gvk.Group,
@@ -250,9 +234,7 @@ func (r *Service) CreateItem(gvk schema.GroupVersionKind, scope v1.ResourceScope
 		ctx, span := otel.Tracer("").Start(p.Context, "CreateItem", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
 
-		gvk.Group = r.getOriginalGroupName(gvk.Group)
-
-		log := r.log.With().Str("operation", "create").Str("kind", gvk.Kind).Logger()
+		log := log.FromContext(p.Context).WithValues("operation", "create", "kind", gvk.Kind)
 
 		objectInput := p.Args["object"].(map[string]any)
 
@@ -283,7 +265,7 @@ func (r *Service) CreateItem(gvk schema.GroupVersionKind, scope v1.ResourceScope
 		}
 
 		if err := r.runtimeClient.Create(ctx, obj, &client.CreateOptions{DryRun: dryRun}); err != nil {
-			log.Error().Err(err).Msg("Failed to create object")
+			log.Error(err, "Failed to create object")
 			return nil, err
 		}
 
@@ -296,8 +278,6 @@ func (r *Service) UpdateItem(gvk schema.GroupVersionKind, scope v1.ResourceScope
 		logger := log.FromContext(p.Context)
 		ctx, span := otel.Tracer("").Start(p.Context, "UpdateItem", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
-
-		gvk.Group = r.getOriginalGroupName(gvk.Group)
 
 		logger = logger.WithValues("operation", "update", "kind", gvk.Kind)
 
@@ -359,8 +339,6 @@ func (r *Service) DeleteItem(gvk schema.GroupVersionKind, scope v1.ResourceScope
 		ctx, span := otel.Tracer("").Start(p.Context, "DeleteItem", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
 
-		gvk.Group = r.getOriginalGroupName(gvk.Group)
-
 		logger = logger.WithValues("operation", "delete", "kind", gvk.Kind)
 
 		name, err := getStringArg(p.Args, NameArg, true)
@@ -402,34 +380,6 @@ func (r *Service) CommonResolver() graphql.FieldResolveFn {
 	return func(p graphql.ResolveParams) (any, error) {
 		return p.Source, nil
 	}
-}
-
-func (r *Service) SanitizeGroupName(groupName string) string {
-	originalGroupName := groupName
-
-	sanitizedGroupName := invalidGroupCharRegex.ReplaceAllString(groupName, "_")
-	// If the name doesn't start with a letter or underscore, prepend '_'
-	if sanitizedGroupName != "" && !validGroupStartRegex.MatchString(sanitizedGroupName) {
-		sanitizedGroupName = "_" + sanitizedGroupName
-	}
-
-	if _, exists := r.groupNames[sanitizedGroupName]; !exists || r.groupNames[sanitizedGroupName] == sanitizedGroupName {
-		r.storeOriginalGroupName(sanitizedGroupName, originalGroupName)
-	}
-
-	return sanitizedGroupName
-}
-
-func (r *Service) storeOriginalGroupName(groupName, originalName string) {
-	r.groupNames[groupName] = originalName
-}
-
-func (r *Service) getOriginalGroupName(groupName string) string {
-	if originalName, ok := r.groupNames[groupName]; ok {
-		return originalName
-	}
-
-	return groupName
 }
 
 func compareUnstructured(a, b unstructured.Unstructured, fieldPath string) int {

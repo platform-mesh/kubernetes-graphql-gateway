@@ -5,12 +5,35 @@ import (
 
 	"github.com/graphql-go/graphql"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/schema/types"
+	"github.com/stretchr/testify/assert"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
+func TestSanitizeGroupName(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{name: "empty string", input: "", want: ""},
+		{name: "simple group", input: "apps", want: "apps"},
+		{name: "group with dots", input: "networking.k8s.io", want: "networking_k8s_io"},
+		{name: "group with hyphens", input: "my-group", want: "my_group"},
+		{name: "group starting with number", input: "1group", want: "_1group"},
+		{name: "group with special chars", input: "my@group!", want: "my_group_"},
+		{name: "already valid", input: "_valid_group", want: "_valid_group"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, types.SanitizeGroupName(tt.input))
+		})
+	}
+}
+
 func TestRegistry_RegisterAndGet(t *testing.T) {
-	registry := types.NewRegistry(func(s string) string { return s })
+	registry := types.NewRegistry()
 
 	// Create test types
 	outputType := graphql.NewObject(graphql.ObjectConfig{
@@ -27,58 +50,41 @@ func TestRegistry_RegisterAndGet(t *testing.T) {
 
 	// Get types back
 	gotOutput, gotInput := registry.Get("test-key")
-	if gotOutput != outputType {
-		t.Errorf("Get() output = %v, want %v", gotOutput, outputType)
-	}
-	if gotInput != inputType {
-		t.Errorf("Get() input = %v, want %v", gotInput, inputType)
-	}
-
+	assert.Equal(t, outputType, gotOutput)
+	assert.Equal(t, inputType, gotInput)
 }
 
 func TestRegistry_GetNonExistent(t *testing.T) {
-	registry := types.NewRegistry(func(s string) string { return s })
+	registry := types.NewRegistry()
 
 	output, input := registry.Get("non-existent")
-	if output != nil || input != nil {
-		t.Errorf("Get() for non-existent key should return nil, got output=%v, input=%v", output, input)
-	}
+	assert.Nil(t, output)
+	assert.Nil(t, input)
 }
 
 func TestRegistry_ProcessingState(t *testing.T) {
-	registry := types.NewRegistry(func(s string) string { return s })
-
+	registry := types.NewRegistry()
 	key := "test-key"
 
 	// Initially not processing
-	if registry.IsProcessing(key) {
-		t.Error("IsProcessing() should return false for new key")
-	}
+	assert.False(t, registry.IsProcessing(key))
 
 	// Mark as processing
 	registry.MarkProcessing(key)
-	if !registry.IsProcessing(key) {
-		t.Error("IsProcessing() should return true after MarkProcessing()")
-	}
+	assert.True(t, registry.IsProcessing(key))
 
 	// Get should return nil while processing
 	output, input := registry.Get(key)
-	if output != nil || input != nil {
-		t.Error("Get() should return nil for processing type")
-	}
+	assert.Nil(t, output)
+	assert.Nil(t, input)
 
 	// Unmark processing
 	registry.UnmarkProcessing(key)
-	if registry.IsProcessing(key) {
-		t.Error("IsProcessing() should return false after UnmarkProcessing()")
-	}
+	assert.False(t, registry.IsProcessing(key))
 }
 
 func TestRegistry_GetUniqueTypeName(t *testing.T) {
-	sanitize := func(s string) string {
-		return s + "_sanitized"
-	}
-	registry := types.NewRegistry(sanitize)
+	registry := types.NewRegistry()
 
 	tests := []struct {
 		name     string
@@ -98,46 +104,46 @@ func TestRegistry_GetUniqueTypeName(t *testing.T) {
 		{
 			name:     "same kind different group",
 			gvk:      schema.GroupVersionKind{Group: "extensions", Version: "v1beta1", Kind: "Deployment"},
-			expected: "ExtensionsSanitizedV1beta1Deployment", // flect.Pascalize removes underscores
+			expected: "ExtensionsV1beta1Deployment",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := registry.GetUniqueTypeName(&tt.gvk)
-			if got != tt.expected {
-				t.Errorf("GetUniqueTypeName() = %q, want %q", got, tt.expected)
-			}
+			assert.Equal(t, tt.expected, got)
 		})
 	}
 }
 
 func TestRegistry_GetUniqueTypeName_EmptyGroup(t *testing.T) {
-	registry := types.NewRegistry(func(s string) string { return s })
+	registry := types.NewRegistry()
 
 	// First: register Pod with empty group (core API)
 	gvk1 := schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Pod"}
-	got1 := registry.GetUniqueTypeName(&gvk1)
-	if got1 != "Pod" {
-		t.Errorf("GetUniqueTypeName() for core API = %q, want %q", got1, "Pod")
-	}
+	assert.Equal(t, "Pod", registry.GetUniqueTypeName(&gvk1))
 
 	// Second: same kind, same group should return same name
-	got2 := registry.GetUniqueTypeName(&gvk1)
-	if got2 != "Pod" {
-		t.Errorf("GetUniqueTypeName() for same GVK = %q, want %q", got2, "Pod")
-	}
+	assert.Equal(t, "Pod", registry.GetUniqueTypeName(&gvk1))
+}
+
+func TestRegistry_GetUniqueTypeName_GroupWithDots(t *testing.T) {
+	registry := types.NewRegistry()
+
+	// First: register Ingress with networking.k8s.io group
+	gvk1 := schema.GroupVersionKind{Group: "networking.k8s.io", Version: "v1", Kind: "Ingress"}
+	assert.Equal(t, "Ingress", registry.GetUniqueTypeName(&gvk1))
+
+	// Second: same kind from extensions group should get prefixed with sanitized group
+	gvk2 := schema.GroupVersionKind{Group: "extensions", Version: "v1beta1", Kind: "Ingress"}
+	assert.Equal(t, "ExtensionsV1beta1Ingress", registry.GetUniqueTypeName(&gvk2))
 }
 
 func TestRegistry_IsProcessing_AfterMark(t *testing.T) {
-	registry := types.NewRegistry(func(s string) string { return s })
+	registry := types.NewRegistry()
 
-	if registry.IsProcessing("test-key") {
-		t.Error("IsProcessing() should return false for non-existent key")
-	}
+	assert.False(t, registry.IsProcessing("test-key"))
 
 	registry.MarkProcessing("test-key")
-	if !registry.IsProcessing("test-key") {
-		t.Error("IsProcessing() should return true after MarkProcessing()")
-	}
+	assert.True(t, registry.IsProcessing("test-key"))
 }

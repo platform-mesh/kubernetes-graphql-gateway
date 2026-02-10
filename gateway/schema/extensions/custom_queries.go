@@ -21,7 +21,7 @@ func NewCustomQueryGenerator(resolver resolver.Provider, categoryManager *Catego
 	}
 }
 
-func (g *CustomQueryGenerator) AddTypeByCategoryQuery(rootQueryFields graphql.Fields) {
+func (g *CustomQueryGenerator) AddTypeByCategoryQuery(rootQueryType *graphql.Object) {
 	resourceType := graphql.NewObject(graphql.ObjectConfig{
 		Name: typeByCategoryFieldName + "Object",
 		Fields: graphql.Fields{
@@ -32,13 +32,13 @@ func (g *CustomQueryGenerator) AddTypeByCategoryQuery(rootQueryFields graphql.Fi
 		},
 	})
 
-	rootQueryFields[typeByCategoryFieldName] = &graphql.Field{
+	rootQueryType.AddFieldConfig(typeByCategoryFieldName, &graphql.Field{
 		Type: graphql.NewNonNull(graphql.NewList(graphql.NewNonNull(resourceType))),
 		Args: resolver.NewFieldConfigArguments().
 			WithName().
 			Complete(),
 		Resolve: g.resolver.TypeByCategory(g.categoryManager.AllCategories()),
-	}
+	})
 }
 
 func graphqlStringField() *graphql.Field {
