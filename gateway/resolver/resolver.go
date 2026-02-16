@@ -18,6 +18,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -34,6 +35,7 @@ const (
 	DELETE_ITEM      = "DeleteItem"
 	SUBSCRIBE_ITEM   = "SubscribeItem"
 	SUBSCRIBE_ITEMS  = "SubscribeItems"
+	APPLY_YAML       = "ApplyYaml"
 )
 
 var (
@@ -47,6 +49,7 @@ type Provider interface {
 	CommonResolver() graphql.FieldResolveFn
 	SanitizeGroupName(string) string
 	RelationResolver(fieldName string, gvk schema.GroupVersionKind) graphql.FieldResolveFn
+	ApplyYaml() graphql.FieldResolveFn
 }
 
 type CrudProvider interface {
@@ -404,6 +407,75 @@ func (r *Service) DeleteItem(gvk schema.GroupVersionKind, scope v1.ResourceScope
 		}
 
 		return true, nil
+	}
+}
+
+// ApplyYaml returns a resolver that applies a Kubernetes resource from YAML.
+// It uses Get-then-Update/Create semantics: checks if resource exists first,
+// then updates or creates accordingly.
+func (r *Service) ApplyYaml() graphql.FieldResolveFn {
+	return func(p graphql.ResolveParams) (any, error) {
+		ctx, span := otel.Tracer("").Start(p.Context, APPLY_YAML)
+		defer span.End()
+
+		yamlInput, err := getStringArg(p.Args, YamlArg, true)
+		if err != nil {
+			return nil, err
+		}
+
+		var objMap map[string]any
+		if err := yaml.Unmarshal([]byte(yamlInput), &objMap); err != nil {
+			return nil, fmt.Errorf("invalid YAML: %w", err)
+		}
+
+		obj := &unstructured.Unstructured{Object: objMap}
+
+		gvk := obj.GetObjectKind().GroupVersionKind()
+		if gvk.Kind == "" {
+			return nil, errors.New("YAML must contain kind field")
+		}
+
+		log := r.log.With().
+			Str("operation", "applyYaml").
+			Str("group", gvk.Group).
+			Str("version", gvk.Version).
+			Str("kind", gvk.Kind).
+			Str("name", obj.GetName()).
+			Logger()
+
+		dryRun := []string{}
+		if dryRunBool, _ := getBoolArg(p.Args, DryRunArg, false); dryRunBool {
+			dryRun = []string{"All"}
+		}
+
+		existing := &unstructured.Unstructured{}
+		existing.SetGroupVersionKind(gvk)
+		key := client.ObjectKey{
+			Name:      obj.GetName(),
+			Namespace: obj.GetNamespace(),
+		}
+
+		getErr := r.runtimeClient.Get(ctx, key, existing)
+
+		if getErr == nil {
+			obj.SetResourceVersion(existing.GetResourceVersion())
+			if err := r.runtimeClient.Update(ctx, obj, &client.UpdateOptions{DryRun: dryRun}); err != nil {
+				log.Error().Err(err).Msg("Failed to update object")
+				return nil, err
+			}
+			return obj.Object, nil
+		}
+
+		if apierrors.IsNotFound(getErr) {
+			if err := r.runtimeClient.Create(ctx, obj, &client.CreateOptions{DryRun: dryRun}); err != nil {
+				log.Error().Err(err).Msg("Failed to create object")
+				return nil, err
+			}
+			return obj.Object, nil
+		}
+
+		log.Error().Err(getErr).Msg("Failed to get object")
+		return nil, getErr
 	}
 }
 

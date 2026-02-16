@@ -23,6 +23,7 @@ const (
 	ResourceVersionArg = "resourceVersion"
 	LimitArg           = "limit"
 	ContinueArg        = "continue"
+	YamlArg            = "yaml"
 )
 
 // FieldConfigArgumentsBuilder helps construct GraphQL field config arguments
@@ -118,6 +119,15 @@ func (b *FieldConfigArgumentsBuilder) WithContinue() *FieldConfigArgumentsBuilde
 	b.arguments[ContinueArg] = &graphql.ArgumentConfig{
 		Type:        graphql.String,
 		Description: "Continue token from a previous list call to retrieve the next page",
+	}
+	return b
+}
+
+// WithYaml adds a YAML string argument for applying Kubernetes resources
+func (b *FieldConfigArgumentsBuilder) WithYaml() *FieldConfigArgumentsBuilder {
+	b.arguments[YamlArg] = &graphql.ArgumentConfig{
+		Type:        graphql.NewNonNull(graphql.String),
+		Description: "YAML representation of the Kubernetes resource to apply",
 	}
 	return b
 }

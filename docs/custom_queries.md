@@ -24,3 +24,45 @@ Each entry in the list may include the following fields: `group`, `version`, `ki
   }
 }
 ```
+
+## applyYaml
+
+`applyYaml` applies a Kubernetes resource from raw YAML using "apply" semantics:
+- Creates the resource if it doesn't exist
+- Updates the resource if it already exists
+
+This is useful when you have YAML manifests and want to apply them directly without constructing type-specific GraphQL mutations.
+
+### Arguments
+
+| Argument | Type | Required | Description |
+|----------|------|----------|-------------|
+| `yaml` | String! | Yes | YAML representation of the Kubernetes resource |
+| `dryRun` | Boolean | No | If true, validates without persisting changes |
+
+### Example
+
+```graphql
+mutation {
+  applyYaml(yaml: """
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-config
+  namespace: default
+data:
+  key: value
+""")
+}
+```
+
+With dry run:
+
+```graphql
+mutation {
+  applyYaml(
+    yaml: "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: test\n  namespace: default"
+    dryRun: true
+  )
+}
+```
