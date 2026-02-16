@@ -85,6 +85,7 @@ func (g *Gateway) generateGraphqlSchema() error {
 	}
 
 	g.AddTypeByCategoryQuery(rootQueryFields)
+	g.addApplyYamlMutation(rootMutationFields)
 
 	newSchema, err := graphql.NewSchema(graphql.SchemaConfig{
 		Query: graphql.NewObject(graphql.ObjectConfig{
@@ -790,4 +791,19 @@ func sanitizeFieldName(name string) string {
 	}
 
 	return name
+}
+
+// addApplyYamlMutation adds the static applyYaml mutation to root mutations.
+func (g *Gateway) addApplyYamlMutation(rootMutationFields graphql.Fields) {
+	args := resolver.NewFieldConfigArguments().
+		WithYaml().
+		WithDryRun().
+		Complete()
+
+	rootMutationFields["applyYaml"] = &graphql.Field{
+		Type:        jsonStringScalar,
+		Args:        args,
+		Resolve:     g.resolver.ApplyYaml(),
+		Description: "Apply a Kubernetes resource from YAML (creates if not exists, updates if exists)",
+	}
 }

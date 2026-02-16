@@ -383,4 +383,10 @@ func (m *mockResolverProvider) SanitizeGroupName(group string) string {
 	return group
 }
 
+func (m *mockResolverProvider) ApplyYaml() graphql.FieldResolveFn {
+	return func(p graphql.ResolveParams) (any, error) {
+		return map[string]any{}, nil
+	}
+}
+
 var _ resolver.Provider = (*mockResolverProvider)(nil)
