@@ -18,13 +18,8 @@ func (g *QueryGenerator) Generate(rc *ResourceContext, target *graphql.Object) {
 	itemArgs := resolver.ItemArgs(rc.Scope)
 
 	listWrapperType := graphql.NewObject(graphql.ObjectConfig{
-		Name: rc.UniqueTypeName + "List",
-		Fields: graphql.Fields{
-			"resourceVersion":    &graphql.Field{Type: graphql.String},
-			"items":              &graphql.Field{Type: graphql.NewNonNull(graphql.NewList(graphql.NewNonNull(rc.ResourceType)))},
-			"continue":           &graphql.Field{Type: graphql.String},
-			"remainingItemCount": &graphql.Field{Type: graphql.Int},
-		},
+		Name:   rc.UniqueTypeName + "List",
+		Fields: resolver.ListResultFields(rc.ResourceType),
 	})
 
 	target.AddFieldConfig(rc.PluralName, &graphql.Field{

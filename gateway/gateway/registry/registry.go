@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/platform-mesh/golang-commons/sentry"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/gateway/cluster"
 	utilscontext "github.com/platform-mesh/kubernetes-graphql-gateway/gateway/utils/context"
 
@@ -64,7 +63,6 @@ func (cr *ClusterRegistry) OnSchemaChanged(ctx context.Context, clusterName stri
 	})
 	if err != nil {
 		logger.Error(err, "Failed to create cluster", "cluster", clusterName)
-		sentry.CaptureError(err, sentry.Tags{"cluster": clusterName})
 		return
 	}
 

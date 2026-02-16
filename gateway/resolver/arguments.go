@@ -148,6 +148,25 @@ type Extractable interface {
 	string | bool | int
 }
 
+// ListResult represents the response structure for list queries.
+type ListResult struct {
+	ResourceVersion    string           `json:"resourceVersion"`
+	Items              []map[string]any `json:"items"`
+	Continue           string           `json:"continue"`
+	RemainingItemCount *int64           `json:"remainingItemCount"`
+}
+
+// ListResultFields returns GraphQL field definitions for ListResult.
+// The resourceType parameter is used for the items field type.
+func ListResultFields(resourceType *graphql.Object) graphql.Fields {
+	return graphql.Fields{
+		"resourceVersion":    &graphql.Field{Type: graphql.String},
+		"items":              &graphql.Field{Type: graphql.NewNonNull(graphql.NewList(graphql.NewNonNull(resourceType)))},
+		"continue":           &graphql.Field{Type: graphql.String},
+		"remainingItemCount": &graphql.Field{Type: graphql.Int},
+	}
+}
+
 // GetArg extracts a typed argument from the args map.
 // Returns the zero value if the argument is not present and not required.
 // Returns an error if required argument is missing or has wrong type.
@@ -193,9 +212,6 @@ func validateSortBy(items []unstructured.Unstructured, fieldPath string) error {
 	if !found {
 		return errors.New("specified sortBy field does not exist")
 	}
-	if err != nil {
-		return errors.Join(errors.New("error accessing specified sortBy field"), err)
-	}
 
-	return nil
+	return errors.Join(errors.New("error accessing specified sortBy field"), err)
 }

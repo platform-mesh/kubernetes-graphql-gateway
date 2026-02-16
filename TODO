@@ -20,3 +20,4 @@ TODO:
 6. Add traces and request logs into gateway http handler so that every request is logged with duration and status code.
 7. the RoundTripper is one hell of a mess - that needs to change
 8. Wire in ClusterAccessReconciler (+ SA authentication method)
+9. What metrics should we report?

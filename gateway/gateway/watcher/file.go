@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/platform-mesh/golang-commons/sentry"
 
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -146,7 +145,6 @@ func (fw *FileWatcher) onFileChanged(ctx context.Context, filePath string) {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		logger.Error(err, "Failed to read schema file", "path", filePath)
-		sentry.CaptureError(err, sentry.Tags{"filepath": filePath})
 		return
 	}
 

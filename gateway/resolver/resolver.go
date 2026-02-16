@@ -6,11 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/graphql-go/graphql"
-	pkgErrors "github.com/pkg/errors"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -95,7 +94,7 @@ func (r *Service) ListItems(gvk schema.GroupVersionKind, scope v1.ResourceScope)
 
 		if err = r.runtimeClient.List(ctx, list, opts...); err != nil {
 			logger.Error(err, "Unable to list objects")
-			return nil, pkgErrors.Wrap(err, "unable to list objects")
+			return nil, fmt.Errorf("unable to list objects: %w", err)
 		}
 
 		sortBy, err := GetArg[string](p.Args, SortByArg, false)
@@ -108,9 +107,7 @@ func (r *Service) ListItems(gvk schema.GroupVersionKind, scope v1.ResourceScope)
 				logger.WithValues(SortByArg, sortBy).Error(err, "Invalid sortBy field path")
 				return nil, err
 			}
-			sort.Slice(list.Items, func(i, j int) bool {
-				return compareUnstructured(list.Items[i], list.Items[j], sortBy) < 0
-			})
+			slices.SortFunc(list.Items, compareUnstructured(sortBy))
 		}
 
 		items := make([]map[string]any, len(list.Items))
@@ -118,11 +115,11 @@ func (r *Service) ListItems(gvk schema.GroupVersionKind, scope v1.ResourceScope)
 			items[i] = item.Object
 		}
 
-		return map[string]any{
-			"resourceVersion":    list.GetResourceVersion(),
-			"items":              items,
-			"continue":           list.GetContinue(),
-			"remainingItemCount": list.GetRemainingItemCount(),
+		return &ListResult{
+			ResourceVersion:    list.GetResourceVersion(),
+			Items:              items,
+			Continue:           list.GetContinue(),
+			RemainingItemCount: list.GetRemainingItemCount(),
 		}, nil
 	}
 }
@@ -254,50 +251,40 @@ func (r *Service) UpdateItem(gvk schema.GroupVersionKind, scope v1.ResourceScope
 			return nil, err
 		}
 
-		objectInput := p.Args["object"].(map[string]any)
-		// Marshal the input object to JSON to create the patch data
+		objectInput := p.Args[ObjectArg].(map[string]any)
 		patchData, err := json.Marshal(objectInput)
 		if err != nil {
-			return nil, fmt.Errorf("failed to marshal object input: %v", err)
+			return nil, fmt.Errorf("failed to marshal object input: %w", err)
 		}
 
-		// Prepare a placeholder for the existing object
-		existingObj := &unstructured.Unstructured{}
-		existingObj.SetGroupVersionKind(gvk)
+		obj := &unstructured.Unstructured{}
+		obj.SetGroupVersionKind(gvk)
+		obj.SetName(name)
 
-		key := client.ObjectKey{Name: name}
 		if isResourceNamespaceScoped(scope) {
 			namespace, err := GetArg[string](p.Args, NamespaceArg, true)
 			if err != nil {
 				return nil, err
 			}
-			key.Namespace = namespace
-		}
-
-		// Fetch the existing object from the cluster
-		err = r.runtimeClient.Get(ctx, key, existingObj)
-		if err != nil {
-			logger.Error(err, "Failed to get existing object")
-			return nil, err
+			obj.SetNamespace(namespace)
 		}
 
 		dryRunBool, err := GetArg[bool](p.Args, DryRunArg, false)
 		if err != nil {
 			return nil, err
 		}
-		dryRun := []string{}
+		var dryRun []string
 		if dryRunBool {
 			dryRun = []string{"All"}
 		}
 
-		// Apply the merge patch to the existing object
 		patch := client.RawPatch(types.MergePatchType, patchData)
-		if err := r.runtimeClient.Patch(ctx, existingObj, patch, &client.PatchOptions{DryRun: dryRun}); err != nil {
+		if err := r.runtimeClient.Patch(ctx, obj, patch, &client.PatchOptions{DryRun: dryRun}); err != nil {
 			logger.Error(err, "Failed to patch object")
 			return nil, err
 		}
 
-		return existingObj.Object, nil
+		return obj.Object, nil
 	}
 }
 
@@ -350,31 +337,33 @@ func (r *Service) CommonResolver() graphql.FieldResolveFn {
 	}
 }
 
-func compareUnstructured(a, b unstructured.Unstructured, fieldPath string) int {
-	segments := strings.Split(fieldPath, ".")
+func compareUnstructured(fieldPath string) func(a, b unstructured.Unstructured) int {
+	return func(a, b unstructured.Unstructured) int {
+		segments := strings.Split(fieldPath, ".")
 
-	aVal, foundA, errA := unstructured.NestedFieldNoCopy(a.Object, segments...)
-	bVal, foundB, errB := unstructured.NestedFieldNoCopy(b.Object, segments...)
-	if errA != nil || errB != nil || !foundA || !foundB {
+		aVal, foundA, errA := unstructured.NestedFieldNoCopy(a.Object, segments...)
+		bVal, foundB, errB := unstructured.NestedFieldNoCopy(b.Object, segments...)
+		if errA != nil || errB != nil || !foundA || !foundB {
+			return 0
+		}
+
+		switch av := aVal.(type) {
+		case string:
+			return cmp.Compare(av, bVal.(string))
+		case float64:
+			return cmp.Compare(av, bVal.(float64))
+		case int64:
+			return cmp.Compare(av, bVal.(int64))
+		case bool:
+			// bool not in cmp.Ordered; false < true
+			if av == bVal.(bool) {
+				return 0
+			} else if bVal.(bool) {
+				return -1
+			}
+			return 1
+		}
+
 		return 0
 	}
-
-	switch av := aVal.(type) {
-	case string:
-		return cmp.Compare(av, bVal.(string))
-	case float64:
-		return cmp.Compare(av, bVal.(float64))
-	case int64:
-		return cmp.Compare(av, bVal.(int64))
-	case bool:
-		// bool not in cmp.Ordered; false < true
-		if av == bVal.(bool) {
-			return 0
-		} else if bVal.(bool) {
-			return -1
-		}
-		return 1
-	}
-
-	return 0
 }
