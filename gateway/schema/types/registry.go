@@ -1,12 +1,18 @@
 package types
 
 import (
+	"regexp"
 	"sync"
 
 	"github.com/gobuffalo/flect"
 	"github.com/graphql-go/graphql"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
+)
+
+var (
+	invalidGroupCharRegex = regexp.MustCompile(`[^_a-zA-Z0-9]`)
+	validGroupStartRegex  = regexp.MustCompile(`^[_a-zA-Z]`)
 )
 
 type ConversionState int
@@ -27,14 +33,12 @@ type Registry struct {
 	mu               sync.RWMutex
 	types            map[string]*TypeEntry
 	typeNameRegistry map[string]string
-	sanitizeGroupFn  func(string) string
 }
 
-func NewRegistry(sanitizeGroupFn func(string) string) *Registry {
+func NewRegistry() *Registry {
 	return &Registry{
 		types:            make(map[string]*TypeEntry),
 		typeNameRegistry: make(map[string]string),
-		sanitizeGroupFn:  sanitizeGroupFn,
 	}
 }
 
@@ -98,8 +102,8 @@ func (r *Registry) GetUniqueTypeName(gvk *schema.GroupVersionKind) string {
 	if existingGroupVersion, exists := r.typeNameRegistry[kind]; exists {
 		if existingGroupVersion != groupVersion {
 			sanitizedGroup := ""
-			if gvk.Group != "" && r.sanitizeGroupFn != nil {
-				sanitizedGroup = r.sanitizeGroupFn(gvk.Group)
+			if gvk.Group != "" {
+				sanitizedGroup = SanitizeGroupName(gvk.Group)
 			}
 			return flect.Pascalize(sanitizedGroup+"_"+gvk.Version) + kind
 		}
@@ -108,6 +112,16 @@ func (r *Registry) GetUniqueTypeName(gvk *schema.GroupVersionKind) string {
 	}
 
 	return kind
+}
+
+// SanitizeGroupName converts a Kubernetes API group name to a valid GraphQL identifier.
+// It replaces invalid characters with underscores and ensures the name starts with a letter or underscore.
+func SanitizeGroupName(groupName string) string {
+	sanitized := invalidGroupCharRegex.ReplaceAllString(groupName, "_")
+	if sanitized != "" && !validGroupStartRegex.MatchString(sanitized) {
+		sanitized = "_" + sanitized
+	}
+	return sanitized
 }
 
 func (r *Registry) getOrCreateEntry(key string) *TypeEntry {
