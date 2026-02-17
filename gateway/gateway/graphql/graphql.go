@@ -1,12 +1,9 @@
 package graphql
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
-	"strings"
 
 	"github.com/graphql-go/graphql"
 	"github.com/graphql-go/handler"
@@ -49,25 +46,6 @@ func (s *GraphQLServer) CreateHandler(schema *graphql.Schema) *GraphQLHandler {
 		Schema:  schema,
 		Handler: graphqlHandler,
 	}
-}
-
-// IsIntrospectionQuery checks if the request contains a GraphQL introspection query
-func IsIntrospectionQuery(r *http.Request) bool {
-	var params struct {
-		Query string `json:"query"`
-	}
-	bodyBytes, err := io.ReadAll(r.Body)
-	r.Body.Close() //nolint:errcheck
-	if err == nil {
-		if err = json.Unmarshal(bodyBytes, &params); err == nil {
-			if strings.Contains(params.Query, "__schema") || strings.Contains(params.Query, "__type") {
-				r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
-				return true
-			}
-		}
-	}
-	r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
-	return false
 }
 
 // HandleSubscription handles GraphQL subscription requests using Server-Sent Events

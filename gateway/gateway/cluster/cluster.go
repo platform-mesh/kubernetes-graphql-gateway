@@ -11,10 +11,10 @@ import (
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/gateway/roundtripper"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/resolver"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/schema"
-	"github.com/rs/zerolog/log"
 
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type ClusterConfig struct {
@@ -72,9 +72,8 @@ func New(
 	})
 	cluster.handler = cluster.graphqlServer.CreateHandler(schemaProvider.GetSchema())
 
-	log.Info().
-		Str("cluster", name).
-		Msg("Registered endpoint")
+	logger := log.FromContext(ctx)
+	logger.Info("Registered endpoint", "cluster", name)
 
 	return cluster, nil
 }
