@@ -57,7 +57,7 @@ func (h *FileHandler) Write(JSON []byte, clusterName string) error {
 
 	// Atomic rename - watchers will never see a partial file
 	if err := os.Rename(tempFile, fileName); err != nil {
-		os.Remove(tempFile) // cleanup temp file on failure
+		_ = os.Remove(tempFile)
 		return errors.Join(ErrWriteJSONFile, err)
 	}
 
