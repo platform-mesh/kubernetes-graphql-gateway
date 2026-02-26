@@ -40,6 +40,7 @@ func (h *FileHandler) Read(clusterName string) ([]byte, error) {
 }
 
 // Write writes the given JSON bytes under the clusterName path, creating subdirectories as needed.
+// Uses atomic write (temp file + rename) to prevent race conditions with file watchers.
 func (h *FileHandler) Write(JSON []byte, clusterName string) error {
 	fileName := path.Join(h.schemasDir, clusterName)
 	// Create intermediate directories if they don't exist
@@ -47,9 +48,19 @@ func (h *FileHandler) Write(JSON []byte, clusterName string) error {
 	if err := os.MkdirAll(dir, os.ModePerm); err != nil {
 		return errors.Join(ErrWriteJSONFile, err)
 	}
-	if err := os.WriteFile(fileName, JSON, os.ModePerm); err != nil {
+
+	// Write to temp file first to ensure atomic operation
+	tempFile := fileName + ".tmp"
+	if err := os.WriteFile(tempFile, JSON, os.ModePerm); err != nil {
 		return errors.Join(ErrWriteJSONFile, err)
 	}
+
+	// Atomic rename - watchers will never see a partial file
+	if err := os.Rename(tempFile, fileName); err != nil {
+		_ = os.Remove(tempFile)
+		return errors.Join(ErrWriteJSONFile, err)
+	}
+
 	return nil
 }
 
