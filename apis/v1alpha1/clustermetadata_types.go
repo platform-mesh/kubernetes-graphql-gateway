@@ -183,8 +183,8 @@ func buildClusterMetadataFromClusterAccess(ctx context.Context, ca ClusterAccess
 	return metadata, nil
 }
 
-// readSecretKey reads a specific key from a secret referenced by SercetKeyRef
-func readSecretKey(ctx context.Context, c client.Client, ref *SercetKeyRef) ([]byte, error) {
+// readSecretKey reads a specific key from a secret referenced by SecretKeyRef
+func readSecretKey(ctx context.Context, c client.Client, ref *SecretKeyRef) ([]byte, error) {
 	secret := &corev1.Secret{}
 	if err := c.Get(ctx, client.ObjectKey{
 		Name:      ref.Name,

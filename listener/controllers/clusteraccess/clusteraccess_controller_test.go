@@ -256,7 +256,7 @@ func (suite *ClusterAccessControllerTestSuite) TestKubeconfigAuth() {
 		Spec: v1alpha1.ClusterAccessSpec{
 			Host: suite.envtestHost,
 			Auth: &v1alpha1.AuthConfig{
-				KubeconfigSecretRef: &v1alpha1.SercetKeyRef{
+				KubeconfigSecretRef: &v1alpha1.SecretKeyRef{
 					SecretReference: corev1.SecretReference{
 						Name:      "kubeconfig-secret",
 						Namespace: testNamespace,
@@ -325,7 +325,7 @@ func (suite *ClusterAccessControllerTestSuite) TestTokenAuth() {
 		Spec: v1alpha1.ClusterAccessSpec{
 			Host: suite.envtestHost,
 			CA: &v1alpha1.CAConfig{
-				SecretRef: &v1alpha1.SercetKeyRef{
+				SecretRef: &v1alpha1.SecretKeyRef{
 					SecretReference: corev1.SecretReference{
 						Name:      "ca-secret",
 						Namespace: testNamespace,
@@ -334,7 +334,7 @@ func (suite *ClusterAccessControllerTestSuite) TestTokenAuth() {
 				},
 			},
 			Auth: &v1alpha1.AuthConfig{
-				TokenSecretRef: &v1alpha1.SercetKeyRef{
+				TokenSecretRef: &v1alpha1.SecretKeyRef{
 					SecretReference: corev1.SecretReference{
 						Name:      "token-secret",
 						Namespace: testNamespace,
@@ -379,7 +379,7 @@ func (suite *ClusterAccessControllerTestSuite) TestClientCertAuth() {
 		Spec: v1alpha1.ClusterAccessSpec{
 			Host: suite.envtestHost,
 			CA: &v1alpha1.CAConfig{
-				SecretRef: &v1alpha1.SercetKeyRef{
+				SecretRef: &v1alpha1.SecretKeyRef{
 					SecretReference: corev1.SecretReference{
 						Name:      "ca-secret",
 						Namespace: testNamespace,
@@ -429,7 +429,7 @@ func (suite *ClusterAccessControllerTestSuite) TestServiceAccountAuth() {
 		Spec: v1alpha1.ClusterAccessSpec{
 			Host: suite.envtestHost,
 			CA: &v1alpha1.CAConfig{
-				SecretRef: &v1alpha1.SercetKeyRef{
+				SecretRef: &v1alpha1.SecretKeyRef{
 					SecretReference: corev1.SecretReference{
 						Name:      "ca-secret",
 						Namespace: testNamespace,
