@@ -6,16 +6,6 @@ go 1.25.6
 // https://github.com/graphql-go/handler/pull/93
 replace github.com/graphql-go/handler => github.com/vertex451/handler v0.0.0-20250124125145-ed328e3cf42a
 
-// We can't go beyond k8s 1.34.0 because of WatchLists feature being enabled by default in 1.35.0
-// This causes not to list existing object in the system on restart. And so schemas are not generated properly because
-// multicluster-runtime is not enaging Clusters.
-replace (
-	k8s.io/api => k8s.io/api v0.34.0
-	k8s.io/apiserver => k8s.io/apiserver v0.34.0
-	k8s.io/client-go => k8s.io/client-go v0.34.0
-	k8s.io/component-base => k8s.io/component-base v0.34.0
-)
-
 require (
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/gobuffalo/flect v1.0.3
@@ -23,8 +13,8 @@ require (
 	github.com/google/gnostic-models v0.7.0
 	github.com/graphql-go/graphql v0.8.1
 	github.com/graphql-go/handler v0.2.4
-	github.com/kcp-dev/multicluster-provider v0.4.0
-	github.com/kcp-dev/sdk v0.28.1-0.20251209130449-436a0347809b
+	github.com/kcp-dev/multicluster-provider v0.5.1
+	github.com/kcp-dev/sdk v0.30.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/rs/cors v1.11.1
 	github.com/rs/zerolog v1.34.0
@@ -37,15 +27,16 @@ require (
 	google.golang.org/protobuf v1.36.8
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.35.0
-	k8s.io/apiextensions-apiserver v0.34.2
+	k8s.io/apiextensions-apiserver v0.35.0
 	k8s.io/apimachinery v0.35.0
 	k8s.io/apiserver v0.35.0
 	k8s.io/client-go v0.35.0
 	k8s.io/component-base v0.35.0
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/kube-openapi v0.0.0-20250910181357-589584f1c912
-	sigs.k8s.io/controller-runtime v0.22.4
-	sigs.k8s.io/multicluster-runtime v0.22.4-beta.1.0.20260121175728-cda86980358b
+	k8s.io/utils v0.0.0-20251002143259-bc988d571ff4
+	sigs.k8s.io/controller-runtime v0.23.3
+	sigs.k8s.io/multicluster-runtime v0.23.1
 )
 
 require (
@@ -83,7 +74,7 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/kcp-dev/apimachinery/v2 v2.29.1-0.20251209121225-cf3c0b624983 // indirect
+	github.com/kcp-dev/apimachinery/v2 v2.30.0 // indirect
 	github.com/kcp-dev/logicalcluster/v3 v3.0.5 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/mailru/easyjson v0.9.0 // indirect
@@ -129,10 +120,9 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250825161204-c5933d9347a5 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
-	k8s.io/utils v0.0.0-20251002143259-bc988d571ff4 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.31.2 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
-	sigs.k8s.io/structured-merge-diff/v6 v6.3.0 // indirect
+	sigs.k8s.io/structured-merge-diff/v6 v6.3.2-0.20260122202528-d9cc6641c482 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
 )
