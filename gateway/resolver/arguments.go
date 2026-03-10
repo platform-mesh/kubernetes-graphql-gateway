@@ -212,6 +212,9 @@ func validateSortBy(items []unstructured.Unstructured, fieldPath string) error {
 	if !found {
 		return errors.New("specified sortBy field does not exist")
 	}
+	if err != nil {
+		return errors.Join(errors.New("error accessing specified sortBy field"), err)
+	}
 
-	return errors.Join(errors.New("error accessing specified sortBy field"), err)
+	return nil
 }

@@ -143,7 +143,7 @@ func (r *ClusterAccessReconciler) Reconcile(ctx context.Context, req mcreconcile
 	}
 
 	// Inject cluster metadata into the schema
-	schemaWithMetadata, err := injectClusterMetadata(ctx, schemaJSON, *ca)
+	schemaWithMetadata, err := injectClusterMetadata(ctx, schemaJSON, *ca, c)
 	if err != nil {
 		logger.Error(err, "Failed to inject cluster metadata", "clusterAccess", ca.Name)
 		return ctrl.Result{}, err
@@ -169,7 +169,7 @@ func (r *ClusterAccessReconciler) SetupWithManager(mgr mcmanager.Manager) error 
 }
 
 // buildTargetClusterConfig extracts connection info from ClusterAccess and builds rest.Config
-func buildTargetClusterConfig(_ context.Context, clusterAccess v1alpha1.ClusterAccess, _ client.Client) (*rest.Config, error) {
+func buildTargetClusterConfig(ctx context.Context, clusterAccess v1alpha1.ClusterAccess, c client.Client) (*rest.Config, error) {
 	spec := clusterAccess.Spec
 
 	// Extract host (required)
@@ -178,7 +178,7 @@ func buildTargetClusterConfig(_ context.Context, clusterAccess v1alpha1.ClusterA
 		return nil, errors.New("host field not found in ClusterAccess spec")
 	}
 
-	config, err := v1alpha1.BuildRestConfigFromClusterAccess(clusterAccess)
+	config, err := v1alpha1.BuildRestConfigFromClusterAccess(ctx, clusterAccess, c)
 	if err != nil {
 		return nil, err
 	}
@@ -186,27 +186,18 @@ func buildTargetClusterConfig(_ context.Context, clusterAccess v1alpha1.ClusterA
 	return config, nil
 }
 
-// injectClusterMetadata injects cluster metadata into schema JSON
-// TODO: This is very unelegant, improve in future
-func injectClusterMetadata(_ context.Context, schemaData []byte, clusterAccess v1alpha1.ClusterAccess) ([]byte, error) {
-	metadata, err := v1alpha1.BuildClusterMetadataFromClusterAccess(clusterAccess)
+func injectClusterMetadata(ctx context.Context, schemaData []byte, clusterAccess v1alpha1.ClusterAccess, c client.Client) ([]byte, error) {
+	metadata, err := v1alpha1.BuildClusterMetadataFromClusterAccess(ctx, clusterAccess, c)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build cluster metadata from ClusterAccess: %w", err)
 	}
 
-	// Parse the existing schema JSON
 	var schemaJSON map[string]any
 	if err := json.Unmarshal(schemaData, &schemaJSON); err != nil {
 		return nil, fmt.Errorf("failed to parse schema JSON: %w", err)
 	}
 
-	data, err := json.Marshal(metadata)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal cluster metadata: %w", err)
-	}
-
-	// Inject the metadata into the schema
-	schemaJSON["x-cluster-metadata"] = data
+	schemaJSON["x-cluster-metadata"] = metadata
 
 	return json.Marshal(schemaJSON)
 }

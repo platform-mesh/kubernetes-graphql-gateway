@@ -55,7 +55,11 @@ func (fw *FileWatcher) Run(ctx context.Context, watchPath string) error {
 	if err := fw.addWatchRecursively(watchPath); err != nil {
 		return fmt.Errorf("failed to add watch paths: %w", err)
 	}
-	defer fw.watcher.Close() //nolint:errcheck
+	defer func() {
+		if err := fw.watcher.Close(); err != nil {
+			logger.Error(err, "Failed to close file watcher")
+		}
+	}()
 
 	logger.WithValues("dirPath", watchPath).Info("started watching directory")
 

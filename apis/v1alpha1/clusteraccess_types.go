@@ -44,7 +44,7 @@ type CAConfig struct {
 }
 
 // AuthConfig defines authentication configuration options
-// +kubebuilder:validation:XValidation:rule="(has(self.tokenSecretRef) ? 1 : 0) + (has(self.kubeconfigSecretRef) ? 1 : 0) + (has(self.clientCertificateRef) ? 1 : 0) <= 1",message="only one of tokenSecretRef, kubeconfigSecretRef, or clientCertificateRef can be set"
+// +kubebuilder:validation:XValidation:rule="(has(self.tokenSecretRef) ? 1 : 0) + (has(self.kubeconfigSecretRef) ? 1 : 0) + (has(self.clientCertificateRef) ? 1 : 0) + (has(self.serviceAccountRef) ? 1 : 0) <= 1",message="only one of tokenSecretRef, kubeconfigSecretRef, clientCertificateRef, or serviceAccountRef can be set"
 type AuthConfig struct {
 	// SecretRef points to a secret containing auth token
 	// +optional
@@ -56,6 +56,9 @@ type AuthConfig struct {
 	// Secret must contain tls.crt and tls.key keys.
 	// +optional
 	ClientCertificateRef *corev1.SecretReference `json:"clientCertificateRef,omitempty"`
+	// ServiceAccountRef points to a service account for token generation
+	// +optional
+	ServiceAccountRef *ServiceAccountRef `json:"serviceAccountRef,omitempty"`
 }
 
 // SercetKeyRef defines a reference to a secret with a specific key.
