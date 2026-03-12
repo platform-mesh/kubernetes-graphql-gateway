@@ -52,10 +52,6 @@ func NewServer(c ServerConfig) (*Server, error) {
 		c.Gateway.ServeHTTP(w, r.WithContext(ctx))
 	}))
 
-	// TODO: Add AccessCluster separate endpoint. Something like
-	// /api/remote-clusters/{clusterName}/graphql (need better naming...)
-	// This would allow for better separation of concerns and clearer routing
-
 	// TODO: Add middleware for logging, metrics, tracing, etc.
 
 	// Health and metrics endpoints

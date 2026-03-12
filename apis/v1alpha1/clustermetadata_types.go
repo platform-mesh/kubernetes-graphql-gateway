@@ -167,6 +167,12 @@ func buildClusterMetadataFromClusterAccess(ctx context.Context, ca ClusterAccess
 			},
 		}
 
+		// Use configured expiration if provided
+		if auth.ServiceAccountRef.TokenExpiration != nil && auth.ServiceAccountRef.TokenExpiration.Duration > 0 {
+			expirationSeconds := int64(auth.ServiceAccountRef.TokenExpiration.Duration.Seconds())
+			tokenRequest.Spec.ExpirationSeconds = &expirationSeconds
+		}
+
 		if err := c.SubResource("token").Create(ctx, sa, tokenRequest); err != nil {
 			return nil, fmt.Errorf("failed to create token for service account %s/%s: %w", auth.ServiceAccountRef.Namespace, auth.ServiceAccountRef.Name, err)
 		}
@@ -299,6 +305,8 @@ func buildConfigFromMetadata(metadata ClusterMetadata) (*rest.Config, error) {
 			config.BearerToken = string(tokenData)
 		}
 	}
+
+	config.Host = metadata.Host
 
 	return config, nil
 }

@@ -2,9 +2,11 @@ package clusteraccess
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/platform-mesh/kubernetes-graphql-gateway/apis/v1alpha1"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
@@ -13,6 +15,7 @@ import (
 
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -98,8 +101,10 @@ func (r *ClusterAccessReconciler) Reconcile(ctx context.Context, req mcreconcile
 		clusterName = fmt.Sprintf("%s-%s", req.ClusterName, clusterName)
 	}
 
+	currentConfig := cl.GetConfig()
+
 	// Build target cluster config from ClusterAccess spec
-	targetConfig, err := buildTargetClusterConfig(ctx, *ca, c)
+	targetConfig, err := buildTargetClusterConfig(ctx, *ca, c, currentConfig)
 	if err != nil {
 		logger.Error(err, "Failed to build target cluster config", "clusterAccess", ca.Name)
 		return ctrl.Result{}, err
@@ -143,7 +148,7 @@ func (r *ClusterAccessReconciler) Reconcile(ctx context.Context, req mcreconcile
 	}
 
 	// Inject cluster metadata into the schema
-	schemaWithMetadata, err := injectClusterMetadata(ctx, schemaJSON, *ca, c)
+	schemaWithMetadata, err := injectClusterMetadata(ctx, schemaJSON, *ca, c, currentConfig)
 	if err != nil {
 		logger.Error(err, "Failed to inject cluster metadata", "clusterAccess", ca.Name)
 		return ctrl.Result{}, err
@@ -156,7 +161,31 @@ func (r *ClusterAccessReconciler) Reconcile(ctx context.Context, req mcreconcile
 	}
 
 	logger.Info("Successfully reconciled schema for ClusterAccess", "name", ca.Name, "path", clusterName)
+
+	// If using SA auth, schedule requeue before token expires
+	if ca.Spec.Auth != nil && ca.Spec.Auth.ServiceAccountRef != nil {
+		requeueDuration := calculateTokenRefreshInterval(ca.Spec.Auth.ServiceAccountRef.TokenExpiration)
+		logger.Info("Scheduled token refresh", "name", ca.Name, "requeueAfter", requeueDuration)
+		return ctrl.Result{RequeueAfter: requeueDuration}, nil
+	}
+
 	return ctrl.Result{}, nil
+}
+
+// calculateTokenRefreshInterval returns when to requeue for token refresh.
+// Requeues at 80% of token lifetime to refresh before expiry.
+func calculateTokenRefreshInterval(tokenExpiration *metav1.Duration) time.Duration {
+	const defaultExpiration = 1 * time.Hour
+
+	var expiration time.Duration
+	if tokenExpiration != nil && tokenExpiration.Duration > 0 {
+		expiration = tokenExpiration.Duration
+	} else {
+		expiration = defaultExpiration
+	}
+
+	// Refresh at 80% of token lifetime (20% safety buffer)
+	return time.Duration(float64(expiration) * 0.8)
 }
 
 // SetupWithManager sets up the controller with the Manager
@@ -168,11 +197,9 @@ func (r *ClusterAccessReconciler) SetupWithManager(mgr mcmanager.Manager) error 
 		Complete(r)
 }
 
-// buildTargetClusterConfig extracts connection info from ClusterAccess and builds rest.Config
-func buildTargetClusterConfig(ctx context.Context, clusterAccess v1alpha1.ClusterAccess, c client.Client) (*rest.Config, error) {
+func buildTargetClusterConfig(ctx context.Context, clusterAccess v1alpha1.ClusterAccess, c client.Client, currentConfig *rest.Config) (*rest.Config, error) {
 	spec := clusterAccess.Spec
 
-	// Extract host (required)
 	host := spec.Host
 	if host == "" {
 		return nil, errors.New("host field not found in ClusterAccess spec")
@@ -183,13 +210,26 @@ func buildTargetClusterConfig(ctx context.Context, clusterAccess v1alpha1.Cluste
 		return nil, err
 	}
 
+	if len(config.CAData) == 0 && currentConfig != nil && len(currentConfig.CAData) > 0 {
+		config.CAData = currentConfig.CAData
+		config.Insecure = false
+	}
+
+	config.Host = host
+
 	return config, nil
 }
 
-func injectClusterMetadata(ctx context.Context, schemaData []byte, clusterAccess v1alpha1.ClusterAccess, c client.Client) ([]byte, error) {
+func injectClusterMetadata(ctx context.Context, schemaData []byte, clusterAccess v1alpha1.ClusterAccess, c client.Client, currentConfig *rest.Config) ([]byte, error) {
 	metadata, err := v1alpha1.BuildClusterMetadataFromClusterAccess(ctx, clusterAccess, c)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build cluster metadata from ClusterAccess: %w", err)
+	}
+
+	if metadata.CA == nil && currentConfig != nil && len(currentConfig.CAData) > 0 {
+		metadata.CA = &v1alpha1.CAMetadata{
+			Data: base64.StdEncoding.EncodeToString(currentConfig.CAData),
+		}
 	}
 
 	var schemaJSON map[string]any
