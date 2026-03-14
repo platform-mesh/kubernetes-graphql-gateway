@@ -6,38 +6,20 @@ import (
 )
 
 type QueryGenerator struct {
-	resolver resolver.Provider
+	resolver *resolver.Service
 }
 
-func NewQueryGenerator(resolver resolver.Provider) *QueryGenerator {
+func NewQueryGenerator(resolver *resolver.Service) *QueryGenerator {
 	return &QueryGenerator{resolver: resolver}
 }
 
 func (g *QueryGenerator) Generate(rc *ResourceContext, target *graphql.Object) {
-	listArgsBuilder := resolver.NewFieldConfigArguments().
-		WithLabelSelector().
-		WithSortBy().
-		WithLimit().
-		WithContinue()
-
-	itemArgsBuilder := resolver.NewFieldConfigArguments().WithName()
-
-	if rc.IsNamespaceScoped() {
-		listArgsBuilder.WithNamespace()
-		itemArgsBuilder.WithNamespace()
-	}
-
-	listArgs := listArgsBuilder.Complete()
-	itemArgs := itemArgsBuilder.Complete()
+	listArgs := resolver.ListArgs(rc.Scope)
+	itemArgs := resolver.ItemArgs(rc.Scope)
 
 	listWrapperType := graphql.NewObject(graphql.ObjectConfig{
-		Name: rc.UniqueTypeName + "List",
-		Fields: graphql.Fields{
-			"resourceVersion":    &graphql.Field{Type: graphql.String},
-			"items":              &graphql.Field{Type: graphql.NewNonNull(graphql.NewList(graphql.NewNonNull(rc.ResourceType)))},
-			"continue":           &graphql.Field{Type: graphql.String},
-			"remainingItemCount": &graphql.Field{Type: graphql.Int},
-		},
+		Name:   rc.UniqueTypeName + "List",
+		Fields: resolver.ListResultFields(rc.ResourceType),
 	})
 
 	target.AddFieldConfig(rc.PluralName, &graphql.Field{

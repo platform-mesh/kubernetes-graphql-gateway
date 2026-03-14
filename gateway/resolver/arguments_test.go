@@ -32,7 +32,7 @@ func TestGetStrArg(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := resolver.GetStringArg(tt.args, "arg1", true)
+			_, err := resolver.GetArg[string](tt.args, "arg1", true)
 			if tt.error != nil {
 				assert.EqualError(t, err, tt.error.Error())
 			}
@@ -62,7 +62,7 @@ func TestGetBoolArg(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := resolver.GetBoolArg(tt.args, "arg1", true)
+			_, err := resolver.GetArg[bool](tt.args, "arg1", true)
 			if tt.error != nil {
 				assert.EqualError(t, err, tt.error.Error())
 			}

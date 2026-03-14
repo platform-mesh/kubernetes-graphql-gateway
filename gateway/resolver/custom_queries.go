@@ -13,7 +13,7 @@ type TypeByCategory struct {
 
 func (r *Service) TypeByCategory(m map[string][]TypeByCategory) graphql.FieldResolveFn {
 	return func(p graphql.ResolveParams) (any, error) {
-		name, err := getStringArg(p.Args, NameArg, true)
+		name, err := GetArg[string](p.Args, NameArg, true)
 		if err != nil {
 			return nil, err
 		}

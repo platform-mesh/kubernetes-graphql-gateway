@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/gateway"
+	gatewayconfig "github.com/platform-mesh/kubernetes-graphql-gateway/gateway/gateway/config"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/http"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/options"
 )
@@ -15,31 +16,32 @@ type Config struct {
 	HTTPServer *http.Server
 }
 
-func NewConfig(options *options.CompletedOptions) (*Config, error) {
-	config := &Config{
-		Options: options,
+func NewConfig(opts *options.CompletedOptions) (*Config, error) {
+	cfg := &Config{
+		Options: opts,
 	}
 
-	gatewayServer, err := gateway.New(gateway.GatewayConfig{
-		DevelopmentDisableAuth: config.Options.DevelopmentDisableAuth,
-		GraphQLPretty:          true,
-		GraphQLPlayground:      config.Options.PlaygroundEnabled,
-		GraphQLGraphiQL:        config.Options.PlaygroundEnabled,
-		SchemaHandler:          config.Options.SchemaHandler,
-		SchemaDirectory:        config.Options.SchemasDir,
-		GRPCAddress:            config.Options.GRPCListenerAddress,
+	gatewayServer, err := gateway.New(gatewayconfig.Gateway{
+		SchemaHandler:   cfg.Options.SchemaHandler,
+		SchemaDirectory: cfg.Options.SchemasDir,
+		GRPCAddress:     cfg.Options.GRPCListenerAddress,
+		GraphQL: gatewayconfig.GraphQL{
+			Pretty:     true,
+			Playground: cfg.Options.PlaygroundEnabled,
+			GraphiQL:   cfg.Options.PlaygroundEnabled,
+		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create gateway server: %w", err)
 	}
-	config.Gateway = gatewayServer
+	cfg.Gateway = gatewayServer
 
 	httpServer, err := http.NewServer(http.ServerConfig{
 		Gateway: gatewayServer,
-		Addr:    fmt.Sprintf("%s:%d", config.Options.ServerBindAddress, config.Options.ServerBindPort),
+		Addr:    fmt.Sprintf("%s:%d", cfg.Options.ServerBindAddress, cfg.Options.ServerBindPort),
 		CORSConfig: http.CORSConfig{
-			AllowedOrigins:   config.Options.CORSAllowedOrigins,
-			AllowedHeaders:   config.Options.CORSAllowedHeaders,
+			AllowedOrigins:   cfg.Options.CORSAllowedOrigins,
+			AllowedHeaders:   cfg.Options.CORSAllowedHeaders,
 			AllowCredentials: true,
 		},
 	})
@@ -47,7 +49,7 @@ func NewConfig(options *options.CompletedOptions) (*Config, error) {
 		return nil, fmt.Errorf("failed to create HTTP server: %w", err)
 	}
 
-	config.HTTPServer = httpServer
+	cfg.HTTPServer = httpServer
 
-	return config, nil
+	return cfg, nil
 }

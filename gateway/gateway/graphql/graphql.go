@@ -1,43 +1,36 @@
 package graphql
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
-	"strings"
 
 	"github.com/graphql-go/graphql"
 	"github.com/graphql-go/handler"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/gateway/config"
 
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-type GraphQLConfig struct {
-	Pretty     bool
-	Playground bool
-	GraphiQL   bool
-}
-
-// GraphQLServer provides utility methods for creating GraphQL handlers
+// GraphQLServer provides utility methods for creating GraphQL handlers.
 type GraphQLServer struct {
-	config GraphQLConfig
+	config config.GraphQL
 }
 
-// NewGraphQLServer creates a new GraphQL server
-func NewGraphQLServer(config GraphQLConfig) *GraphQLServer {
+// NewGraphQLServer creates a new GraphQL server.
+func NewGraphQLServer(cfg config.GraphQL) *GraphQLServer {
 	return &GraphQLServer{
-		config: config,
+		config: cfg,
 	}
 }
 
+// GraphQLHandler wraps a GraphQL schema and its HTTP handler.
 type GraphQLHandler struct {
 	Schema  *graphql.Schema
 	Handler http.Handler
 }
 
-// CreateHandler creates a new GraphQL handler from a schema
+// CreateHandler creates a new GraphQL handler from a schema.
 func (s *GraphQLServer) CreateHandler(schema *graphql.Schema) *GraphQLHandler {
 	graphqlHandler := handler.New(&handler.Config{
 		Schema:     schema,
@@ -51,26 +44,7 @@ func (s *GraphQLServer) CreateHandler(schema *graphql.Schema) *GraphQLHandler {
 	}
 }
 
-// IsIntrospectionQuery checks if the request contains a GraphQL introspection query
-func IsIntrospectionQuery(r *http.Request) bool {
-	var params struct {
-		Query string `json:"query"`
-	}
-	bodyBytes, err := io.ReadAll(r.Body)
-	r.Body.Close() //nolint:errcheck
-	if err == nil {
-		if err = json.Unmarshal(bodyBytes, &params); err == nil {
-			if strings.Contains(params.Query, "__schema") || strings.Contains(params.Query, "__type") {
-				r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
-				return true
-			}
-		}
-	}
-	r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
-	return false
-}
-
-// HandleSubscription handles GraphQL subscription requests using Server-Sent Events
+// HandleSubscription handles GraphQL subscription requests using Server-Sent Events.
 func (s *GraphQLServer) HandleSubscription(w http.ResponseWriter, r *http.Request, schema *graphql.Schema) {
 	logger := log.FromContext(r.Context())
 
@@ -91,7 +65,10 @@ func (s *GraphQLServer) HandleSubscription(w http.ResponseWriter, r *http.Reques
 	}
 
 	flusher := http.NewResponseController(w)
-	r.Body.Close() //nolint:errcheck
+
+	if err := r.Body.Close(); err != nil {
+		logger.V(4).Error(err, "Failed to close request body")
+	}
 
 	subscriptionParams := graphql.Params{
 		Schema:         *schema,
@@ -113,9 +90,18 @@ func (s *GraphQLServer) HandleSubscription(w http.ResponseWriter, r *http.Reques
 			continue
 		}
 
-		fmt.Fprintf(w, "event: next\ndata: %s\n\n", data) //nolint:errcheck
-		flusher.Flush()                                   //nolint:errcheck
+		if _, err := fmt.Fprintf(w, "event: next\ndata: %s\n\n", data); err != nil {
+			logger.V(4).Error(err, "Failed to write SSE event")
+			return
+		}
+
+		if err := flusher.Flush(); err != nil {
+			logger.V(4).Error(err, "Failed to flush SSE response")
+			return
+		}
 	}
 
-	fmt.Fprint(w, "event: complete\n\n") //nolint:errcheck
+	if _, err := fmt.Fprint(w, "event: complete\n\n"); err != nil {
+		logger.V(4).Error(err, "Failed to write SSE complete event")
+	}
 }
