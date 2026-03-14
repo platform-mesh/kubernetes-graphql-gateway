@@ -28,6 +28,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
@@ -36,8 +37,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 )
 
 const testNamespace = "gateway-test-ns"
@@ -300,7 +299,7 @@ func (suite *GatewayE2ETestSuite) executeGraphQLQuery(
 
 	resp, err := http.DefaultClient.Do(req)
 	suite.Require().NoError(err, "failed to execute request")
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	respBody, err := io.ReadAll(resp.Body)
 	suite.Require().NoError(err, "failed to read response body")
@@ -696,7 +695,7 @@ func (suite *GatewayE2ETestSuite) TestClusterNotFound() {
 
 	resp, err := http.DefaultClient.Do(req)
 	suite.Require().NoError(err)
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	suite.Equal(404, resp.StatusCode)
 }
@@ -795,7 +794,7 @@ func (suite *GatewayE2ETestSuite) TestSchemaDelete() {
 
 	resp, err := http.DefaultClient.Do(req)
 	suite.Require().NoError(err)
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	suite.Equal(404, resp.StatusCode)
 }

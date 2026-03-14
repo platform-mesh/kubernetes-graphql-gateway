@@ -102,4 +102,3 @@ func TestSchemaSet_O1_Lookups(t *testing.T) {
 		assert.Len(t, all, 3)
 	})
 }
-

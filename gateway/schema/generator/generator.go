@@ -41,8 +41,8 @@ type SchemaGenerator struct {
 	mutationGen     *fields.MutationGenerator
 	subscriptionGen *fields.SubscriptionGenerator
 
-	categoryManager  *extensions.CategoryManager
-	customQueryGen   *extensions.CustomQueryGenerator
+	categoryManager *extensions.CategoryManager
+	customQueryGen  *extensions.CustomQueryGenerator
 }
 
 // New creates a new schema generator.
@@ -51,15 +51,15 @@ func New(definitions map[string]*spec.Schema, resolverProvider *resolver.Service
 	categoryManager := extensions.NewCategoryManager(definitions)
 
 	return &SchemaGenerator{
-		definitions:      definitions,
-		resolver:         resolverProvider,
-		typeRegistry:     registry,
-		typeConverter:    types.NewConverter(registry),
-		queryGen:         fields.NewQueryGenerator(resolverProvider),
-		mutationGen:      fields.NewMutationGenerator(resolverProvider),
-		subscriptionGen:  fields.NewSubscriptionGenerator(resolverProvider),
-		categoryManager:  categoryManager,
-		customQueryGen:   extensions.NewCustomQueryGenerator(resolverProvider, categoryManager),
+		definitions:     definitions,
+		resolver:        resolverProvider,
+		typeRegistry:    registry,
+		typeConverter:   types.NewConverter(registry),
+		queryGen:        fields.NewQueryGenerator(resolverProvider),
+		mutationGen:     fields.NewMutationGenerator(resolverProvider),
+		subscriptionGen: fields.NewSubscriptionGenerator(resolverProvider),
+		categoryManager: categoryManager,
+		customQueryGen:  extensions.NewCustomQueryGenerator(resolverProvider, categoryManager),
 	}
 }
 

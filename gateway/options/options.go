@@ -66,9 +66,9 @@ func NewOptions() *Options {
 			ServerBindAddress:   "0.0.0.0",
 			ServerBindPort:      8080,
 			PlaygroundEnabled:   false,
-			CORSAllowedOrigins: []string{},
-			CORSAllowedHeaders: []string{},
-			URLSuffix:          "/graphql",
+			CORSAllowedOrigins:  []string{},
+			CORSAllowedHeaders:  []string{},
+			URLSuffix:           "/graphql",
 		},
 	}
 	return opts

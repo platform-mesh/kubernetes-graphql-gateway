@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/graphql-go/graphql"
+
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )

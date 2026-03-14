@@ -169,7 +169,7 @@ func buildClusterMetadataFromClusterAccess(ctx context.Context, ca ClusterAccess
 
 		// Use configured expiration if provided
 		if auth.ServiceAccountRef.TokenExpiration != nil && auth.ServiceAccountRef.TokenExpiration.Duration > 0 {
-			expirationSeconds := int64(auth.ServiceAccountRef.TokenExpiration.Duration.Seconds())
+			expirationSeconds := int64(auth.ServiceAccountRef.TokenExpiration.Seconds())
 			tokenRequest.Spec.ExpirationSeconds = &expirationSeconds
 		}
 
