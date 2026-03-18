@@ -35,8 +35,6 @@ type ExtraOptions struct {
 	// URLSuffix is the URL suffix for the GraphQL endpoint.
 	// For example, if set to "/graphql", the endpoint will be available at /graphql.
 	URLSuffix string
-	// DevelopmentDisableAuth indicates whether to disable authentication in development mode.
-	DevelopmentDisableAuth bool
 
 	GraphQLPretty     bool
 	GraphQLPlayground bool
@@ -71,8 +69,6 @@ func NewOptions() *Options {
 			CORSAllowedOrigins:  []string{},
 			CORSAllowedHeaders:  []string{},
 			URLSuffix:           "/graphql",
-
-			DevelopmentDisableAuth: false,
 		},
 	}
 	return opts
@@ -90,9 +86,6 @@ func (options *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.StringSliceVar(&options.CORSAllowedOrigins, "cors-allowed-origins", options.CORSAllowedOrigins, "list of allowed origins for CORS")
 	fs.StringSliceVar(&options.CORSAllowedHeaders, "cors-allowed-headers", options.CORSAllowedHeaders, "list of allowed headers for CORS")
 	fs.StringVar(&options.URLSuffix, "url-suffix", options.URLSuffix, "URL suffix for the GraphQL endpoint")
-
-	fs.BoolVar(&options.DevelopmentDisableAuth, "development-disable-auth", options.DevelopmentDisableAuth, "disable authentication in development mode")
-	fs.MarkHidden("development-disable-auth") //nolint:errcheck
 }
 
 func (options *Options) Complete() (*CompletedOptions, error) {

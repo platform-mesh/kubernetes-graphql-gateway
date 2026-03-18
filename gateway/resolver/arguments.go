@@ -2,16 +2,16 @@ package resolver
 
 import (
 	"errors"
-	"maps"
+	"fmt"
 	"strings"
 
 	"github.com/graphql-go/graphql"
-	"github.com/rs/zerolog/log"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
+// Argument name constants
 const (
 	LabelSelectorArg   = "labelselector"
 	NameArg            = "name"
@@ -25,176 +25,176 @@ const (
 	ContinueArg        = "continue"
 )
 
-// FieldConfigArgumentsBuilder helps construct GraphQL field config arguments
-type FieldConfigArgumentsBuilder struct {
-	arguments graphql.FieldConfigArgument
-}
-
-// NewFieldConfigArguments initializes a new builder
-func NewFieldConfigArguments() *FieldConfigArgumentsBuilder {
-	return &FieldConfigArgumentsBuilder{
-		arguments: graphql.FieldConfigArgument{},
-	}
-}
-
-func (b *FieldConfigArgumentsBuilder) WithName() *FieldConfigArgumentsBuilder {
-	b.arguments[NameArg] = &graphql.ArgumentConfig{
+var (
+	NameArgConfig = &graphql.ArgumentConfig{
 		Type:        graphql.NewNonNull(graphql.String),
 		Description: "The name of the object",
 	}
-	return b
-}
 
-func (b *FieldConfigArgumentsBuilder) WithNamespace() *FieldConfigArgumentsBuilder {
-	b.arguments[NamespaceArg] = &graphql.ArgumentConfig{
+	NamespaceArgConfig = &graphql.ArgumentConfig{
 		Type:        graphql.String,
 		Description: "The namespace in which to search for the objects",
 	}
 
-	return b
-}
-
-func (b *FieldConfigArgumentsBuilder) WithLabelSelector() *FieldConfigArgumentsBuilder {
-	b.arguments[LabelSelectorArg] = &graphql.ArgumentConfig{
+	LabelSelectorArgConfig = &graphql.ArgumentConfig{
 		Type:        graphql.String,
 		Description: "A label selector to filter the objects by",
 	}
-	return b
-}
 
-func (b *FieldConfigArgumentsBuilder) WithObject(resourceInputType *graphql.InputObject) *FieldConfigArgumentsBuilder {
-	b.arguments[ObjectArg] = &graphql.ArgumentConfig{
-		Type:        graphql.NewNonNull(resourceInputType),
-		Description: "The object to create or update",
-	}
-	return b
-}
-
-func (b *FieldConfigArgumentsBuilder) WithDryRun() *FieldConfigArgumentsBuilder {
-	b.arguments[DryRunArg] = &graphql.ArgumentConfig{
+	DryRunArgConfig = &graphql.ArgumentConfig{
 		Type:        graphql.Boolean,
 		Description: "If true, the operation will be performed in dry-run mode",
 	}
-	return b
-}
 
-func (b *FieldConfigArgumentsBuilder) WithSubscribeToAll() *FieldConfigArgumentsBuilder {
-	b.arguments[SubscribeToAllArg] = &graphql.ArgumentConfig{
+	SubscribeToAllArgConfig = &graphql.ArgumentConfig{
 		Type:         graphql.Boolean,
 		DefaultValue: false,
 		Description:  "If true, events will be emitted on every field change",
 	}
-	return b
-}
 
-func (b *FieldConfigArgumentsBuilder) WithResourceVersion() *FieldConfigArgumentsBuilder {
-	b.arguments[ResourceVersionArg] = &graphql.ArgumentConfig{
+	ResourceVersionArgConfig = &graphql.ArgumentConfig{
 		Type:        graphql.String,
 		Description: "If set, subscription will stream changes starting from this resourceVersion. If omitted will return all",
 	}
-	return b
-}
 
-func (b *FieldConfigArgumentsBuilder) WithSortBy() *FieldConfigArgumentsBuilder {
-	b.arguments[SortByArg] = &graphql.ArgumentConfig{
+	SortByArgConfig = &graphql.ArgumentConfig{
 		Type:         graphql.String,
 		Description:  "The field to sort the results by",
 		DefaultValue: "metadata.name",
 	}
-	return b
-}
 
-// WithLimit adds a pagination limit argument for list queries
-func (b *FieldConfigArgumentsBuilder) WithLimit() *FieldConfigArgumentsBuilder {
-	b.arguments[LimitArg] = &graphql.ArgumentConfig{
+	LimitArgConfig = &graphql.ArgumentConfig{
 		Type:        graphql.Int,
 		Description: "Maximum number of items to return (server may return fewer)",
 	}
-	return b
-}
 
-// WithContinue adds a pagination continue token argument for list queries
-func (b *FieldConfigArgumentsBuilder) WithContinue() *FieldConfigArgumentsBuilder {
-	b.arguments[ContinueArg] = &graphql.ArgumentConfig{
+	ContinueArgConfig = &graphql.ArgumentConfig{
 		Type:        graphql.String,
 		Description: "Continue token from a previous list call to retrieve the next page",
 	}
-	return b
+)
+
+// ItemArgs returns arguments for single item queries (name + optional namespace)
+func ItemArgs(scope apiextensionsv1.ResourceScope) graphql.FieldConfigArgument {
+	args := graphql.FieldConfigArgument{
+		NameArg: NameArgConfig,
+	}
+	if isResourceNamespaceScoped(scope) {
+		args[NamespaceArg] = NamespaceArgConfig
+	}
+	return args
 }
 
-// Complete returns the constructed arguments and dereferences the builder
-func (b *FieldConfigArgumentsBuilder) Complete() graphql.FieldConfigArgument {
-	return maps.Clone(b.arguments)
+// ListArgs returns arguments for list queries
+func ListArgs(scope apiextensionsv1.ResourceScope) graphql.FieldConfigArgument {
+	args := graphql.FieldConfigArgument{
+		LabelSelectorArg: LabelSelectorArgConfig,
+		SortByArg:        SortByArgConfig,
+		LimitArg:         LimitArgConfig,
+		ContinueArg:      ContinueArgConfig,
+	}
+	if isResourceNamespaceScoped(scope) {
+		args[NamespaceArg] = NamespaceArgConfig
+	}
+	return args
 }
 
-func getStringArg(args map[string]any, key string, required bool) (string, error) {
+// SubscriptionItemArgs returns arguments for single item subscriptions
+func SubscriptionItemArgs(scope apiextensionsv1.ResourceScope) graphql.FieldConfigArgument {
+	args := ItemArgs(scope)
+	args[SubscribeToAllArg] = SubscribeToAllArgConfig
+	args[ResourceVersionArg] = ResourceVersionArgConfig
+	return args
+}
+
+// SubscriptionListArgs returns arguments for list subscriptions
+func SubscriptionListArgs(scope apiextensionsv1.ResourceScope) graphql.FieldConfigArgument {
+	args := ListArgs(scope)
+	args[SubscribeToAllArg] = SubscribeToAllArgConfig
+	args[ResourceVersionArg] = ResourceVersionArgConfig
+	return args
+}
+
+// CreateArgs returns arguments for create mutations
+func CreateArgs(scope apiextensionsv1.ResourceScope, inputType *graphql.InputObject) graphql.FieldConfigArgument {
+	args := graphql.FieldConfigArgument{
+		ObjectArg: &graphql.ArgumentConfig{
+			Type:        graphql.NewNonNull(inputType),
+			Description: "The object to create or update",
+		},
+		DryRunArg: DryRunArgConfig,
+	}
+	if isResourceNamespaceScoped(scope) {
+		args[NamespaceArg] = NamespaceArgConfig
+	}
+	return args
+}
+
+// UpdateArgs returns arguments for update mutations
+func UpdateArgs(scope apiextensionsv1.ResourceScope, inputType *graphql.InputObject) graphql.FieldConfigArgument {
+	args := CreateArgs(scope, inputType)
+	args[NameArg] = NameArgConfig
+	return args
+}
+
+// DeleteArgs returns arguments for delete mutations
+func DeleteArgs(scope apiextensionsv1.ResourceScope) graphql.FieldConfigArgument {
+	args := ItemArgs(scope)
+	args[DryRunArg] = DryRunArgConfig
+	return args
+}
+
+// Extractable defines types that can be extracted from GraphQL arguments
+type Extractable interface {
+	string | bool | int
+}
+
+// ListResult represents the response structure for list queries.
+type ListResult struct {
+	ResourceVersion    string           `json:"resourceVersion"`
+	Items              []map[string]any `json:"items"`
+	Continue           string           `json:"continue"`
+	RemainingItemCount *int64           `json:"remainingItemCount"`
+}
+
+// ListResultFields returns GraphQL field definitions for ListResult.
+// The resourceType parameter is used for the items field type.
+func ListResultFields(resourceType *graphql.Object) graphql.Fields {
+	return graphql.Fields{
+		"resourceVersion":    &graphql.Field{Type: graphql.String},
+		"items":              &graphql.Field{Type: graphql.NewNonNull(graphql.NewList(graphql.NewNonNull(resourceType)))},
+		"continue":           &graphql.Field{Type: graphql.String},
+		"remainingItemCount": &graphql.Field{Type: graphql.Int},
+	}
+}
+
+// GetArg extracts a typed argument from the args map.
+// Returns the zero value if the argument is not present and not required.
+// Returns an error if required argument is missing or has wrong type.
+func GetArg[T Extractable](args map[string]any, key string, required bool) (T, error) {
+	var zero T
+
 	val, exists := args[key]
-	if !exists {
+	if !exists || val == nil {
 		if required {
-			err := errors.New("missing required argument: " + key)
-			log.Error().Err(err).Msg(key + " argument is required")
-			return "", err
+			return zero, fmt.Errorf("missing required argument: %s", key)
 		}
-
-		return "", nil
+		return zero, nil
 	}
 
-	str, ok := val.(string)
+	typedVal, ok := val.(T)
 	if !ok {
-		err := errors.New("invalid type for argument: " + key)
-		log.Error().Err(err).Msg(key + " argument must be a string")
-		return "", err
+		return zero, fmt.Errorf("invalid type for argument: %s", key)
 	}
 
-	if str == "" {
-		err := errors.New("empty value for argument: " + key)
-		log.Error().Err(err).Msg(key + " argument cannot be empty")
-		return "", err
-	}
-
-	return str, nil
-}
-
-func getBoolArg(args map[string]any, key string, required bool) (bool, error) {
-	val, exists := args[key]
-	if !exists {
-		if required {
-			err := errors.New("missing required argument: " + key)
-			log.Error().Err(err).Msg(key + " argument is required")
-			return false, err
+	// For strings, check empty value when required
+	if required {
+		if str, isString := any(typedVal).(string); isString && str == "" {
+			return zero, fmt.Errorf("empty value for argument: %s", key)
 		}
-
-		return false, nil
 	}
 
-	res, ok := val.(bool)
-	if !ok {
-		err := errors.New("invalid type for argument: " + key)
-		log.Error().Err(err).Msg(key + " argument must be a bool")
-		return false, err
-	}
-
-	return res, nil
-}
-
-func getIntArg(args map[string]any, key string, required bool) (int, error) {
-	val, exists := args[key]
-	if !exists {
-		if required {
-			err := errors.New("missing required argument: " + key)
-			log.Error().Err(err).Msg(key + " argument is required")
-			return 0, err
-		}
-		return 0, nil
-	}
-
-	num, ok := val.(int)
-	if !ok {
-		err := errors.New("invalid type for argument: " + key)
-		log.Error().Err(err).Msg(key + " argument must be an int")
-		return 0, err
-	}
-	return num, nil
+	return typedVal, nil
 }
 
 func isResourceNamespaceScoped(resourceScope apiextensionsv1.ResourceScope) bool {

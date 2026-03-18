@@ -7,8 +7,6 @@ import (
 
 	"github.com/graphql-go/graphql"
 	"github.com/graphql-go/graphql/language/ast"
-	"github.com/pkg/errors"
-	"github.com/platform-mesh/golang-commons/sentry"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -20,6 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var (
@@ -53,22 +52,16 @@ type SubscriptionMetadata struct {
 
 func (r *Service) SubscribeItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
 	return func(p graphql.ResolveParams) (any, error) {
-		_, span := otel.Tracer("").Start(p.Context, "SubscribeItem", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
-		defer span.End()
 		resultChannel := make(chan any)
 		go r.runWatch(p, gvk, resultChannel, true, scope)
-
 		return resultChannel, nil
 	}
 }
 
 func (r *Service) SubscribeItems(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
 	return func(p graphql.ResolveParams) (any, error) {
-		_, span := otel.Tracer("").Start(p.Context, "SubscribeItems", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
-		defer span.End()
 		resultChannel := make(chan any)
 		go r.runWatch(p, gvk, resultChannel, false, scope)
-
 		return resultChannel, nil
 	}
 }
@@ -82,29 +75,42 @@ func (r *Service) runWatch(
 ) {
 	defer close(resultChannel)
 
-	ctx := p.Context
+	ctx, span := otel.Tracer("").Start(p.Context, "runWatch", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
+	defer span.End()
 
-	gvk.Group = r.getOriginalGroupName(gvk.Group)
+	logger := log.FromContext(ctx).WithValues(
+		"operation", "watch",
+		"group", gvk.Group,
+		"version", gvk.Version,
+		"kind", gvk.Kind,
+	)
 
-	labelSelector, err := getStringArg(p.Args, LabelSelectorArg, false)
+	sendErr := func(err error) {
+		select {
+		case <-ctx.Done():
+		case resultChannel <- err:
+		}
+	}
+
+	labelSelector, err := GetArg[string](p.Args, LabelSelectorArg, false)
 	if err != nil {
-		r.log.Error().Err(err).Msg("Failed to get label selector argument")
-		resultChannel <- errors.Wrap(err, "failed to get label selector argument")
+		logger.Error(err, "Failed to get label selector argument")
+		sendErr(fmt.Errorf("failed to get label selector argument: %w", err))
 		return
 	}
 
-	subscribeToAll, err := getBoolArg(p.Args, SubscribeToAllArg, false)
+	subscribeToAll, err := GetArg[bool](p.Args, SubscribeToAllArg, false)
 	if err != nil {
-		r.log.Error().Err(err).Msg("Failed to get subscribeToAll argument")
-		resultChannel <- errors.Wrap(err, "failed to get subscribeToAll argument")
+		logger.Error(err, "Failed to get subscribeToAll argument")
+		sendErr(fmt.Errorf("failed to get subscribeToAll argument: %w", err))
 		return
 	}
 
 	// optional resourceVersion to continue subscription from
-	resourceVersion, err := getStringArg(p.Args, ResourceVersionArg, false)
+	resourceVersion, err := GetArg[string](p.Args, ResourceVersionArg, false)
 	if err != nil {
-		r.log.Error().Err(err).Msg("Failed to get resourceVersion argument")
-		resultChannel <- errors.Wrap(err, "failed to get resourceVersion argument")
+		logger.Error(err, "Failed to get resourceVersion argument")
+		sendErr(fmt.Errorf("failed to get resourceVersion argument: %w", err))
 		return
 	}
 
@@ -120,10 +126,10 @@ func (r *Service) runWatch(
 	var namespace string
 	if isResourceNamespaceScoped(scope) {
 		isNamespaceRequired := singleItem
-		namespace, err = getStringArg(p.Args, NamespaceArg, isNamespaceRequired)
+		namespace, err = GetArg[string](p.Args, NamespaceArg, isNamespaceRequired)
 		if err != nil {
-			r.log.Error().Err(err).Msg("Failed to get namespace argument")
-			resultChannel <- errors.Wrap(err, "failed to get namespace argument")
+			logger.Error(err, "Failed to get namespace argument")
+			sendErr(fmt.Errorf("failed to get namespace argument: %w", err))
 			return
 		}
 		if namespace != "" {
@@ -134,8 +140,8 @@ func (r *Service) runWatch(
 	if labelSelector != "" {
 		selector, err := labels.Parse(labelSelector)
 		if err != nil {
-			r.log.Error().Err(err).Str("labelSelector", labelSelector).Msg("Invalid label selector")
-			resultChannel <- errors.Wrap(err, "invalid label selector")
+			logger.WithValues(LabelSelectorArg, labelSelector).Error(err, "Invalid label selector")
+			sendErr(fmt.Errorf("invalid label selector: %w", err))
 			return
 		}
 		opts = append(opts, client.MatchingLabelsSelector{Selector: selector})
@@ -143,10 +149,10 @@ func (r *Service) runWatch(
 
 	var name string
 	if singleItem {
-		name, err = getStringArg(p.Args, NameArg, true)
+		name, err = GetArg[string](p.Args, NameArg, true)
 		if err != nil {
-			r.log.Error().Err(err).Msg("Failed to get name argument")
-			resultChannel <- errors.Wrap(err, "failed to get name argument")
+			logger.Error(err, "Failed to get name argument")
+			sendErr(fmt.Errorf("failed to get name argument: %w", err))
 			return
 		}
 		opts = append(opts, client.MatchingFields{"metadata.name": name})
@@ -164,9 +170,8 @@ func (r *Service) runWatch(
 	if resourceVersion == "" {
 		// Initial LIST without a resourceVersion to get current items and resourceVersion
 		if err := r.runtimeClient.List(ctx, list, opts...); err != nil {
-			r.log.Error().Err(err).Str("gvk", gvk.String()).Msg("Failed to list resources for initial watch state")
-			sentry.CaptureError(err, sentry.Tags{"namespace": namespace}, sentry.Extras{"gvk": gvk.String()})
-			resultChannel <- errors.Wrap(err, "failed to list resources for initial watch state")
+			logger.Error(err, "Failed to list resources for initial watch state")
+			sendErr(fmt.Errorf("failed to list resources for initial watch state: %w", err))
 			return
 		}
 
@@ -198,11 +203,8 @@ func (r *Service) runWatch(
 
 	watcher, err := r.runtimeClient.Watch(ctx, list, watchOpts...)
 	if err != nil {
-		r.log.Error().Err(err).Str("gvk", gvk.String()).Msg("Failed to start watch")
-
-		sentry.CaptureError(err, sentry.Tags{"namespace": namespace}, sentry.Extras{"gvk": gvk.String()})
-
-		resultChannel <- errors.Wrap(err, "failed to start watch")
+		logger.Error(err, "Failed to start watch")
+		sendErr(fmt.Errorf("failed to start watch: %w", err))
 		return
 	}
 	defer watcher.Stop()
@@ -216,11 +218,8 @@ func (r *Service) runWatch(
 			obj, ok := event.Object.(*unstructured.Unstructured)
 			if !ok {
 				err = ErrFailedToCastEventObjectToUnstructured
-				r.log.Error().Err(err)
-
-				sentry.CaptureError(err, sentry.Tags{"namespace": namespace})
-
-				resultChannel <- errors.Wrap(err, "failed to cast event object to unstructured")
+				logger.Error(err, "Failed to cast event object to unstructured")
+				sendErr(fmt.Errorf("failed to cast event object to unstructured: %w", err))
 				return
 			}
 			key := obj.GetNamespace() + "/" + obj.GetName()
@@ -240,11 +239,8 @@ func (r *Service) runWatch(
 					var changed bool
 					changed, err = determineFieldChanged(oldObj, obj, fieldsToWatch)
 					if err != nil {
-						r.log.Error().Err(err).Msg("Failed to determine field changes")
-
-						sentry.CaptureError(err, sentry.Tags{"namespace": namespace})
-
-						resultChannel <- errors.Wrap(err, "failed to determine field changed")
+						logger.Error(err, "Failed to determine field changes")
+						sendErr(fmt.Errorf("failed to determine field changed: %w", err))
 						return
 					}
 					sendUpdate = changed

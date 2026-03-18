@@ -35,7 +35,7 @@ tasks:
     desc: "Generate all CRD-related files (manifests + deepcopy methods)"
     deps: [setup:controller-gen, setup:kcp-apigen ]
     cmds:
-      - "{{.LOCAL_BIN}}/controller-gen object crd:crdVersions=v1 paths=./common/apis/v1alpha1 output:crd:artifacts:config=config/crd"
+      - "{{.LOCAL_BIN}}/controller-gen object crd:crdVersions=v1 paths=./apis/v1alpha1 output:crd:artifacts:config=config/crd"
       - "{{.LOCAL_BIN}}/apigen --output-dir config/kcp --input-dir config/crd"
 
   ## Development

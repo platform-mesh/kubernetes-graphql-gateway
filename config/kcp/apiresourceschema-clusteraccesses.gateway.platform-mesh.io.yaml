@@ -1,8 +1,7 @@
 apiVersion: apis.kcp.io/v1alpha1
 kind: APIResourceSchema
 metadata:
-  creationTimestamp: null
-  name: v260127-84a8fb4.clusteraccesses.gateway.platform-mesh.io
+  name: v260310-87011ac.clusteraccesses.gateway.platform-mesh.io
 spec:
   group: gateway.platform-mesh.io
   names:
@@ -73,6 +72,24 @@ spec:
                       type: string
                   type: object
                   x-kubernetes-map-type: atomic
+                serviceAccountRef:
+                  description: ServiceAccountRef points to a service account for token
+                    generation
+                  properties:
+                    audience:
+                      items:
+                        type: string
+                      type: array
+                    name:
+                      type: string
+                    namespace:
+                      type: string
+                    token_expiration:
+                      type: string
+                  required:
+                  - name
+                  - namespace
+                  type: object
                 tokenSecretRef:
                   description: SecretRef points to a secret containing auth token
                   properties:
@@ -92,10 +109,11 @@ spec:
                   x-kubernetes-map-type: atomic
               type: object
               x-kubernetes-validations:
-              - message: only one of tokenSecretRef, kubeconfigSecretRef, or clientCertificateRef
-                  can be set
+              - message: only one of tokenSecretRef, kubeconfigSecretRef, clientCertificateRef,
+                  or serviceAccountRef can be set
                 rule: '(has(self.tokenSecretRef) ? 1 : 0) + (has(self.kubeconfigSecretRef)
-                  ? 1 : 0) + (has(self.clientCertificateRef) ? 1 : 0) <= 1'
+                  ? 1 : 0) + (has(self.clientCertificateRef) ? 1 : 0) + (has(self.serviceAccountRef)
+                  ? 1 : 0) <= 1'
             ca:
               description: CA configuration for the cluster
               properties:

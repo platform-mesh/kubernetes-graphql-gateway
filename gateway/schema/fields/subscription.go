@@ -11,34 +11,21 @@ import (
 var WatchEventTypeEnum = graphql.NewEnum(graphql.EnumConfig{
 	Name: "WatchEventType",
 	Values: graphql.EnumValueConfigMap{
-		"ADDED":    &graphql.EnumValueConfig{Value: resolver.EventTypeAdded},
-		"MODIFIED": &graphql.EnumValueConfig{Value: resolver.EventTypeModified},
-		"DELETED":  &graphql.EnumValueConfig{Value: resolver.EventTypeDeleted},
+		resolver.EventTypeAdded:    &graphql.EnumValueConfig{Value: resolver.EventTypeAdded},
+		resolver.EventTypeModified: &graphql.EnumValueConfig{Value: resolver.EventTypeModified},
+		resolver.EventTypeDeleted:  &graphql.EnumValueConfig{Value: resolver.EventTypeDeleted},
 	},
 })
 
 type SubscriptionGenerator struct {
-	resolver resolver.Provider
+	resolver *resolver.Service
 }
 
-func NewSubscriptionGenerator(resolver resolver.Provider) *SubscriptionGenerator {
+func NewSubscriptionGenerator(resolver *resolver.Service) *SubscriptionGenerator {
 	return &SubscriptionGenerator{resolver: resolver}
 }
 
-func (g *SubscriptionGenerator) Generate(rc *ResourceContext, target graphql.Fields) {
-	listArgsBuilder := resolver.NewFieldConfigArguments().
-		WithLabelSelector().
-		WithSortBy().
-		WithLimit().
-		WithContinue()
-
-	itemArgsBuilder := resolver.NewFieldConfigArguments().WithName()
-
-	if rc.IsNamespaceScoped() {
-		listArgsBuilder.WithNamespace()
-		itemArgsBuilder.WithNamespace()
-	}
-
+func (g *SubscriptionGenerator) Generate(rc *ResourceContext, target *graphql.Object) {
 	eventType := graphql.NewObject(graphql.ObjectConfig{
 		Name: rc.UniqueTypeName + "Event",
 		Fields: graphql.Fields{
@@ -50,27 +37,21 @@ func (g *SubscriptionGenerator) Generate(rc *ResourceContext, target graphql.Fie
 	singularName := g.buildSubscriptionName(rc, rc.SingularName)
 	pluralName := g.buildSubscriptionName(rc, rc.PluralName)
 
-	target[singularName] = &graphql.Field{
-		Type: eventType,
-		Args: itemArgsBuilder.
-			WithSubscribeToAll().
-			WithResourceVersion().
-			Complete(),
+	target.AddFieldConfig(singularName, &graphql.Field{
+		Type:        eventType,
+		Args:        resolver.SubscriptionItemArgs(rc.Scope),
 		Resolve:     resolver.CreateSubscriptionResolver(),
 		Subscribe:   g.resolver.SubscribeItem(rc.GVK, rc.Scope),
 		Description: fmt.Sprintf("Subscribe to changes of %s", rc.SingularName),
-	}
+	})
 
-	target[pluralName] = &graphql.Field{
-		Type: eventType,
-		Args: listArgsBuilder.
-			WithSubscribeToAll().
-			WithResourceVersion().
-			Complete(),
+	target.AddFieldConfig(pluralName, &graphql.Field{
+		Type:        eventType,
+		Args:        resolver.SubscriptionListArgs(rc.Scope),
 		Resolve:     resolver.CreateSubscriptionResolver(),
 		Subscribe:   g.resolver.SubscribeItems(rc.GVK, rc.Scope),
 		Description: fmt.Sprintf("Subscribe to changes of %s", rc.PluralName),
-	}
+	})
 }
 
 func (g *SubscriptionGenerator) buildSubscriptionName(rc *ResourceContext, name string) string {
