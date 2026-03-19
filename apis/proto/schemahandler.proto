@@ -16,7 +16,7 @@ message SubscribeRequest {}
 // SubscribeResponse is the response message for schema change events.
 message SubscribeResponse {
   string cluster_name = 1;
-  string schema = 2;
+  bytes schema = 2;
   enum EventType {
     CREATED = 0;
     UPDATED = 1;

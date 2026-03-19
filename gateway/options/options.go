@@ -104,8 +104,8 @@ func (options *CompletedOptions) Validate() error {
 		return errors.New("--grpc-listener-address must be set when --schema-handler=grpc")
 	}
 
-	if options.SchemaHandler != "file" && options.SchemasDir == "" {
-		return errors.New("--schemas-dir must be set when --schema-handler is not 'file'")
+	if options.SchemaHandler == "file" && options.SchemasDir == "" {
+		return errors.New("--schemas-dir must be set when --schema-handler=file")
 	}
 	return nil
 }

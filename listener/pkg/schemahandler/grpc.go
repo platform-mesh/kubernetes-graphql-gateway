@@ -24,12 +24,12 @@ type Handler interface {
 
 type Event struct {
 	ClusterName string
-	Schema      string // nil if Type is SchemaRemoved
+	Schema      []byte // nil if Type is SchemaRemoved
 	Type        proto.SubscribeResponse_EventType
 }
 
 type GRPCHandler struct {
-	schemas sync.Map // map[string]string
+	schemas sync.Map // map[string][]byte
 	bus     *broadcaster.Broadcaster[Event]
 	proto.UnimplementedSchemaHandlerServer
 }
@@ -64,12 +64,12 @@ func (g *GRPCHandler) Read(ctx context.Context, clusterName string) ([]byte, err
 		return nil, ErrNotExist
 	}
 
-	schema, ok := value.(string)
+	schema, ok := value.([]byte)
 	if !ok {
 		return nil, ErrNotExist
 	}
 
-	return []byte(schema), nil
+	return schema, nil
 }
 
 // Write implements [Handler].
@@ -77,7 +77,7 @@ func (g *GRPCHandler) Write(ctx context.Context, schema []byte, clusterName stri
 	log := log.FromContext(ctx)
 	log.V(8).Info("writing schema for cluster", "cluster", clusterName)
 
-	_, loaded := g.schemas.Swap(clusterName, string(schema))
+	_, loaded := g.schemas.Swap(clusterName, schema)
 
 	eventType := proto.SubscribeResponse_CREATED
 	if loaded {
@@ -85,7 +85,7 @@ func (g *GRPCHandler) Write(ctx context.Context, schema []byte, clusterName stri
 	}
 	g.bus.Publish(ctx, Event{
 		ClusterName: clusterName,
-		Schema:      string(schema),
+		Schema:      schema,
 		Type:        eventType,
 	})
 	return nil
@@ -98,7 +98,7 @@ func (g *GRPCHandler) Subscribe(req *proto.SubscribeRequest, stream proto.Schema
 	g.schemas.Range(func(key, value any) bool {
 		err := stream.Send(&proto.SubscribeResponse{
 			ClusterName: key.(string),
-			Schema:      value.(string),
+			Schema:      value.([]byte),
 			EventType:   proto.SubscribeResponse_CREATED,
 		})
 		if err != nil {
@@ -114,7 +114,7 @@ func (g *GRPCHandler) Subscribe(req *proto.SubscribeRequest, stream proto.Schema
 		log.V(8).Info("sending schema update", "cluster", update.ClusterName, "eventType", update.Type.String())
 		resp := &proto.SubscribeResponse{
 			ClusterName: update.ClusterName,
-			Schema:      string(update.Schema),
+			Schema:      update.Schema,
 			EventType:   update.Type,
 		}
 		if err := stream.Send(resp); err != nil {

@@ -15,6 +15,7 @@ import (
 // GRPCWatcher watches for schema changes via gRPC streaming from a listener.
 // It implements the Watcher interface.
 type GRPCWatcher struct {
+	conn    *grpc.ClientConn
 	client  sdk.SchemaHandlerClient
 	handler SchemaEventHandler
 }
@@ -40,15 +41,29 @@ func NewGRPCWatcher(config GRPCWatcherConfig, handler SchemaEventHandler) (*GRPC
 	client := sdk.NewSchemaHandlerClient(conn)
 
 	return &GRPCWatcher{
+		conn:    conn,
 		client:  client,
 		handler: handler,
 	}, nil
+}
+
+// Close closes the underlying gRPC client connection.
+func (w *GRPCWatcher) Close() error {
+	if w.conn != nil {
+		return w.conn.Close()
+	}
+	return nil
 }
 
 // Run starts the gRPC watcher and blocks until the context is cancelled.
 // It subscribes to schema updates from the listener and processes them.
 func (w *GRPCWatcher) Run(ctx context.Context) error {
 	logger := log.FromContext(ctx)
+	defer func() {
+		if err := w.Close(); err != nil {
+			logger.Error(err, "Failed to close gRPC connection")
+		}
+	}()
 
 	stream, err := w.client.Subscribe(ctx, &sdk.SubscribeRequest{})
 	if err != nil {

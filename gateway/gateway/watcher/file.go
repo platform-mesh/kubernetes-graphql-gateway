@@ -15,7 +15,7 @@ import (
 
 // SchemaEventHandler handles schema change events from watchers.
 type SchemaEventHandler interface {
-	OnSchemaChanged(ctx context.Context, clusterName string, schema string)
+	OnSchemaChanged(ctx context.Context, clusterName string, schema []byte)
 	OnSchemaDeleted(ctx context.Context, clusterName string)
 }
 
@@ -154,7 +154,7 @@ func (fw *FileWatcher) onFileChanged(ctx context.Context, filePath string) {
 
 	// Extract cluster name from file path and notify handler
 	clusterName := extractClusterName(filePath)
-	fw.handler.OnSchemaChanged(ctx, clusterName, string(data))
+	fw.handler.OnSchemaChanged(ctx, clusterName, data)
 
 	logger.Info("Successfully processed schema file change", "path", filePath, "cluster", clusterName)
 }
@@ -192,7 +192,7 @@ func (fw *FileWatcher) loadAllFiles(ctx context.Context, dir string) error {
 		}
 
 		clusterName := extractClusterName(path)
-		fw.handler.OnSchemaChanged(ctx, clusterName, string(data))
+		fw.handler.OnSchemaChanged(ctx, clusterName, data)
 
 		return nil
 	})

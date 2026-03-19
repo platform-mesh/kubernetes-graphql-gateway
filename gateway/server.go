@@ -27,12 +27,11 @@ func (s *Server) Run(ctx context.Context) error {
 	logger.Info("Starting Gateway Server")
 
 	wg := sync.WaitGroup{}
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		if err := s.Gateway.Run(ctx); err != nil {
 			logger.Error(err, "Gateway encountered an error")
 		}
-	}()
+	})
 
 	wg.Go(func() {
 		if err := s.HTTPServer.Run(ctx); err != nil {

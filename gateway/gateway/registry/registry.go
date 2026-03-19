@@ -3,6 +3,7 @@ package registry
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/gateway/config"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/gateway/endpoint"
@@ -27,13 +28,19 @@ func New(cfg config.Gateway) *Registry {
 
 // OnSchemaChanged implements watcher.SchemaEventHandler.
 // It is called when a schema is created or updated.
-func (r *Registry) OnSchemaChanged(ctx context.Context, clusterName string, schema string) {
+func (r *Registry) OnSchemaChanged(ctx context.Context, clusterName string, schema []byte) {
 	logger := log.FromContext(ctx)
 	logger.V(4).Info("Loading endpoint", "cluster", clusterName)
 
+	// Use a scoped timeout so that a slow endpoint creation does not block
+	// the watcher indefinitely. The timeout only applies to creation, not to
+	// the endpoint's lifetime.
+	createCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
 	// Create endpoint outside the lock to avoid holding it during slow operations
 	ep, err := endpoint.New(
-		ctx,
+		createCtx,
 		clusterName,
 		schema,
 		r.config.GraphQL,
@@ -46,7 +53,8 @@ func (r *Registry) OnSchemaChanged(ctx context.Context, clusterName string, sche
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if _, exists := r.endpoints[clusterName]; exists {
+	if old, exists := r.endpoints[clusterName]; exists {
+		old.Close()
 		logger.V(4).Info("Replaced existing endpoint", "cluster", clusterName)
 	}
 
@@ -64,11 +72,13 @@ func (r *Registry) OnSchemaDeleted(ctx context.Context, clusterName string) {
 
 	logger.V(4).Info("Removing endpoint", "cluster", clusterName)
 
-	if _, exists := r.endpoints[clusterName]; !exists {
+	old, exists := r.endpoints[clusterName]
+	if !exists {
 		logger.V(2).Info("Attempted to remove non-existent endpoint", "cluster", clusterName)
 		return
 	}
 
+	old.Close()
 	delete(r.endpoints, clusterName)
 	logger.Info("Successfully removed endpoint", "cluster", clusterName)
 }

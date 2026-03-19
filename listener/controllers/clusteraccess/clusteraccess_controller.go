@@ -31,6 +31,10 @@ import (
 
 const (
 	controllerName = "clusteraccess-schema-controller"
+
+	// ConditionTypeReady indicates whether the ClusterAccess schema was
+	// successfully generated and written.
+	ConditionTypeReady = "Ready"
 )
 
 var (
@@ -92,16 +96,34 @@ func (r *ClusterAccessReconciler) Reconcile(ctx context.Context, req mcreconcile
 		return ctrl.Result{}, fmt.Errorf("failed to get ClusterAccess: %w", err)
 	}
 
+	result, reconcileErr := r.reconcileClusterAccess(ctx, ca, c, cl.GetConfig(), req.ClusterName)
+
+	// Update the Ready status condition based on the reconciliation outcome
+	if err := r.setReadyCondition(ctx, ca, c, reconcileErr); err != nil {
+		logger.Error(err, "Failed to update status conditions", "clusterAccess", ca.Name)
+	}
+
+	return result, reconcileErr
+}
+
+// reconcileClusterAccess performs the core reconciliation: building the schema and writing it.
+func (r *ClusterAccessReconciler) reconcileClusterAccess(
+	ctx context.Context,
+	ca *v1alpha1.ClusterAccess,
+	c client.Client,
+	currentConfig *rest.Config,
+	reqClusterName string,
+) (ctrl.Result, error) {
+	logger := log.FromContext(ctx)
+
 	// Determine cluster name/path for the schema file
 	clusterName := ca.GetName()
 	if ca.Spec.Path != "" {
 		clusterName = ca.Spec.Path
 	}
-	if req.ClusterName != "" {
-		clusterName = fmt.Sprintf("%s-%s", req.ClusterName, clusterName)
+	if reqClusterName != "" {
+		clusterName = fmt.Sprintf("%s-%s", reqClusterName, clusterName)
 	}
-
-	currentConfig := cl.GetConfig()
 
 	// Build target cluster config from ClusterAccess spec
 	targetConfig, err := buildTargetClusterConfig(ctx, *ca, c, currentConfig)
@@ -254,4 +276,29 @@ func (r *ClusterAccessReconciler) restMapperFromConfig(cfg *rest.Config) (meta.R
 	}
 
 	return rm, nil
+}
+
+// setReadyCondition updates the Ready status condition on the ClusterAccess resource.
+// On success (reconcileErr == nil) it sets Ready=True; on failure it sets Ready=False
+// with the error message. This is best-effort: failures to update are returned but
+// should not override the original reconciliation error.
+func (r *ClusterAccessReconciler) setReadyCondition(ctx context.Context, ca *v1alpha1.ClusterAccess, c client.Client, reconcileErr error) error {
+	condition := metav1.Condition{
+		Type:               ConditionTypeReady,
+		ObservedGeneration: ca.Generation,
+	}
+
+	if reconcileErr == nil {
+		condition.Status = metav1.ConditionTrue
+		condition.Reason = "ReconcileSucceeded"
+		condition.Message = "Schema generated and written successfully"
+	} else {
+		condition.Status = metav1.ConditionFalse
+		condition.Reason = "ReconcileFailed"
+		condition.Message = reconcileErr.Error()
+	}
+
+	meta.SetStatusCondition(&ca.Status.Conditions, condition)
+
+	return c.Status().Update(ctx, ca)
 }

@@ -69,3 +69,9 @@ func New(
 func (c *Cluster) Client() client.WithWatch {
 	return c.client
 }
+
+// Close releases resources held by this cluster connection.
+func (c *Cluster) Close() {
+	c.client = nil
+	c.restCfg = nil
+}

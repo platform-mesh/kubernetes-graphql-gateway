@@ -77,5 +77,11 @@ func (s *Server) Run(ctx context.Context) error {
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting Listener")
 
+	// Gracefully stop the gRPC server when the context is cancelled
+	go func() {
+		<-ctx.Done()
+		s.Config.GracefulStop()
+	}()
+
 	return s.Config.Manager.Start(ctx)
 }

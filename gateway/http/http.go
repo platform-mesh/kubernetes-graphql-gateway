@@ -2,8 +2,10 @@ package http
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	utilscontext "github.com/platform-mesh/kubernetes-graphql-gateway/gateway/utils/context"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -81,5 +83,19 @@ func (s *Server) Run(ctx context.Context) error {
 	logger := log.FromContext(ctx)
 
 	logger.WithValues("addr", s.Server.Addr).Info("Starting HTTP server")
-	return s.Server.ListenAndServe()
+
+	// Gracefully shut down the HTTP server when the context is cancelled
+	go func() {
+		<-ctx.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := s.Server.Shutdown(shutdownCtx); err != nil {
+			logger.Error(err, "HTTP server shutdown error")
+		}
+	}()
+
+	if err := s.Server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		return err
+	}
+	return nil
 }

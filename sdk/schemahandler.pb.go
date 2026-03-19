@@ -111,7 +111,7 @@ func (*SubscribeRequest) Descriptor() ([]byte, []int) {
 type SubscribeResponse struct {
 	state         protoimpl.MessageState      `protogen:"open.v1"`
 	ClusterName   string                      `protobuf:"bytes,1,opt,name=cluster_name,json=clusterName,proto3" json:"cluster_name,omitempty"`
-	Schema        string                      `protobuf:"bytes,2,opt,name=schema,proto3" json:"schema,omitempty"`
+	Schema        []byte                      `protobuf:"bytes,2,opt,name=schema,proto3" json:"schema,omitempty"`
 	EventType     SubscribeResponse_EventType `protobuf:"varint,3,opt,name=event_type,json=eventType,proto3,enum=proto.SubscribeResponse_EventType" json:"event_type,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -154,11 +154,11 @@ func (x *SubscribeResponse) GetClusterName() string {
 	return ""
 }
 
-func (x *SubscribeResponse) GetSchema() string {
+func (x *SubscribeResponse) GetSchema() []byte {
 	if x != nil {
 		return x.Schema
 	}
-	return ""
+	return nil
 }
 
 func (x *SubscribeResponse) GetEventType() SubscribeResponse_EventType {
@@ -176,7 +176,7 @@ const file_apis_proto_schemahandler_proto_rawDesc = "" +
 	"\x10SubscribeRequest\"\xc5\x01\n" +
 	"\x11SubscribeResponse\x12!\n" +
 	"\fcluster_name\x18\x01 \x01(\tR\vclusterName\x12\x16\n" +
-	"\x06schema\x18\x02 \x01(\tR\x06schema\x12A\n" +
+	"\x06schema\x18\x02 \x01(\fR\x06schema\x12A\n" +
 	"\n" +
 	"event_type\x18\x03 \x01(\x0e2\".proto.SubscribeResponse.EventTypeR\teventType\"2\n" +
 	"\tEventType\x12\v\n" +

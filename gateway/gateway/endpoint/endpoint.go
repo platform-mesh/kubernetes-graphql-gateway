@@ -25,11 +25,11 @@ type Endpoint struct {
 	handler       *graphql.GraphQLHandler
 }
 
-// New creates a new Endpoint from a schema JSON string.
+// New creates a new Endpoint from a schema JSON byte slice.
 func New(
 	ctx context.Context,
 	name string,
-	schemaJSON string,
+	schemaJSON []byte,
 	graphqlCfg config.GraphQL,
 ) (*Endpoint, error) {
 	schemaData, err := parseSchema(schemaJSON)
@@ -87,10 +87,19 @@ func (e *Endpoint) Name() string {
 	return e.name
 }
 
-// parseSchema parses a JSON schema string into a Schema struct.
-func parseSchema(schemaJSON string) (*v1alpha1.Schema, error) {
+// Close releases resources held by this endpoint.
+func (e *Endpoint) Close() {
+	if e.cluster != nil {
+		e.cluster.Close()
+	}
+	e.handler = nil
+	e.graphqlServer = nil
+}
+
+// parseSchema parses a JSON schema byte slice into a Schema struct.
+func parseSchema(schemaJSON []byte) (*v1alpha1.Schema, error) {
 	var schemaData v1alpha1.Schema
-	if err := json.Unmarshal([]byte(schemaJSON), &schemaData); err != nil {
+	if err := json.Unmarshal(schemaJSON, &schemaData); err != nil {
 		return nil, fmt.Errorf("failed to parse JSON: %w", err)
 	}
 	return &schemaData, nil
