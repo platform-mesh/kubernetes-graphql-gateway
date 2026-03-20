@@ -94,7 +94,12 @@ func (g *GRPCHandler) Write(ctx context.Context, schema []byte, clusterName stri
 func (g *GRPCHandler) Subscribe(req *proto.SubscribeRequest, stream proto.SchemaHandler_SubscribeServer) error {
 	log := log.FromContext(stream.Context())
 	log.V(8).Info("new schema subscription")
-	// Send existing schemas first
+
+	// Subscribe to updates first to avoid missing events that occur between
+	// iterating existing schemas and registering the subscription.
+	ch := g.bus.Subscribe(stream.Context())
+
+	// Send existing schemas
 	g.schemas.Range(func(key, value any) bool {
 		err := stream.Send(&proto.SubscribeResponse{
 			ClusterName: key.(string),
@@ -108,8 +113,7 @@ func (g *GRPCHandler) Subscribe(req *proto.SubscribeRequest, stream proto.Schema
 		return true
 	})
 
-	// Subscribe to updates
-	ch := g.bus.Subscribe(stream.Context())
+	// Forward broadcast events to the stream
 	for update := range ch {
 		log.V(8).Info("sending schema update", "cluster", update.ClusterName, "eventType", update.Type.String())
 		resp := &proto.SubscribeResponse{

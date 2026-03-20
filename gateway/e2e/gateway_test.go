@@ -181,7 +181,10 @@ func (suite *GatewayE2ETestSuite) initGateway(ctx context.Context) {
 	}()
 
 	// Wait for gateway to be ready
-	time.Sleep(500 * time.Millisecond)
+	readyCtx, readyCancel := context.WithTimeout(ctx, 10*time.Second)
+	defer readyCancel()
+	err = suite.gatewayService.WaitForReady(readyCtx)
+	suite.Require().NoError(err, "gateway failed to become ready")
 
 	// Create HTTP server configuration
 	httpCfg := gwhttp.ServerConfig{

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sync"
 
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/gateway/config"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/gateway/registry"
@@ -18,6 +19,8 @@ type Service struct {
 	registry *registry.Registry
 	config   config.Gateway
 	started  bool
+	ready    chan struct{}
+	readyOnce sync.Once
 }
 
 // New creates a new Gateway service.
@@ -25,6 +28,7 @@ func New(cfg config.Gateway) (*Service, error) {
 	return &Service{
 		registry: registry.New(cfg),
 		config:   cfg,
+		ready:    make(chan struct{}),
 	}, nil
 }
 
@@ -32,6 +36,7 @@ func New(cfg config.Gateway) (*Service, error) {
 func (s *Service) Run(ctx context.Context) error {
 	logger := log.FromContext(ctx)
 	s.started = true
+	s.readyOnce.Do(func() { close(s.ready) })
 
 	switch s.config.SchemaHandler {
 	case "file":
@@ -98,4 +103,14 @@ func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // Registry returns the endpoint registry for direct access if needed.
 func (s *Service) Registry() *registry.Registry {
 	return s.registry
+}
+
+// WaitForReady blocks until the gateway service has started or the context is cancelled.
+func (s *Service) WaitForReady(ctx context.Context) error {
+	select {
+	case <-s.ready:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
