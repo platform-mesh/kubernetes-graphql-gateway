@@ -20,8 +20,8 @@ This repository contains two main components:
 
 The system supports two modes of operation:
 
-1. **KCP Mode** (`ENABLE_KCP=true`): Designed for KCP-based multi-cluster scenarios
-   - See [Virtual Workspaces](./docs/virtual-workspaces.md) for advanced KCP configuration
+1. **kcp Mode** (`ENABLE_KCP=true`): Designed for kcp-based multi-cluster scenarios
+   - See [Virtual Workspaces](./docs/virtual-workspaces.md) for advanced kcp configuration
 2. **ClusterAccess Mode** (`ENABLE_KCP=false`): Designed for support of multiple standard clusters.
 
 ## ClusterAccess
@@ -58,4 +58,3 @@ If you find any bug that may be a security problem, please follow our instructio
 
 Copyright 2025 SAP SE or an SAP affiliate company and platform-mesh contributors. Please see our [LICENSE](LICENSE) for copyright and license information. Detailed information including third-party components and their licensing/copyright information is available [via the REUSE tool](https://api.reuse.software/info/github.com/platform-mesh/kubernetes-graphql-gateway).
 
-<p align="center"><img alt="Bundesministerium für Wirtschaft und Energie (BMWE)-EU funding logo" src="https://apeirora.eu/assets/img/BMWK-EU.png" width="400"/></p>

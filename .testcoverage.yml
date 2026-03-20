@@ -1,13 +1,13 @@
 exclude:
   paths:
     - main.go
+    - sdk
     - cmd
-    - tests
-    - common/config/config.go
-    - mocks
-    - common/apis/*
-    - export_test.go
-    - export_test_integration.go
-    # remove it later:
-    - listener/reconciler/clusteraccess/subroutines.go
-
+    - apis/v1alpha1/zz_generated.deepcopy.go
+    - listener/server.go
+    - listener/config.go
+    - listener/options
+    - gateway/server.go
+    - gateway/config.go
+    - gateway/options
+    - gateway/utils/context

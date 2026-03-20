@@ -1,0 +1,11 @@
+---
+apiVersion: gateway.platform-mesh.io/v1alpha1
+kind: GraphQL
+metadata:
+  name: example-graphql-sa
+  namespace: default
+spec:
+  # Reference to a service account to use for authentication
+  # The controller will request a token for this service account
+  serviceAccountRef:
+    name: default
