@@ -88,7 +88,7 @@ func New(
 func (r *Reconciler) Reconcile(ctx context.Context, req mcreconcile.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
-	logger.Info("Reconciling anchor namespace", "namespace", req.Name, "cluster", req.ClusterName)
+	logger.Info("Reconciling anchor resource", "resourceName", req.Name, "cluster", req.ClusterName)
 
 	cl, err := r.manager.GetCluster(ctx, req.ClusterName)
 	if err != nil {
