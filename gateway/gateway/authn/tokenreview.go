@@ -2,6 +2,8 @@ package authn
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"time"
 
 	"github.com/jellydator/ttlcache/v3"
@@ -25,9 +27,14 @@ type TokenReviewValidator struct {
 	cache     *ttlcache.Cache[string, bool]
 }
 
+func hashToken(token string) string {
+	h := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(h[:])
+}
+
 func newCache(ttl time.Duration) *ttlcache.Cache[string, bool] {
 	if ttl <= 0 {
-		ttl = ttlcache.NoTTL
+		return nil
 	}
 	return ttlcache.New(
 		ttlcache.WithTTL[string, bool](ttl),
@@ -36,7 +43,8 @@ func newCache(ttl time.Duration) *ttlcache.Cache[string, bool] {
 }
 
 // NewTokenReviewValidator creates a validator that calls TokenReview on the
-// given cluster. If cacheTTL <= 0, caching is disabled.
+// given cluster. If cacheTTL <= 0, caching is disabled and every request
+// triggers an API call.
 func NewTokenReviewValidator(cfg *rest.Config, cacheTTL time.Duration) (*TokenReviewValidator, error) {
 	cs, err := kubernetes.NewForConfig(cfg)
 	if err != nil {
@@ -58,8 +66,11 @@ func NewTokenReviewValidatorFromClientset(cs kubernetes.Interface, cacheTTL time
 }
 
 func (v *TokenReviewValidator) Validate(ctx context.Context, token string) (bool, error) {
-	if item := v.cache.Get(token); item != nil {
-		return item.Value(), nil
+	key := hashToken(token)
+	if v.cache != nil {
+		if item := v.cache.Get(key); item != nil {
+			return item.Value(), nil
+		}
 	}
 
 	tr, err := v.clientset.AuthenticationV1().TokenReviews().Create(ctx, &authenticationv1.TokenReview{
@@ -70,12 +81,18 @@ func (v *TokenReviewValidator) Validate(ctx context.Context, token string) (bool
 		return false, err
 	}
 
-	v.cache.Set(token, tr.Status.Authenticated, ttlcache.DefaultTTL)
+	// TODO: use min(cacheTTL, tokenExpiry) to avoid serving expired tokens from cache.
+	if v.cache != nil {
+		v.cache.Set(key, tr.Status.Authenticated, ttlcache.DefaultTTL)
+	}
 	return tr.Status.Authenticated, nil
 }
 
 // Start begins automatic cache cleanup. Blocks until ctx is cancelled.
 func (v *TokenReviewValidator) Start(ctx context.Context) {
+	if v.cache == nil {
+		return
+	}
 	go v.cache.Start()
 	<-ctx.Done()
 	v.cache.Stop()
