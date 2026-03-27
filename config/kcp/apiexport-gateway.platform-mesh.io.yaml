@@ -1,0 +1,16 @@
+apiVersion: apis.kcp.io/v1alpha2
+kind: APIExport
+metadata:
+  name: gateway.platform-mesh.io
+spec:
+  permissionClaims:
+  - resource: namespaces
+    verbs:
+    - '*'
+  resources:
+  - group: gateway.platform-mesh.io
+    name: clusteraccesses
+    schema: v260310-87011ac.clusteraccesses.gateway.platform-mesh.io
+    storage:
+      crd: {}
+status: {}

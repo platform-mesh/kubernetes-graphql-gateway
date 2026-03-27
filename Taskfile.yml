@@ -1,19 +1,14 @@
 version: '3'
 
-dotenv: ['.taskenv', '.secret/.env', '{{.HOME}}/.env' ]
 vars:
   LOCAL_BIN: bin
-  ENVTEST_K8S_VERSION: "1.30.0" # to get latest version run $(pwd)/bin/setup-envtest list
-  ENVTEST_VERSION: "release-0.20" # https://github.com/kubernetes-sigs/controller-runtime/releases
-  MOCKERY_VERSION: v2.52.3 # https://github.com/vektra/mockery/releases
-  CONTROLLER_GEN_VERSION: v0.18.0 # https://github.com/kubernetes-sigs/controller-tools/releases
+  ENVTEST_K8S_VERSION: "1.34.0" # to get latest version run $(pwd)/bin/setup-envtest list
+  ENVTEST_VERSION: "release-0.23" # https://github.com/kubernetes-sigs/controller-runtime/releases
+  CONTROLLER_GEN_VERSION: v0.20.0 # https://github.com/kubernetes-sigs/controller-tools/releases
   GOLANGCI_LINT_VERSION: v2.6.0
+  KCP_APIGEN_VERSION: v0.30.0 # https://pkg.go.dev/github.com/kcp-dev/sdk
 tasks:
   ## Setup
-  setup:mockery:
-    internal: true
-    cmds:
-      - test -s {{.LOCAL_BIN}}/mockery || GOBIN=$(pwd)/{{.LOCAL_BIN}} go install github.com/vektra/mockery/v2@{{.MOCKERY_VERSION}}
   setup:envtest:
     internal: true
     cmds:
@@ -30,19 +25,20 @@ tasks:
     internal: true
     cmds:
       - test -s {{.LOCAL_BIN}}/go-test-coverage || GOBIN=$(pwd)/{{.LOCAL_BIN}} go install github.com/vladopajic/go-test-coverage/v2@latest
+  setup:kcp-apigen:
+    internal: true
+    cmds:
+      - test -s {{.LOCAL_BIN}}/apigen || GOBIN=$(pwd)/{{.LOCAL_BIN}} go install github.com/kcp-dev/sdk/cmd/apigen@{{.KCP_APIGEN_VERSION}}
 
   ## Code Generation
   generate:
     desc: "Generate all CRD-related files (manifests + deepcopy methods)"
-    deps: [setup:controller-gen]
+    deps: [setup:controller-gen, setup:kcp-apigen ]
     cmds:
-      - "{{.LOCAL_BIN}}/controller-gen object crd:crdVersions=v1 paths=./common/apis/v1alpha1 output:crd:artifacts:config=config/crd"
+      - "{{.LOCAL_BIN}}/controller-gen object crd:crdVersions=v1 paths=./apis/v1alpha1 output:crd:artifacts:config=config/crd"
+      - "{{.LOCAL_BIN}}/apigen --output-dir config/kcp --input-dir config/crd"
 
   ## Development
-  mockery:
-    deps: [ setup:mockery ]
-    cmds:
-      - "{{.LOCAL_BIN}}/mockery"
   docker:
     cmds:
       - docker build -t ghcr.io/platform-mesh/kubernetes-graphql-gateway .
@@ -116,10 +112,13 @@ tasks:
     desc: "Run all validation checks including code generation, linting, and testing"
     cmds:
       - task: generate
-      - task: mockery
       - task: lint
       - task: test
 
+  proto:
+    desc: "Generate protobuf files"
+    cmds:
+      - protoc --go_out=. --go-grpc_out=. --go_opt=module=github.com/platform-mesh/kubernetes-graphql-gateway --go-grpc_opt=module=github.com/platform-mesh/kubernetes-graphql-gateway ./apis/proto/schemahandler.proto
 
   gateway:
     desc: "Start the GraphQL gateway server (kills existing process on port 8080 if needed)"
@@ -132,17 +131,14 @@ tasks:
           kill $PID 2>/dev/null || true
           sleep 2
         fi
-      - go run main.go gateway
+      - go run ./cmd/gateway/gateway.go --enable-playground
 
   listener:
     desc: "Start the listener server (kills existing process on port 8090 if needed)"
     cmds:
-      - |
-        # Check if port 8090 is in use and kill the process if found
-        PID=$(lsof -ti:8090 2>/dev/null || echo "")
-        if [ ! -z "$PID" ]; then
-          echo "Found existing process $PID on port 8090, killing it..."
-          kill $PID 2>/dev/null || true
-          sleep 2
-        fi
-      - go run main.go listener
+      - go run ./cmd/listener/listener.go 
+
+  listener-kcp:
+    desc: "Start the listener server (kills existing process on port 8090 if needed)"
+    cmds:
+      - go run ./cmd/listener/listener.go --apiexport-endpoint-slice-name gateway.platform-mesh.io --multicluster-runtime-provider kcp --kubeconfig=.secret/cc-d2-kcp.yaml
