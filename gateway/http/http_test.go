@@ -7,10 +7,9 @@ import (
 	"strings"
 	"testing"
 
+	utilscontext "github.com/platform-mesh/kubernetes-graphql-gateway/gateway/utils/context"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	utilscontext "github.com/platform-mesh/kubernetes-graphql-gateway/gateway/utils/context"
 )
 
 // captureHandler is a test handler that records the request context values
