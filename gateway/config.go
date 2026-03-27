@@ -30,6 +30,7 @@ func NewConfig(opts *options.CompletedOptions) (*Config, error) {
 			Playground: cfg.Options.PlaygroundEnabled,
 			GraphiQL:   cfg.Options.PlaygroundEnabled,
 		},
+		TokenReviewCacheTTL: cfg.Options.TokenReviewCacheTTL,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create gateway server: %w", err)
