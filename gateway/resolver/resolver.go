@@ -378,7 +378,12 @@ func (r *Service) ApplyYaml() graphql.FieldResolveFn {
 		target.SetNamespace(namespace)
 
 		if _, err := controllerutil.CreateOrUpdate(ctx, r.runtimeClient, target, func() error {
+			// Preserve server-managed fields that CreateOrUpdate fetched
+			rv := target.GetResourceVersion()
+			uid := target.GetUID()
 			target.Object = parsed
+			target.SetResourceVersion(rv)
+			target.SetUID(uid)
 			return nil
 		}); err != nil {
 			logger.Error(err, "Failed to apply YAML")
