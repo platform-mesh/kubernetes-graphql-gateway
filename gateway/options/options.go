@@ -33,9 +33,6 @@ type ExtraOptions struct {
 	CORSAllowedOrigins []string
 	// CORSAllowedHeaders is the list of allowed headers for CORS.
 	CORSAllowedHeaders []string
-	GraphQLPretty     bool
-	GraphQLPlayground bool
-	GraphQLGraphiQL   bool
 	// TokenReviewCacheTTL is the duration to cache TokenReview results.
 	TokenReviewCacheTTL time.Duration
 }

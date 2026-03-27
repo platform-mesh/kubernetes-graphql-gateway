@@ -16,10 +16,10 @@ import (
 
 // Service orchestrates the gateway with target clusters.
 type Service struct {
-	registry *registry.Registry
-	config   config.Gateway
-	started  bool
-	ready    chan struct{}
+	registry  *registry.Registry
+	config    config.Gateway
+	started   bool
+	ready     chan struct{}
 	readyOnce sync.Once
 }
 
