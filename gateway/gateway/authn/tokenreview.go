@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/jellydator/ttlcache/v3"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,11 +26,25 @@ const maxCacheSize = 10000
 type TokenReviewValidator struct {
 	clientset kubernetes.Interface
 	cache     *ttlcache.Cache[string, bool]
+	cacheTTL  time.Duration
 }
 
 func hashToken(token string) string {
 	h := sha256.Sum256([]byte(token))
 	return hex.EncodeToString(h[:])
+}
+
+var jwtParser = jwt.NewParser(jwt.WithoutClaimsValidation())
+
+func tokenExpiry(token string) time.Time {
+	claims := &jwt.RegisteredClaims{}
+	if _, _, err := jwtParser.ParseUnverified(token, claims); err != nil {
+		return time.Time{}
+	}
+	if claims.ExpiresAt == nil {
+		return time.Time{}
+	}
+	return claims.ExpiresAt.Time
 }
 
 func newCache(ttl time.Duration) *ttlcache.Cache[string, bool] {
@@ -53,6 +68,7 @@ func NewTokenReviewValidator(cfg *rest.Config, cacheTTL time.Duration) (*TokenRe
 	return &TokenReviewValidator{
 		clientset: cs,
 		cache:     newCache(cacheTTL),
+		cacheTTL:  cacheTTL,
 	}, nil
 }
 
@@ -62,6 +78,7 @@ func NewTokenReviewValidatorFromClientset(cs kubernetes.Interface, cacheTTL time
 	return &TokenReviewValidator{
 		clientset: cs,
 		cache:     newCache(cacheTTL),
+		cacheTTL:  cacheTTL,
 	}
 }
 
@@ -81,9 +98,14 @@ func (v *TokenReviewValidator) Validate(ctx context.Context, token string) (bool
 		return false, err
 	}
 
-	// TODO: use min(cacheTTL, tokenExpiry) to avoid serving expired tokens from cache.
 	if v.cache != nil {
-		v.cache.Set(key, tr.Status.Authenticated, ttlcache.DefaultTTL)
+		itemTTL := ttlcache.DefaultTTL
+		if exp := tokenExpiry(token); !exp.IsZero() {
+			if remaining := time.Until(exp); remaining > 0 {
+				itemTTL = min(v.cacheTTL, remaining)
+			}
+		}
+		v.cache.Set(key, tr.Status.Authenticated, itemTTL)
 	}
 	return tr.Status.Authenticated, nil
 }

@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
@@ -155,6 +156,28 @@ func TestCacheDisabledWhenTTLZero(t *testing.T) {
 	_, _ = v.Validate(t.Context(), "same-token")
 	_, _ = v.Validate(t.Context(), "same-token")
 	assert.Equal(t, int32(2), calls.Load(), "every call should hit the API when caching is disabled")
+}
+
+func TestCacheTTLCappedAtTokenExpiry(t *testing.T) {
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Second)),
+	})
+	shortLivedToken, err := token.SignedString([]byte("test-secret"))
+	assert.NoError(t, err)
+
+	var calls atomic.Int32
+	v := NewTokenReviewValidatorFromClientset(fakeClientset(true, &calls, nil), 5*time.Minute)
+
+	_, _ = v.Validate(t.Context(), shortLivedToken)
+	assert.Equal(t, int32(1), calls.Load())
+
+	_, _ = v.Validate(t.Context(), shortLivedToken)
+	assert.Equal(t, int32(1), calls.Load(), "should use cache before token expiry")
+
+	time.Sleep(1500 * time.Millisecond)
+
+	_, _ = v.Validate(t.Context(), shortLivedToken)
+	assert.Equal(t, int32(2), calls.Load(), "should call API after token expired")
 }
 
 func TestConcurrentValidation(t *testing.T) {
