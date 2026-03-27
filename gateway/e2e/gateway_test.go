@@ -685,6 +685,202 @@ func (suite *GatewayE2ETestSuite) TestDeleteMutation() {
 }
 
 // ============================================================================
+// applyYaml Mutation Tests
+// ============================================================================
+
+// TestApplyYamlCreate tests applyYaml creates a new resource
+func (suite *GatewayE2ETestSuite) TestApplyYamlCreate() {
+	clusterName := "apply-yaml-create-cluster"
+	metadata := suite.buildClusterMetadata(v1alpha1.AuthTypeKubeconfig)
+
+	suite.generateSchema(clusterName, metadata)
+	suite.waitForSchemaLoaded(clusterName)
+
+	yamlInput := fmt.Sprintf(`apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: apply-yaml-created
+  namespace: %s
+data:
+  key: value`, testNamespace)
+
+	resp := suite.executeGraphQLQuery(clusterName, `
+		mutation($yaml: String!) {
+			applyYaml(yaml: $yaml)
+		}
+	`, map[string]any{
+		"yaml": yamlInput,
+	}, suite.testToken)
+
+	suite.Equal(200, resp.StatusCode)
+	suite.Empty(resp.Errors, "expected no errors, got: %v", resp.Errors)
+	suite.NotNil(resp.Data["applyYaml"])
+
+	// Verify ConfigMap was created
+	cm := &corev1.ConfigMap{}
+	err := suite.client.Get(suite.T().Context(), client.ObjectKey{
+		Name:      "apply-yaml-created",
+		Namespace: testNamespace,
+	}, cm)
+	suite.Require().NoError(err)
+	suite.Equal("value", cm.Data["key"])
+}
+
+// TestApplyYamlUpdate tests applyYaml updates an existing resource
+func (suite *GatewayE2ETestSuite) TestApplyYamlUpdate() {
+	clusterName := "apply-yaml-update-cluster"
+	metadata := suite.buildClusterMetadata(v1alpha1.AuthTypeKubeconfig)
+
+	suite.generateSchema(clusterName, metadata)
+	suite.waitForSchemaLoaded(clusterName)
+
+	// First apply: create the resource
+	yamlCreate := fmt.Sprintf(`apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: apply-yaml-updated
+  namespace: %s
+data:
+  key: original`, testNamespace)
+
+	resp := suite.executeGraphQLQuery(clusterName, `
+		mutation($yaml: String!) {
+			applyYaml(yaml: $yaml)
+		}
+	`, map[string]any{
+		"yaml": yamlCreate,
+	}, suite.testToken)
+
+	suite.Equal(200, resp.StatusCode)
+	suite.Empty(resp.Errors)
+
+	// Second apply: update the resource
+	yamlUpdate := fmt.Sprintf(`apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: apply-yaml-updated
+  namespace: %s
+data:
+  key: updated`, testNamespace)
+
+	resp = suite.executeGraphQLQuery(clusterName, `
+		mutation($yaml: String!) {
+			applyYaml(yaml: $yaml)
+		}
+	`, map[string]any{
+		"yaml": yamlUpdate,
+	}, suite.testToken)
+
+	suite.Equal(200, resp.StatusCode)
+	suite.Empty(resp.Errors)
+
+	// Verify update
+	cm := &corev1.ConfigMap{}
+	err := suite.client.Get(suite.T().Context(), client.ObjectKey{
+		Name:      "apply-yaml-updated",
+		Namespace: testNamespace,
+	}, cm)
+	suite.Require().NoError(err)
+	suite.Equal("updated", cm.Data["key"])
+}
+
+// TestApplyYamlInvalidYAML tests applyYaml rejects invalid YAML
+func (suite *GatewayE2ETestSuite) TestApplyYamlInvalidYAML() {
+	clusterName := "apply-yaml-invalid-cluster"
+	metadata := suite.buildClusterMetadata(v1alpha1.AuthTypeKubeconfig)
+
+	suite.generateSchema(clusterName, metadata)
+	suite.waitForSchemaLoaded(clusterName)
+
+	resp := suite.executeGraphQLQuery(clusterName, `
+		mutation($yaml: String!) {
+			applyYaml(yaml: $yaml)
+		}
+	`, map[string]any{
+		"yaml": "{not: valid: yaml: [",
+	}, suite.testToken)
+
+	suite.Equal(200, resp.StatusCode)
+	suite.NotEmpty(resp.Errors)
+	suite.Contains(resp.Errors[0].Message, "invalid YAML")
+}
+
+// TestApplyYamlMissingKind tests applyYaml rejects YAML without kind
+func (suite *GatewayE2ETestSuite) TestApplyYamlMissingKind() {
+	clusterName := "apply-yaml-nokind-cluster"
+	metadata := suite.buildClusterMetadata(v1alpha1.AuthTypeKubeconfig)
+
+	suite.generateSchema(clusterName, metadata)
+	suite.waitForSchemaLoaded(clusterName)
+
+	resp := suite.executeGraphQLQuery(clusterName, `
+		mutation($yaml: String!) {
+			applyYaml(yaml: $yaml)
+		}
+	`, map[string]any{
+		"yaml": `apiVersion: v1
+metadata:
+  name: no-kind`,
+	}, suite.testToken)
+
+	suite.Equal(200, resp.StatusCode)
+	suite.NotEmpty(resp.Errors)
+	suite.Contains(resp.Errors[0].Message, "kind is required")
+}
+
+// TestApplyYamlMissingApiVersion tests applyYaml rejects YAML without apiVersion
+func (suite *GatewayE2ETestSuite) TestApplyYamlMissingApiVersion() {
+	clusterName := "apply-yaml-noversion-cluster"
+	metadata := suite.buildClusterMetadata(v1alpha1.AuthTypeKubeconfig)
+
+	suite.generateSchema(clusterName, metadata)
+	suite.waitForSchemaLoaded(clusterName)
+
+	resp := suite.executeGraphQLQuery(clusterName, `
+		mutation($yaml: String!) {
+			applyYaml(yaml: $yaml)
+		}
+	`, map[string]any{
+		"yaml": `kind: ConfigMap
+metadata:
+  name: no-version`,
+	}, suite.testToken)
+
+	suite.Equal(200, resp.StatusCode)
+	suite.NotEmpty(resp.Errors)
+	suite.Contains(resp.Errors[0].Message, "apiVersion is required")
+}
+
+// TestApplyYamlMultiDocument tests applyYaml rejects multi-document YAML
+func (suite *GatewayE2ETestSuite) TestApplyYamlMultiDocument() {
+	clusterName := "apply-yaml-multidoc-cluster"
+	metadata := suite.buildClusterMetadata(v1alpha1.AuthTypeKubeconfig)
+
+	suite.generateSchema(clusterName, metadata)
+	suite.waitForSchemaLoaded(clusterName)
+
+	resp := suite.executeGraphQLQuery(clusterName, `
+		mutation($yaml: String!) {
+			applyYaml(yaml: $yaml)
+		}
+	`, map[string]any{
+		"yaml": `apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: first
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: second`,
+	}, suite.testToken)
+
+	suite.Equal(200, resp.StatusCode)
+	suite.NotEmpty(resp.Errors)
+	suite.Contains(resp.Errors[0].Message, "multi-document YAML is not supported")
+}
+
+// ============================================================================
 // Error Handling Tests
 // ============================================================================
 
