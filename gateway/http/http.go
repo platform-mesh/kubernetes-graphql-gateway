@@ -39,17 +39,25 @@ type Server struct {
 func NewServer(c ServerConfig) (*Server, error) {
 	s := http.NewServeMux()
 
-	// Pattern: /api/clusters/{clusterName} where {clusterName} captures the path segment
 	s.Handle("/api/clusters/{clusterName}", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		clusterName := r.PathValue("clusterName")
-		// FIXME: for now lets implement the token extraction here until a better place is found
 
 		authHeader := r.Header.Get("Authorization")
+		if authHeader == "" {
+			http.Error(w, "Unauthorized: missing Authorization header", http.StatusUnauthorized)
+			return
+		}
+		if !strings.HasPrefix(authHeader, "Bearer ") {
+			http.Error(w, "Unauthorized: invalid Authorization header format", http.StatusUnauthorized)
+			return
+		}
 		token := strings.TrimPrefix(authHeader, "Bearer ")
+		if token == "" {
+			http.Error(w, "Unauthorized: empty bearer token", http.StatusUnauthorized)
+			return
+		}
 
 		ctx := utilscontext.SetToken(r.Context(), token)
-
-		// Add cluster name to request context for downstream handlers
 		ctx = utilscontext.SetCluster(ctx, clusterName)
 		c.Gateway.ServeHTTP(w, r.WithContext(ctx))
 	}))

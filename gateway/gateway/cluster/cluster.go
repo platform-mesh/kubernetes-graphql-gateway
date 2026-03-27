@@ -14,11 +14,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-// Cluster represents a connection to a Kubernetes cluster.
 type Cluster struct {
-	name    string
-	client  client.WithWatch
-	restCfg *rest.Config
+	name     string
+	client   client.WithWatch
+	restCfg  *rest.Config
+	adminCfg *rest.Config
 }
 
 // New creates a new Cluster connection from cluster metadata.
@@ -40,6 +40,10 @@ func New(
 	if err != nil {
 		return nil, fmt.Errorf("failed to build config from metadata: %w", err)
 	}
+
+	// Save a copy before Wrap() mutates the transport — callers that need
+	// admin-credential access (e.g. TokenReview) use this config.
+	cluster.adminCfg = rest.CopyConfig(cluster.restCfg)
 
 	tlsConfig := cluster.restCfg.TLSClientConfig
 	baseRT, err := roundtripper.NewBaseRoundTripper(tlsConfig)
@@ -65,13 +69,18 @@ func New(
 	return cluster, nil
 }
 
-// Client returns the Kubernetes client for this cluster.
 func (c *Cluster) Client() client.WithWatch {
 	return c.client
 }
 
-// Close releases resources held by this cluster connection.
+// AdminConfig returns a rest.Config with the cluster's admin credentials,
+// suitable for privileged API calls like TokenReview.
+func (c *Cluster) AdminConfig() *rest.Config {
+	return c.adminCfg
+}
+
 func (c *Cluster) Close() {
 	c.client = nil
+	c.adminCfg = nil
 	c.restCfg = nil
 }

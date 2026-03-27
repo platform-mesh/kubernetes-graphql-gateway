@@ -2,6 +2,7 @@ package options
 
 import (
 	"errors"
+	"time"
 
 	"github.com/spf13/pflag"
 
@@ -35,6 +36,8 @@ type ExtraOptions struct {
 	GraphQLPretty     bool
 	GraphQLPlayground bool
 	GraphQLGraphiQL   bool
+	// TokenReviewCacheTTL is the duration to cache TokenReview results.
+	TokenReviewCacheTTL time.Duration
 }
 
 type completedOptions struct {
@@ -64,6 +67,7 @@ func NewOptions() *Options {
 			PlaygroundEnabled:   false,
 			CORSAllowedOrigins:  []string{},
 			CORSAllowedHeaders:  []string{},
+			TokenReviewCacheTTL: 30 * time.Second,
 		},
 	}
 	return opts
@@ -80,6 +84,7 @@ func (options *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&options.PlaygroundEnabled, "enable-playground", options.PlaygroundEnabled, "enable the GraphQL playground")
 	fs.StringSliceVar(&options.CORSAllowedOrigins, "cors-allowed-origins", options.CORSAllowedOrigins, "list of allowed origins for CORS")
 	fs.StringSliceVar(&options.CORSAllowedHeaders, "cors-allowed-headers", options.CORSAllowedHeaders, "list of allowed headers for CORS")
+	fs.DurationVar(&options.TokenReviewCacheTTL, "token-review-cache-ttl", options.TokenReviewCacheTTL, "TTL for cached TokenReview results (0 to disable caching)")
 }
 
 func (options *Options) Complete() (*CompletedOptions, error) {
@@ -101,5 +106,10 @@ func (options *CompletedOptions) Validate() error {
 	if options.SchemaHandler == "file" && options.SchemasDir == "" {
 		return errors.New("--schemas-dir must be set when --schema-handler=file")
 	}
+
+	if options.TokenReviewCacheTTL < 0 {
+		return errors.New("--token-review-cache-ttl must not be negative")
+	}
+
 	return nil
 }

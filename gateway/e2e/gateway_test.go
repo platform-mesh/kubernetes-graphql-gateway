@@ -165,6 +165,7 @@ func (suite *GatewayE2ETestSuite) initGateway(ctx context.Context) {
 			Playground: false,
 			GraphiQL:   false,
 		},
+		TokenReviewCacheTTL: 30 * time.Second,
 	}
 
 	// Create gateway service
@@ -457,6 +458,56 @@ func (suite *GatewayE2ETestSuite) TestServiceAccountAuth() {
 
 	suite.Equal(200, resp.StatusCode)
 	suite.Empty(resp.Errors, "expected no errors, got: %v", resp.Errors)
+}
+
+// ============================================================================
+// Token Validation Tests (TokenReview middleware)
+// ============================================================================
+
+// TestMissingAuthorizationHeader verifies that a request without an
+// Authorization header is rejected with 401 at the HTTP layer before
+// reaching the gateway.
+func (suite *GatewayE2ETestSuite) TestMissingAuthorizationHeader() {
+	clusterName := "missing-auth-cluster"
+	metadata := suite.buildClusterMetadata(v1alpha1.AuthTypeKubeconfig)
+
+	suite.generateSchema(clusterName, metadata)
+	suite.waitForSchemaLoaded(clusterName)
+
+	// executeGraphQLQuery skips the Authorization header when token is ""
+	resp := suite.executeGraphQLQuery(clusterName, `
+		query {
+			v1 {
+				Namespaces {
+					items { metadata { name } }
+				}
+			}
+		}
+	`, nil, "")
+
+	suite.Equal(401, resp.StatusCode, "missing Authorization header should return 401")
+}
+
+// TestInvalidToken verifies that a request with a fabricated token that
+// fails TokenReview validation is rejected with 401.
+func (suite *GatewayE2ETestSuite) TestInvalidToken() {
+	clusterName := "invalid-token-cluster"
+	metadata := suite.buildClusterMetadata(v1alpha1.AuthTypeKubeconfig)
+
+	suite.generateSchema(clusterName, metadata)
+	suite.waitForSchemaLoaded(clusterName)
+
+	resp := suite.executeGraphQLQuery(clusterName, `
+		query {
+			v1 {
+				Namespaces {
+					items { metadata { name } }
+				}
+			}
+		}
+	`, nil, "garbage-token-that-should-not-validate")
+
+	suite.Equal(401, resp.StatusCode, "invalid token should return 401 after TokenReview rejection")
 }
 
 // ============================================================================
