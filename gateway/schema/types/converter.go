@@ -66,13 +66,13 @@ func (c *Converter) convert(schema spec.Schema, definitions map[string]*spec.Sch
 	case "object":
 		return c.handleObjectType(schema, definitions, typePrefix, fieldPath)
 	default:
-		return graphql.String, graphql.String, nil
+		return JSONStringScalar, JSONStringScalar, nil
 	}
 }
 
 func (c *Converter) handleRefType(schema spec.Schema, definitions map[string]*spec.Schema, fieldPath []string) (graphql.Output, graphql.Input, error) {
 	if len(schema.AllOf) == 0 {
-		return graphql.String, graphql.String, nil
+		return JSONStringScalar, JSONStringScalar, nil
 	}
 
 	refKey := schema.AllOf[0].Ref.String()
@@ -81,12 +81,12 @@ func (c *Converter) handleRefType(schema spec.Schema, definitions map[string]*sp
 		if output, input := c.registry.Get(refKey); output != nil {
 			return output, input, nil
 		}
-		return graphql.String, graphql.String, nil
+		return JSONStringScalar, JSONStringScalar, nil
 	}
 
 	refDef, ok := definitions[refKey]
 	if !ok {
-		return graphql.String, graphql.String, nil
+		return JSONStringScalar, JSONStringScalar, nil
 	}
 
 	c.registry.MarkProcessing(refKey)
@@ -109,7 +109,7 @@ func (c *Converter) handleRefType(schema spec.Schema, definitions map[string]*sp
 
 func (c *Converter) handleArrayType(schema spec.Schema, definitions map[string]*spec.Schema, typePrefix string, fieldPath []string) (graphql.Output, graphql.Input, error) {
 	if schema.Items == nil || schema.Items.Schema == nil {
-		return graphql.NewList(graphql.String), graphql.NewList(graphql.String), nil
+		return graphql.NewList(JSONStringScalar), graphql.NewList(JSONStringScalar), nil
 	}
 
 	itemType, inputItemType, err := c.convert(*schema.Items.Schema, definitions, typePrefix, fieldPath)
@@ -120,6 +120,10 @@ func (c *Converter) handleArrayType(schema spec.Schema, definitions map[string]*
 }
 
 func (c *Converter) handleObjectType(fieldSpec spec.Schema, definitions map[string]*spec.Schema, typePrefix string, fieldPath []string) (graphql.Output, graphql.Input, error) {
+	// NOTE: When a schema has both Properties and x-kubernetes-preserve-unknown-fields: true,
+	// only the declared properties are exposed in the GraphQL type. Any additional undeclared
+	// fields are silently dropped from responses. Supporting the full preserve-unknown-fields
+	// semantics would require a catch-all JSON field or falling back to JSONStringScalar.
 	if len(fieldSpec.Properties) > 0 {
 		return c.handleNestedObject(fieldSpec, definitions, typePrefix, fieldPath)
 	}
@@ -141,10 +145,10 @@ func (c *Converter) handleNestedObject(fieldSpec spec.Schema, definitions map[st
 	}
 
 	if c.registry.IsProcessing(typeName) {
-		// Circular reference detected - return String as a fallback to break recursion.
-		// This loses the actual type structure. A proper fix would use graphql.FieldsThunk
-		// for lazy type resolution, allowing self-referential types.
-		return graphql.String, graphql.String, nil
+		// Circular reference detected - return JSONStringScalar as a fallback to break
+		// recursion. This loses the actual type structure. A proper fix would use
+		// graphql.FieldsThunk for lazy type resolution, allowing self-referential types.
+		return JSONStringScalar, JSONStringScalar, nil
 	}
 
 	c.registry.MarkProcessing(typeName)
