@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"slices"
 	"strings"
 
@@ -21,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -331,6 +333,67 @@ func (r *Service) DeleteItem(gvk schema.GroupVersionKind, scope v1.ResourceScope
 	}
 }
 
+// ApplyYaml returns a resolver that applies a single YAML document to the
+// Kubernetes API server with create-or-update semantics: if the resource
+// exists it is updated, otherwise it is created.
+func (r *Service) ApplyYaml() graphql.FieldResolveFn {
+	return func(p graphql.ResolveParams) (any, error) {
+		ctx, span := otel.Tracer("").Start(p.Context, "ApplyYaml")
+		defer span.End()
+
+		logger := log.FromContext(ctx).WithValues("operation", "apply")
+
+		yamlStr, err := GetArg[string](p.Args, YamlArg, true)
+		if err != nil {
+			return nil, err
+		}
+
+		parsed, err := parseAndValidateYAML(yamlStr)
+		if err != nil {
+			return nil, err
+		}
+
+		obj := &unstructured.Unstructured{Object: parsed}
+
+		gvk := obj.GetObjectKind().GroupVersionKind()
+		name := obj.GetName()
+		namespace := obj.GetNamespace()
+
+		span.SetAttributes(
+			attribute.String("kind", gvk.Kind),
+			attribute.String("name", name),
+		)
+
+		logger = logger.WithValues(
+			"group", gvk.Group,
+			"version", gvk.Version,
+			"kind", gvk.Kind,
+			"name", name,
+			"namespace", namespace,
+		)
+
+		target := &unstructured.Unstructured{}
+		target.SetGroupVersionKind(gvk)
+		target.SetName(name)
+		target.SetNamespace(namespace)
+
+		if _, err := controllerutil.CreateOrUpdate(ctx, r.runtimeClient, target, func() error {
+			// Preserve server-managed fields that CreateOrUpdate fetched
+			rv := target.GetResourceVersion()
+			uid := target.GetUID()
+			target.Object = parsed
+			target.SetResourceVersion(rv)
+			target.SetUID(uid)
+			return nil
+		}); err != nil {
+			logger.Error(err, "Failed to apply YAML")
+			return nil, fmt.Errorf("failed to apply resource %s/%s: %w", gvk.Kind, name, err)
+		}
+
+		return target.Object, nil
+	}
+}
+
 func (r *Service) CommonResolver() graphql.FieldResolveFn {
 	return func(p graphql.ResolveParams) (any, error) {
 		return p.Source, nil
@@ -366,4 +429,41 @@ func compareUnstructured(fieldPath string) func(a, b unstructured.Unstructured) 
 
 		return 0
 	}
+}
+
+// parseAndValidateYAML decodes a YAML string, rejects multi-document input,
+// and validates that apiVersion, kind, and metadata.name are present.
+func parseAndValidateYAML(yamlStr string) (map[string]any, error) {
+	decoder := yaml.NewDecoder(bytes.NewReader([]byte(yamlStr)))
+
+	var parsed map[string]any
+	if err := decoder.Decode(&parsed); err != nil {
+		return nil, fmt.Errorf("invalid YAML: %w", err)
+	}
+
+	var extra any
+	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
+		return nil, errors.New("multi-document YAML is not supported; provide a single document")
+	}
+
+	apiVersion, ok := parsed["apiVersion"].(string)
+	if !ok || apiVersion == "" {
+		return nil, errors.New("apiVersion is required and must be a string")
+	}
+
+	kind, ok := parsed["kind"].(string)
+	if !ok || kind == "" {
+		return nil, errors.New("kind is required and must be a string")
+	}
+
+	metadata, ok := parsed["metadata"].(map[string]any)
+	if !ok || metadata == nil {
+		return nil, errors.New("metadata is required")
+	}
+	name, ok := metadata["name"].(string)
+	if !ok || name == "" {
+		return nil, errors.New("metadata.name is required and must be a string")
+	}
+
+	return parsed, nil
 }

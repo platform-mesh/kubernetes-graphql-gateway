@@ -23,6 +23,7 @@ const (
 	ResourceVersionArg = "resourceVersion"
 	LimitArg           = "limit"
 	ContinueArg        = "continue"
+	YamlArg            = "yaml"
 )
 
 var (
@@ -71,6 +72,11 @@ var (
 	ContinueArgConfig = &graphql.ArgumentConfig{
 		Type:        graphql.String,
 		Description: "Continue token from a previous list call to retrieve the next page",
+	}
+
+	YamlArgConfig = &graphql.ArgumentConfig{
+		Type:        graphql.NewNonNull(graphql.String),
+		Description: "YAML manifest to apply (single document only)",
 	}
 )
 
@@ -142,6 +148,13 @@ func DeleteArgs(scope apiextensionsv1.ResourceScope) graphql.FieldConfigArgument
 	args := ItemArgs(scope)
 	args[DryRunArg] = DryRunArgConfig
 	return args
+}
+
+// ApplyYamlArgs returns arguments for the applyYaml mutation
+func ApplyYamlArgs() graphql.FieldConfigArgument {
+	return graphql.FieldConfigArgument{
+		YamlArg: YamlArgConfig,
+	}
 }
 
 // Extractable defines types that can be extracted from GraphQL arguments

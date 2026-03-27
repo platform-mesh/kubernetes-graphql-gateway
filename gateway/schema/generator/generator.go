@@ -79,6 +79,7 @@ func (g *SchemaGenerator) Generate(ctx context.Context) (*graphql.Schema, error)
 	}
 
 	g.customQueryGen.AddTypeByCategoryQuery(rootQuery)
+	g.addApplyYamlMutation(rootMutation)
 
 	schema, err := graphql.NewSchema(graphql.SchemaConfig{
 		Query:        rootQuery,
@@ -269,6 +270,14 @@ func (g *SchemaGenerator) processResource(
 	g.queryGen.Generate(rc, queryVersionType)
 	g.mutationGen.Generate(rc, mutationVersionType)
 	g.subscriptionGen.Generate(rc, rootSubscription)
+}
+
+func (g *SchemaGenerator) addApplyYamlMutation(rootMutation *graphql.Object) {
+	rootMutation.AddFieldConfig("applyYaml", &graphql.Field{
+		Type:    types.JSONStringScalar,
+		Args:    resolver.ApplyYamlArgs(),
+		Resolve: g.resolver.ApplyYaml(),
+	})
 }
 
 func createGroupType(group, suffix string) *graphql.Object {

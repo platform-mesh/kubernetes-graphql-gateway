@@ -685,6 +685,101 @@ func (suite *GatewayE2ETestSuite) TestDeleteMutation() {
 }
 
 // ============================================================================
+// applyYaml Mutation Tests
+// ============================================================================
+
+func (suite *GatewayE2ETestSuite) TestApplyYamlCreate() {
+	clusterName := "apply-yaml-create-cluster"
+	metadata := suite.buildClusterMetadata(v1alpha1.AuthTypeKubeconfig)
+
+	suite.generateSchema(clusterName, metadata)
+	suite.waitForSchemaLoaded(clusterName)
+
+	yamlInput := fmt.Sprintf(`apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: apply-yaml-created
+  namespace: %s
+data:
+  key: value`, testNamespace)
+
+	resp := suite.executeGraphQLQuery(clusterName, `
+		mutation($yaml: String!) {
+			applyYaml(yaml: $yaml)
+		}
+	`, map[string]any{
+		"yaml": yamlInput,
+	}, suite.testToken)
+
+	suite.Equal(200, resp.StatusCode)
+	suite.Empty(resp.Errors, "expected no errors, got: %v", resp.Errors)
+	suite.NotNil(resp.Data["applyYaml"])
+
+	cm := &corev1.ConfigMap{}
+	err := suite.client.Get(suite.T().Context(), client.ObjectKey{
+		Name:      "apply-yaml-created",
+		Namespace: testNamespace,
+	}, cm)
+	suite.Require().NoError(err)
+	suite.Equal("value", cm.Data["key"])
+}
+
+func (suite *GatewayE2ETestSuite) TestApplyYamlUpdate() {
+	clusterName := "apply-yaml-update-cluster"
+	metadata := suite.buildClusterMetadata(v1alpha1.AuthTypeKubeconfig)
+
+	suite.generateSchema(clusterName, metadata)
+	suite.waitForSchemaLoaded(clusterName)
+
+	yamlCreate := fmt.Sprintf(`apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: apply-yaml-updated
+  namespace: %s
+data:
+  key: original`, testNamespace)
+
+	resp := suite.executeGraphQLQuery(clusterName, `
+		mutation($yaml: String!) {
+			applyYaml(yaml: $yaml)
+		}
+	`, map[string]any{
+		"yaml": yamlCreate,
+	}, suite.testToken)
+
+	suite.Equal(200, resp.StatusCode)
+	suite.Empty(resp.Errors)
+
+	yamlUpdate := fmt.Sprintf(`apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: apply-yaml-updated
+  namespace: %s
+data:
+  key: updated`, testNamespace)
+
+	resp = suite.executeGraphQLQuery(clusterName, `
+		mutation($yaml: String!) {
+			applyYaml(yaml: $yaml)
+		}
+	`, map[string]any{
+		"yaml": yamlUpdate,
+	}, suite.testToken)
+
+	suite.Equal(200, resp.StatusCode)
+	suite.Empty(resp.Errors)
+
+	cm := &corev1.ConfigMap{}
+	err := suite.client.Get(suite.T().Context(), client.ObjectKey{
+		Name:      "apply-yaml-updated",
+		Namespace: testNamespace,
+	}, cm)
+	suite.Require().NoError(err)
+	suite.Equal("updated", cm.Data["key"])
+}
+
+
+// ============================================================================
 // Error Handling Tests
 // ============================================================================
 
