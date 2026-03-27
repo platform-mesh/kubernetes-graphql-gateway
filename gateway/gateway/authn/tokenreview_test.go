@@ -76,15 +76,6 @@ func TestCacheHit(t *testing.T) {
 	assert.Equal(t, int32(1), calls.Load(), "second call should use cache")
 }
 
-func TestCacheHitDifferentTokens(t *testing.T) {
-	var calls atomic.Int32
-	v := NewTokenReviewValidatorFromClientset(fakeClientset(true, &calls, nil), 5*time.Minute)
-
-	_, _ = v.Validate(t.Context(), "token-a")
-	_, _ = v.Validate(t.Context(), "token-b")
-	assert.Equal(t, int32(2), calls.Load())
-}
-
 func TestCacheExpiry(t *testing.T) {
 	var calls atomic.Int32
 	v := NewTokenReviewValidatorFromClientset(fakeClientset(true, &calls, nil), 50*time.Millisecond)
@@ -155,6 +146,15 @@ func TestStartStopsOnCancel(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("Start did not exit after context cancellation")
 	}
+}
+
+func TestCacheDisabledWhenTTLZero(t *testing.T) {
+	var calls atomic.Int32
+	v := NewTokenReviewValidatorFromClientset(fakeClientset(true, &calls, nil), 0)
+
+	_, _ = v.Validate(t.Context(), "same-token")
+	_, _ = v.Validate(t.Context(), "same-token")
+	assert.Equal(t, int32(2), calls.Load(), "every call should hit the API when caching is disabled")
 }
 
 func TestConcurrentValidation(t *testing.T) {
