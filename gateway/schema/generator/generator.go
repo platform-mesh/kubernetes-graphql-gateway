@@ -272,7 +272,6 @@ func (g *SchemaGenerator) processResource(
 	g.subscriptionGen.Generate(rc, rootSubscription)
 }
 
-// addApplyYamlMutation adds the root-level applyYaml mutation field.
 func (g *SchemaGenerator) addApplyYamlMutation(rootMutation *graphql.Object) {
 	rootMutation.AddFieldConfig("applyYaml", &graphql.Field{
 		Type:    types.JSONStringScalar,

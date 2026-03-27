@@ -436,7 +436,6 @@ func parseAndValidateYAML(yamlStr string) (map[string]any, error) {
 		return nil, fmt.Errorf("invalid YAML: %w", err)
 	}
 
-	// Reject multi-document YAML
 	var extra any
 	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
 		return nil, errors.New("multi-document YAML is not supported; provide a single document")
