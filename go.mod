@@ -9,7 +9,7 @@ replace github.com/graphql-go/handler => github.com/vertex451/handler v0.0.0-202
 require (
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/gobuffalo/flect v1.0.3
-	github.com/google/cel-go v0.26.0
+	github.com/google/cel-go v0.27.0
 	github.com/google/gnostic-models v0.7.0
 	github.com/graphql-go/graphql v0.8.1
 	github.com/graphql-go/handler v0.2.4
@@ -88,7 +88,6 @@ require (
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.66.1 // indirect
 	github.com/prometheus/procfs v0.16.1 // indirect
-	github.com/stoewer/go-strcase v1.3.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	go.etcd.io/etcd/api/v3 v3.6.5 // indirect
