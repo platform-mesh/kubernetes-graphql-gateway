@@ -9,6 +9,7 @@ replace github.com/graphql-go/handler => github.com/vertex451/handler v0.0.0-202
 require (
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/gobuffalo/flect v1.0.3
+	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/google/cel-go v0.27.0
 	github.com/google/gnostic-models v0.7.1
 	github.com/graphql-go/graphql v0.8.1
@@ -64,7 +65,6 @@ require (
 	github.com/go-openapi/swag v0.23.0 // indirect
 	github.com/go-openapi/swag/jsonname v0.25.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
-	github.com/golang-jwt/jwt/v5 v5.3.0 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
