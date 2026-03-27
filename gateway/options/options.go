@@ -32,10 +32,6 @@ type ExtraOptions struct {
 	CORSAllowedOrigins []string
 	// CORSAllowedHeaders is the list of allowed headers for CORS.
 	CORSAllowedHeaders []string
-	// URLSuffix is the URL suffix for the GraphQL endpoint.
-	// For example, if set to "/graphql", the endpoint will be available at /graphql.
-	URLSuffix string
-
 	GraphQLPretty     bool
 	GraphQLPlayground bool
 	GraphQLGraphiQL   bool
@@ -68,7 +64,6 @@ func NewOptions() *Options {
 			PlaygroundEnabled:   false,
 			CORSAllowedOrigins:  []string{},
 			CORSAllowedHeaders:  []string{},
-			URLSuffix:           "/graphql",
 		},
 	}
 	return opts
@@ -85,7 +80,6 @@ func (options *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&options.PlaygroundEnabled, "enable-playground", options.PlaygroundEnabled, "enable the GraphQL playground")
 	fs.StringSliceVar(&options.CORSAllowedOrigins, "cors-allowed-origins", options.CORSAllowedOrigins, "list of allowed origins for CORS")
 	fs.StringSliceVar(&options.CORSAllowedHeaders, "cors-allowed-headers", options.CORSAllowedHeaders, "list of allowed headers for CORS")
-	fs.StringVar(&options.URLSuffix, "url-suffix", options.URLSuffix, "URL suffix for the GraphQL endpoint")
 }
 
 func (options *Options) Complete() (*CompletedOptions, error) {

@@ -36,7 +36,6 @@ func New(cfg config.Gateway) (*Service, error) {
 func (s *Service) Run(ctx context.Context) error {
 	logger := log.FromContext(ctx)
 	s.started = true
-	s.readyOnce.Do(func() { close(s.ready) })
 
 	switch s.config.SchemaHandler {
 	case "file":
@@ -45,6 +44,7 @@ func (s *Service) Run(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to create file watcher: %w", err)
 		}
+		s.readyOnce.Do(func() { close(s.ready) })
 		return fw.Run(ctx, s.config.SchemaDirectory)
 
 	case "grpc":
@@ -56,6 +56,7 @@ func (s *Service) Run(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to create gRPC watcher: %w", err)
 		}
+		s.readyOnce.Do(func() { close(s.ready) })
 		return gw.Run(ctx)
 
 	default:

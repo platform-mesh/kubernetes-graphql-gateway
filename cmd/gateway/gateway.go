@@ -63,6 +63,5 @@ func (c *command) run(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("error running gateway: %w", err)
 	}
 
-	<-ctx.Done()
 	return nil
 }
