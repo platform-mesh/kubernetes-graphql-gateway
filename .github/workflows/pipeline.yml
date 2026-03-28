@@ -13,7 +13,7 @@ jobs:
     concurrency:
       group: ${{ github.ref }}
       cancel-in-progress: true
-    uses: platform-mesh/.github/.github/workflows/pipeline-golang-app.yml@5c377e5944acf613950dfe83a13cc7ab3054728f # main
+    uses: platform-mesh/.github/.github/workflows/pipeline-golang-app.yml@main
     secrets: inherit
     with:
       useTask: true
