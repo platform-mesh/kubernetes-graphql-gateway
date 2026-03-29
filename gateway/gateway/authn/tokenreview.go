@@ -8,6 +8,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/jellydator/ttlcache/v3"
+	"golang.org/x/sync/singleflight"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,6 +29,7 @@ type TokenReviewValidator struct {
 	clientset kubernetes.Interface
 	cache     *ttlcache.Cache[string, bool]
 	cacheTTL  time.Duration
+	inflight  singleflight.Group
 }
 
 func hashToken(token string) string {
@@ -91,24 +93,28 @@ func (v *TokenReviewValidator) Validate(ctx context.Context, token string) (bool
 		}
 	}
 
-	tr, err := v.clientset.AuthenticationV1().TokenReviews().Create(ctx, &authenticationv1.TokenReview{
-		Spec: authenticationv1.TokenReviewSpec{Token: token},
-	}, metav1.CreateOptions{})
-	if err != nil {
-		log.FromContext(ctx).Error(err, "TokenReview API call failed")
-		return false, err
-	}
-
-	if v.cache != nil {
-		itemTTL := ttlcache.DefaultTTL
-		if exp := tokenExpiry(token); !exp.IsZero() {
-			if remaining := time.Until(exp); remaining > 0 {
-				itemTTL = min(v.cacheTTL, remaining)
-			}
+	result, err, _ := v.inflight.Do(key, func() (any, error) {
+		tr, err := v.clientset.AuthenticationV1().TokenReviews().Create(ctx, &authenticationv1.TokenReview{
+			Spec: authenticationv1.TokenReviewSpec{Token: token},
+		}, metav1.CreateOptions{})
+		if err != nil {
+			log.FromContext(ctx).Error(err, "TokenReview API call failed")
+			return false, err
 		}
-		v.cache.Set(key, tr.Status.Authenticated, itemTTL)
-	}
-	return tr.Status.Authenticated, nil
+
+		if v.cache != nil {
+			itemTTL := ttlcache.DefaultTTL
+			if exp := tokenExpiry(token); !exp.IsZero() {
+				if remaining := time.Until(exp); remaining > 0 {
+					itemTTL = min(v.cacheTTL, remaining)
+				}
+			}
+			v.cache.Set(key, tr.Status.Authenticated, itemTTL)
+		}
+		return tr.Status.Authenticated, nil
+	})
+
+	return result.(bool), err
 }
 
 // Start begins automatic cache cleanup. Blocks until ctx is cancelled.
