@@ -206,5 +206,7 @@ func TestConcurrentValidation(t *testing.T) {
 		assert.NoError(t, <-errCh)
 	}
 
-	assert.LessOrEqual(t, calls.Load(), int32(goroutines))
+	// singleflight deduplicates concurrent in-flight calls for the same key,
+	// so we expect exactly 1 API call (all goroutines share the result).
+	assert.Equal(t, int32(1), calls.Load(), "singleflight should deduplicate concurrent calls")
 }
