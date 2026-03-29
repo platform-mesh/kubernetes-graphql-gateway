@@ -9,7 +9,7 @@ replace github.com/graphql-go/handler => github.com/vertex451/handler v0.0.0-202
 require (
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/gobuffalo/flect v1.0.3
-	github.com/golang-jwt/jwt/v5 v5.3.0
+	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/cel-go v0.27.0
 	github.com/google/gnostic-models v0.7.1
 	github.com/graphql-go/graphql v0.8.1
