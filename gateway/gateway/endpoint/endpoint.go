@@ -5,71 +5,97 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/platform-mesh/kubernetes-graphql-gateway/apis/v1alpha1"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/gateway/authn"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/gateway/cluster"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/gateway/config"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/gateway/graphql"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/resolver"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/schema"
+	utilscontext "github.com/platform-mesh/kubernetes-graphql-gateway/gateway/utils/context"
 
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // Endpoint combines a cluster connection with its GraphQL handler.
-// It represents a complete, servable GraphQL endpoint for a Kubernetes cluster.
 type Endpoint struct {
-	name          string
-	cluster       *cluster.Cluster
-	graphqlServer *graphql.GraphQLServer
-	handler       *graphql.GraphQLHandler
+	name           string
+	cluster        *cluster.Cluster
+	graphqlServer  *graphql.GraphQLServer
+	handler        *graphql.GraphQLHandler
+	tokenValidator authn.Validator
+	cancelFunc     context.CancelFunc
 }
 
-// New creates a new Endpoint from a schema JSON byte slice.
 func New(
 	ctx context.Context,
 	name string,
 	schemaJSON []byte,
 	graphqlCfg config.GraphQL,
+	tokenReviewCacheTTL time.Duration,
 ) (*Endpoint, error) {
 	schemaData, err := parseSchema(schemaJSON)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse schema: %w", err)
 	}
 
-	// Create cluster connection
 	cl, err := cluster.New(ctx, name, schemaData.ClusterMetadata)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cluster: %w", err)
 	}
 
-	// Create GraphQL schema and handler
-	resolverProvider := resolver.New(cl.Client())
+	validatorCtx, validatorCancel := context.WithCancel(ctx)
 
+	validator, err := authn.NewTokenReviewValidator(cl.AdminConfig(), tokenReviewCacheTTL)
+	if err != nil {
+		validatorCancel()
+		return nil, fmt.Errorf("failed to create token validator: %w", err)
+	}
+	go validator.Start(validatorCtx)
+
+	resolverProvider := resolver.New(cl.Client())
 	schemaProvider, err := schema.New(ctx, schemaData.Components.Schemas, resolverProvider)
 	if err != nil {
+		validatorCancel()
 		return nil, fmt.Errorf("failed to create GraphQL schema: %w", err)
 	}
 
-	// Create GraphQL server and handler
 	graphqlServer := graphql.NewGraphQLServer(graphqlCfg)
 	handler := graphqlServer.CreateHandler(schemaProvider.GetSchema())
 
-	logger := log.FromContext(ctx)
-	logger.Info("Registered endpoint", "cluster", name)
+	log.FromContext(ctx).Info("Registered endpoint", "cluster", name)
 
 	return &Endpoint{
-		name:          name,
-		cluster:       cl,
-		graphqlServer: graphqlServer,
-		handler:       handler,
+		name:           name,
+		cluster:        cl,
+		graphqlServer:  graphqlServer,
+		handler:        handler,
+		tokenValidator: validator,
+		cancelFunc:     validatorCancel,
 	}, nil
 }
 
-// ServeHTTP handles HTTP requests for this endpoint.
 func (e *Endpoint) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if e.handler == nil || e.handler.Handler == nil {
 		http.Error(w, "Endpoint not ready", http.StatusServiceUnavailable)
+		return
+	}
+
+	token, ok := utilscontext.GetTokenFromCtx(r.Context())
+	if !ok || token == "" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	authenticated, err := e.tokenValidator.Validate(r.Context(), token)
+	if err != nil {
+		http.Error(w, "Service Unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	if !authenticated {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
@@ -82,13 +108,14 @@ func (e *Endpoint) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	e.handler.Handler.ServeHTTP(w, r)
 }
 
-// Name returns the endpoint name.
 func (e *Endpoint) Name() string {
 	return e.name
 }
 
-// Close releases resources held by this endpoint.
 func (e *Endpoint) Close() {
+	if e.cancelFunc != nil {
+		e.cancelFunc()
+	}
 	if e.cluster != nil {
 		e.cluster.Close()
 	}
@@ -96,7 +123,6 @@ func (e *Endpoint) Close() {
 	e.graphqlServer = nil
 }
 
-// parseSchema parses a JSON schema byte slice into a Schema struct.
 func parseSchema(schemaJSON []byte) (*v1alpha1.Schema, error) {
 	var schemaData v1alpha1.Schema
 	if err := json.Unmarshal(schemaJSON, &schemaData); err != nil {

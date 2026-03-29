@@ -1,5 +1,7 @@
 package config
 
+import "time"
+
 // Gateway holds the complete gateway service configuration.
 type Gateway struct {
 	// SchemaHandler specifies which watcher to use ("file" or "grpc")
@@ -13,6 +15,9 @@ type Gateway struct {
 
 	// GraphQL contains GraphQL-specific configuration
 	GraphQL GraphQL
+
+	// TokenReviewCacheTTL is the duration to cache TokenReview results.
+	TokenReviewCacheTTL time.Duration
 }
 
 // GraphQL holds GraphQL handler configuration.
