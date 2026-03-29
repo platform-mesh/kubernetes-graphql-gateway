@@ -76,7 +76,7 @@ func (c *Cluster) Client() client.WithWatch {
 // AdminConfig returns a rest.Config with the cluster's admin credentials,
 // suitable for privileged API calls like TokenReview.
 func (c *Cluster) AdminConfig() *rest.Config {
-	return c.adminCfg
+	return rest.CopyConfig(c.adminCfg)
 }
 
 func (c *Cluster) Close() {
