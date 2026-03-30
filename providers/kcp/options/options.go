@@ -115,6 +115,14 @@ func (options *CompletedOptions) GetClusterURLResolverFunc() v1alpha1.ClusterURL
 		if options.WorkspaceSchemaHostOverride != "" {
 			return options.WorkspaceSchemaHostOverride, nil
 		}
+		if options.WorkspaceSchemaKubeconfigRestConfig != nil {
+			parsed, err := url.Parse(options.WorkspaceSchemaKubeconfigRestConfig.Host)
+			if err != nil {
+				return "", fmt.Errorf("failed to parse host from kubeconfig override: %w", err)
+			}
+			parsed.Path = path.Join("clusters", clusterName)
+			return parsed.String(), nil
+		}
 		parts := strings.Split(currentURL, "/services/")
 		if len(parts) != 2 {
 			return "", fmt.Errorf("invalid current URL format: %s", currentURL)
