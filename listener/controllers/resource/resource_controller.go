@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -96,7 +97,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req mcreconcile.Request) (ct
 	}
 
 	c := cl.GetClient()
-	config := cl.GetConfig()
+	config := rest.CopyConfig(cl.GetConfig())
 
 	config.Host, err = r.clusterURLResolverFunc(config.Host, req.ClusterName)
 	if err != nil {
