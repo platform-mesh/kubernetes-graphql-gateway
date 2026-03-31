@@ -35,6 +35,8 @@ type ExtraOptions struct {
 	CORSAllowedHeaders []string
 	// TokenReviewCacheTTL is the duration to cache TokenReview results.
 	TokenReviewCacheTTL time.Duration
+	// EndpointSuffix is the suffix appended to the cluster endpoint path (e.g. "/graphql").
+	EndpointSuffix string
 }
 
 type completedOptions struct {
@@ -65,6 +67,7 @@ func NewOptions() *Options {
 			CORSAllowedOrigins:  []string{},
 			CORSAllowedHeaders:  []string{},
 			TokenReviewCacheTTL: 30 * time.Second,
+			EndpointSuffix:      "/graphql",
 		},
 	}
 	return opts
@@ -82,6 +85,7 @@ func (options *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.StringSliceVar(&options.CORSAllowedOrigins, "cors-allowed-origins", options.CORSAllowedOrigins, "list of allowed origins for CORS")
 	fs.StringSliceVar(&options.CORSAllowedHeaders, "cors-allowed-headers", options.CORSAllowedHeaders, "list of allowed headers for CORS")
 	fs.DurationVar(&options.TokenReviewCacheTTL, "token-review-cache-ttl", options.TokenReviewCacheTTL, "TTL for cached TokenReview results (0 to disable caching)")
+	fs.StringVar(&options.EndpointSuffix, "endpoint-suffix", options.EndpointSuffix, "suffix appended to the cluster endpoint path (default \"/graphql\")")
 }
 
 func (options *Options) Complete() (*CompletedOptions, error) {

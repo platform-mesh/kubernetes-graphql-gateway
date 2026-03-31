@@ -1,6 +1,7 @@
 package http
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -11,6 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+const testEndpointSuffix = "/graphql"
 
 // captureHandler is a test handler that records the request context values
 // passed through the middleware chain.
@@ -30,12 +33,17 @@ func (h *captureHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte("OK"))
 }
 
+func clusterURL(base, cluster string) string {
+	return fmt.Sprintf("%s/api/clusters/%s%s", base, cluster, testEndpointSuffix)
+}
+
 func newTestServer(t *testing.T, gateway http.Handler) *httptest.Server {
 	t.Helper()
 	srv, err := NewServer(ServerConfig{
-		Gateway:    gateway,
-		Addr:       ":0",
-		CORSConfig: CORSConfig{},
+		Gateway:        gateway,
+		Addr:           ":0",
+		EndpointSuffix: testEndpointSuffix,
+		CORSConfig:     CORSConfig{},
 	})
 	require.NoError(t, err)
 	return httptest.NewServer(srv.Server.Handler)
@@ -46,7 +54,7 @@ func TestMissingAuthorizationHeader(t *testing.T) {
 	ts := newTestServer(t, handler)
 	defer ts.Close()
 
-	req, err := http.NewRequest("POST", ts.URL+"/api/clusters/test-cluster", strings.NewReader(`{"query":"{}"}`))
+	req, err := http.NewRequest("POST", clusterURL(ts.URL, "test-cluster"), strings.NewReader(`{"query":"{}"}`))
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/json")
 
@@ -66,7 +74,7 @@ func TestInvalidAuthorizationFormat(t *testing.T) {
 	ts := newTestServer(t, handler)
 	defer ts.Close()
 
-	req, err := http.NewRequest("POST", ts.URL+"/api/clusters/test-cluster", strings.NewReader(`{"query":"{}"}`))
+	req, err := http.NewRequest("POST", clusterURL(ts.URL, "test-cluster"), strings.NewReader(`{"query":"{}"}`))
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Basic abc123")
@@ -84,7 +92,7 @@ func TestValidBearerTokenForwarded(t *testing.T) {
 	ts := newTestServer(t, handler)
 	defer ts.Close()
 
-	req, err := http.NewRequest("POST", ts.URL+"/api/clusters/my-cluster", strings.NewReader(`{"query":"{}"}`))
+	req, err := http.NewRequest("POST", clusterURL(ts.URL, "my-cluster"), strings.NewReader(`{"query":"{}"}`))
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer valid-test-token")
