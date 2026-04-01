@@ -38,8 +38,9 @@ func NewConfig(opts *options.CompletedOptions) (*Config, error) {
 	cfg.Gateway = gatewayServer
 
 	httpServer, err := http.NewServer(http.ServerConfig{
-		Gateway: gatewayServer,
-		Addr:    fmt.Sprintf("%s:%d", cfg.Options.ServerBindAddress, cfg.Options.ServerBindPort),
+		Gateway:        gatewayServer,
+		Addr:           fmt.Sprintf("%s:%d", cfg.Options.ServerBindAddress, cfg.Options.ServerBindPort),
+		EndpointSuffix: cfg.Options.EndpointSuffix,
 		CORSConfig: http.CORSConfig{
 			AllowedOrigins:   cfg.Options.CORSAllowedOrigins,
 			AllowedHeaders:   cfg.Options.CORSAllowedHeaders,

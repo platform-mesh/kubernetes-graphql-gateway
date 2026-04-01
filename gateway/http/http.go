@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -22,6 +23,9 @@ type ServerConfig struct {
 
 	// Addr is the address the server listens on
 	Addr string
+
+	// EndpointSuffix is the suffix appended to the cluster endpoint path (e.g. "/graphql").
+	EndpointSuffix string
 }
 
 type CORSConfig struct {
@@ -39,7 +43,7 @@ type Server struct {
 func NewServer(c ServerConfig) (*Server, error) {
 	s := http.NewServeMux()
 
-	s.Handle("/api/clusters/{clusterName}", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	s.Handle(fmt.Sprintf("/api/clusters/{clusterName}%s", c.EndpointSuffix), http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		clusterName := r.PathValue("clusterName")
 
 		authHeader := r.Header.Get("Authorization")
