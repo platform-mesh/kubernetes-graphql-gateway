@@ -1,3 +1,7 @@
+threshold:
+  file: 49
+  package: 63
+  total: 81
 exclude:
   paths:
     - main.go
