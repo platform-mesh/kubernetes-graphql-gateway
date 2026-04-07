@@ -96,18 +96,22 @@ func (r *Reconciler) Reconcile(ctx context.Context, req mcreconcile.Request) (ct
 		return ctrl.Result{}, fmt.Errorf("failed to get client for cluster %q: %w", req.ClusterName, err)
 	}
 
+	// Strip multi-provider prefix (e.g. "kcp#workspace1" → "workspace1") for
+	// downstream use in URLs, schema paths, and metadata lookups.
+	clusterName := reconciler.ClusterName(req.ClusterName)
+
 	c := cl.GetClient()
 	config := rest.CopyConfig(cl.GetConfig())
 
-	config.Host, err = r.clusterURLResolverFunc(config.Host, req.ClusterName)
+	config.Host, err = r.clusterURLResolverFunc(config.Host, clusterName)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to resolve cluster URL: %w", err)
 	}
 
 	// If we are running in k8s mode, the cluster name might be empty.
 	paths := []string{"default"}
-	if req.ClusterName != "" {
-		paths = []string{req.ClusterName}
+	if clusterName != "" {
+		paths = []string{clusterName}
 	}
 
 	us := unstructured.Unstructured{}
@@ -137,7 +141,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req mcreconcile.Request) (ct
 	var metadata *v1alpha1.ClusterMetadata
 	if r.clusterMetadataFunc != nil {
 		var err error
-		metadata, err = r.clusterMetadataFunc(req.ClusterName)
+		metadata, err = r.clusterMetadataFunc(clusterName)
 		if err != nil {
 			logger.Error(err, "Failed to get cluster metadata for namespace reconciliation", "cluster", req.ClusterName)
 			return ctrl.Result{}, fmt.Errorf("failed to get cluster metadata for namespace reconciliation: %w", err)
@@ -162,7 +166,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req mcreconcile.Request) (ct
 }
 
 // SetupWithManager sets up the controller with the Manager
-func (r *Reconciler) SetupWithManager(mgr mcmanager.Manager) error {
+func (r *Reconciler) SetupWithManager(mgr mcmanager.Manager, forOpts ...mcbuilder.ForOption) error {
 	env, err := cel.NewEnv(
 		cel.Variable("object", cel.MapType(cel.StringType, cel.DynType)),
 	)
@@ -209,8 +213,11 @@ func (r *Reconciler) SetupWithManager(mgr mcmanager.Manager) error {
 	us := unstructured.Unstructured{}
 	us.SetGroupVersionKind(r.resourceGVK)
 
+	opts := []mcbuilder.ForOption{mcbuilder.WithPredicates(anchorResourcePredicate)}
+	opts = append(opts, forOpts...)
+
 	return mcbuilder.ControllerManagedBy(mgr).
-		For(&us, mcbuilder.WithPredicates(anchorResourcePredicate)).
+		For(&us, opts...).
 		WithOptions(r.opts).
 		Named(controllerName).
 		Complete(r)

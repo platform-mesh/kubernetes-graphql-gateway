@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net"
+	"strings"
 
 	gatewayv1alpha1 "github.com/platform-mesh/kubernetes-graphql-gateway/apis/v1alpha1"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/options"
@@ -21,12 +22,16 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	ctrl "sigs.k8s.io/controller-runtime"
+	ctrlcluster "sigs.k8s.io/controller-runtime/pkg/cluster"
 	ctrlconfig "sigs.k8s.io/controller-runtime/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
+	mcbuilder "sigs.k8s.io/multicluster-runtime/pkg/builder"
 	mcmanager "sigs.k8s.io/multicluster-runtime/pkg/manager"
 	"sigs.k8s.io/multicluster-runtime/pkg/multicluster"
+	multiprovider "sigs.k8s.io/multicluster-runtime/providers/multi"
+	singleprovider "sigs.k8s.io/multicluster-runtime/providers/single"
 
 	kcpapisv1alpha1 "github.com/kcp-dev/sdk/apis/apis/v1alpha1"
 	kcpapis "github.com/kcp-dev/sdk/apis/apis/v1alpha2"
@@ -53,6 +58,14 @@ type Config struct {
 	// ResourceReconcilerClusterMetadataFunc allows to provide cluster metadata for a given cluster name
 	// when reconciling anchor namespaces.
 	ResourceReconcilerClusterMetadataFunc func(clusterName string) (*gatewayv1alpha1.ClusterMetadata, error)
+
+	// Per-controller builder options (provider filters). Nil means no filter (watch all providers).
+	ResourceControllerForOptions      []mcbuilder.ForOption
+	ClusterAccessControllerForOptions []mcbuilder.ForOption
+
+	// singleCluster holds the cluster.Cluster for the single provider so it can
+	// be added as a runnable to the manager (the single provider does not start it).
+	singleCluster ctrlcluster.Cluster
 
 	// grpcServer holds a reference to the gRPC server so it can be gracefully stopped.
 	grpcServer *grpc.Server
@@ -97,21 +110,21 @@ func NewConfig(options *options.CompletedOptions) (*Config, error) {
 	config.Scheme = scheme
 
 	switch options.Provider {
+	case "single":
+		cl, err := ctrlcluster.New(config.ClientConfig, func(o *ctrlcluster.Options) {
+			o.Scheme = scheme
+		})
+		if err != nil {
+			return nil, fmt.Errorf("error creating cluster for single provider: %w", err)
+		}
+		config.Provider = singleprovider.New("single", cl)
+		// The single provider does not start the cluster, so we need to
+		// add it to the manager as a runnable to start the cache.
+		config.singleCluster = cl
+
 	case "kcp":
-		if options.ProviderKcp == nil {
-			return nil, fmt.Errorf("kcp provider options must be provided when provider is kcp")
-		}
-		if err := kcpapisv1alpha1.AddToScheme(scheme); err != nil {
-			return nil, fmt.Errorf("error adding apis scheme: %w", err)
-		}
-		if err := kcpapis.AddToScheme(scheme); err != nil {
-			return nil, fmt.Errorf("error adding apis scheme: %w", err)
-		}
-		if err := kcpcore.AddToScheme(scheme); err != nil {
-			return nil, fmt.Errorf("error adding core scheme: %w", err)
-		}
-		if err := kcptenancy.AddToScheme(scheme); err != nil {
-			return nil, fmt.Errorf("error adding tenancy scheme: %w", err)
+		if err := addKcpSchemes(scheme); err != nil {
+			return nil, err
 		}
 
 		provider, err := kcpprovider.New(config.ClientConfig, options.ProviderKcp.APIExportEndpointSliceName, apiexport.Options{
@@ -123,8 +136,51 @@ func NewConfig(options *options.CompletedOptions) (*Config, error) {
 
 		config.Provider = provider
 		config.ResourceReconcilerClusterMetadataFunc = options.ProviderKcp.GetClusterMetadataOverrideFunc()
-	default:
-		config.Provider = nil
+
+	case "multi":
+		if err := addKcpSchemes(scheme); err != nil {
+			return nil, err
+		}
+
+		// Create kcp provider from main kubeconfig
+		kcpProv, err := kcpprovider.New(config.ClientConfig, options.ProviderKcp.APIExportEndpointSliceName, apiexport.Options{
+			Scheme: scheme,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("error setting up kcp provider: %w", err)
+		}
+		config.ResourceReconcilerClusterMetadataFunc = options.ProviderKcp.GetClusterMetadataOverrideFunc()
+
+		// Create single provider from --single-kubeconfig
+		singleConfig, err := clientcmd.BuildConfigFromFlags("", options.SingleKubeConfig)
+		if err != nil {
+			return nil, fmt.Errorf("error loading single-kubeconfig: %w", err)
+		}
+		singleConfig = rest.AddUserAgent(singleConfig, "kubernetes-graphql-gateway-listener")
+
+		singleCluster, err := ctrlcluster.New(singleConfig, func(o *ctrlcluster.Options) {
+			o.Scheme = scheme
+		})
+		if err != nil {
+			return nil, fmt.Errorf("error creating cluster for single provider: %w", err)
+		}
+		singleProv := singleprovider.New("single", singleCluster)
+
+		// Compose into multi provider
+		multiProv := multiprovider.New(multiprovider.Options{})
+		if err := multiProv.AddProvider("kcp", kcpProv); err != nil {
+			return nil, fmt.Errorf("error adding kcp provider to multi provider: %w", err)
+		}
+		if err := multiProv.AddProvider("single", singleProv); err != nil {
+			return nil, fmt.Errorf("error adding single provider to multi provider: %w", err)
+		}
+		config.Provider = multiProv
+		// The single provider does not start its cluster.
+		config.singleCluster = singleCluster
+
+		// Build per-controller provider filters
+		config.ResourceControllerForOptions = buildControllerForOptions(options.ResourceControllerProviders, "kcp")
+		config.ClusterAccessControllerForOptions = buildControllerForOptions(options.ClusterAccessControllerProviders, "single")
 	}
 
 	var tlsOpts []func(*tls.Config)
@@ -157,6 +213,14 @@ func NewConfig(options *options.CompletedOptions) (*Config, error) {
 
 	config.Manager = manager
 
+	// The single provider does not start its cluster, so we add it as a
+	// runnable to the manager to ensure the cache is started.
+	if config.singleCluster != nil {
+		if err := manager.GetLocalManager().Add(config.singleCluster); err != nil {
+			return nil, fmt.Errorf("error adding single cluster to manager: %w", err)
+		}
+	}
+
 	switch options.SchemaHandler {
 	case "file":
 		config.SchemaHandler, err = schemahandler.NewFileHandler(options.SchemasDir)
@@ -188,4 +252,56 @@ func NewConfig(options *options.CompletedOptions) (*Config, error) {
 	}
 
 	return config, nil
+}
+
+func addKcpSchemes(scheme *runtime.Scheme) error {
+	if err := kcpapisv1alpha1.AddToScheme(scheme); err != nil {
+		return fmt.Errorf("error adding apis v1alpha1 scheme: %w", err)
+	}
+	if err := kcpapis.AddToScheme(scheme); err != nil {
+		return fmt.Errorf("error adding apis v1alpha2 scheme: %w", err)
+	}
+	if err := kcpcore.AddToScheme(scheme); err != nil {
+		return fmt.Errorf("error adding core scheme: %w", err)
+	}
+	if err := kcptenancy.AddToScheme(scheme); err != nil {
+		return fmt.Errorf("error adding tenancy scheme: %w", err)
+	}
+	return nil
+}
+
+// buildControllerForOptions builds a ForOption slice that filters a controller to the given providers.
+// If names is empty, defaultNames is used.
+// The multi.Provider prefixes cluster names as "providerName#clusterName", so the
+// filter matches on the provider prefix to route clusters to the correct controller.
+func buildControllerForOptions(names string, defaultNames string) []mcbuilder.ForOption {
+	if names == "" {
+		names = defaultNames
+	}
+
+	var allowed []string
+	for name := range strings.SplitSeq(names, ",") {
+		if n := strings.TrimSpace(name); n != "" {
+			allowed = append(allowed, n)
+		}
+	}
+
+	if len(allowed) == 0 {
+		return nil
+	}
+
+	return []mcbuilder.ForOption{
+		mcbuilder.WithClusterFilter(func(clusterName string, _ ctrlcluster.Cluster) bool {
+			prefix, _, ok := strings.Cut(clusterName, "#")
+			if !ok {
+				return false
+			}
+			for _, name := range allowed {
+				if prefix == name {
+					return true
+				}
+			}
+			return false
+		}),
+	}
 }

@@ -2,6 +2,7 @@ package options
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/platform-mesh/kubernetes-graphql-gateway/apis/v1alpha1"
 	providerkcp "github.com/platform-mesh/kubernetes-graphql-gateway/providers/kcp/options"
@@ -26,6 +27,15 @@ type ExtraOptions struct {
 	KubeConfig string
 	// Multicluster runtime provider
 	Provider string
+	// SingleKubeConfig is the path to a kubeconfig for the single provider cluster.
+	// Only required when provider is "multi".
+	SingleKubeConfig string
+	// ResourceControllerProviders is a comma-separated list of provider names (kcp, single)
+	// that the resource controller should watch. Only valid when provider is "multi".
+	ResourceControllerProviders string
+	// ClusterAccessControllerProviders is a comma-separated list of provider names (kcp, single)
+	// that the clusteraccess controller should watch. Only valid when provider is "multi".
+	ClusterAccessControllerProviders string
 	// SchemasDir is the directory to store schema files. Only required if using file schema handler
 	SchemasDir string
 	// ResourceGVR is the GroupVersionResource which the reconciler will be watching
@@ -79,7 +89,7 @@ func NewOptions() *Options {
 		ProviderKcp: providerkcp.NewOptions(),
 
 		ExtraOptions: ExtraOptions{
-			Provider:               "kubernetes",
+			Provider:               "single",
 			SchemaHandler:          "file",
 			SchemasDir:             "_output/schemas",
 			GRPCListenAddr:         ":50051",
@@ -95,9 +105,9 @@ func NewOptions() *Options {
 }
 
 var providerAliases = map[string]string{
-	"kcp":        "kcp",
-	"kubernetes": "kubernetes",
-	"":           "kubernetes",
+	"kcp":    "kcp",
+	"single": "single",
+	"multi":  "multi",
 }
 
 func (options *Options) AddFlags(fs *pflag.FlagSet) {
@@ -109,6 +119,10 @@ func (options *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&options.Provider, "multicluster-runtime-provider", options.Provider,
 		fmt.Sprintf("The multicluster runtime provider. Possible values are: %v", sets.List(sets.Set[string](sets.StringKeySet(providerAliases)))),
 	)
+
+	fs.StringVar(&options.SingleKubeConfig, "single-kubeconfig", options.SingleKubeConfig, "path to a kubeconfig for the single provider cluster. Only required when provider is 'multi'")
+	fs.StringVar(&options.ResourceControllerProviders, "resource-controller-providers", options.ResourceControllerProviders, "comma-separated list of provider names (kcp, single) that the resource controller should watch. Only valid when provider is 'multi'. Default: kcp")
+	fs.StringVar(&options.ClusterAccessControllerProviders, "clusteraccess-controller-providers", options.ClusterAccessControllerProviders, "comma-separated list of provider names (kcp, single) that the clusteraccess controller should watch. Only valid when provider is 'multi'. Default: single")
 
 	fs.StringVar(&options.SchemaHandler, "schema-handler", options.SchemaHandler, "The type of schema handler to use (e.g., 'file', 'grpc')")
 	fs.StringVar(&options.SchemasDir, "schemas-dir", options.SchemasDir, "SchemasDir is the directory to store schema files. Only required if using file schema handler")
@@ -134,7 +148,7 @@ func (options *Options) Complete() (*CompletedOptions, error) {
 		},
 	}
 
-	if options.Provider == "kcp" {
+	if options.Provider == "kcp" || options.Provider == "multi" {
 		opts, err := options.ProviderKcp.Complete()
 		if err != nil {
 			return nil, err
@@ -146,12 +160,49 @@ func (options *Options) Complete() (*CompletedOptions, error) {
 	return co, nil
 }
 
+var validControllerProviderNames = sets.New("kcp", "single")
+
 func (options *CompletedOptions) Validate() error {
 	provider := providerAliases[options.Provider]
 	if provider == "" {
 		return fmt.Errorf("unknown provider %q, must be one of %v", options.Provider, sets.List(sets.Set[string](sets.StringKeySet(providerAliases))))
 	}
 	options.Provider = provider
+
+	// Multi-mode specific validation
+	if provider == "multi" {
+		if options.KubeConfig == "" {
+			return fmt.Errorf("--kubeconfig is required when provider is 'multi' (used for kcp endpoint)")
+		}
+		if options.SingleKubeConfig == "" {
+			return fmt.Errorf("--single-kubeconfig is required when provider is 'multi'")
+		}
+	} else {
+		if options.SingleKubeConfig != "" {
+			return fmt.Errorf("--single-kubeconfig is only valid with --multicluster-runtime-provider=multi")
+		}
+		if options.ResourceControllerProviders != "" {
+			return fmt.Errorf("--resource-controller-providers is only valid with --multicluster-runtime-provider=multi")
+		}
+		if options.ClusterAccessControllerProviders != "" {
+			return fmt.Errorf("--clusteraccess-controller-providers is only valid with --multicluster-runtime-provider=multi")
+		}
+	}
+
+	// Validate per-controller provider names
+	if options.ResourceControllerProviders != "" {
+		if err := validateProviderNames(options.ResourceControllerProviders, "--resource-controller-providers"); err != nil {
+			return err
+		}
+	}
+	if options.ClusterAccessControllerProviders != "" {
+		if !options.EnableClusterAccessController {
+			return fmt.Errorf("--clusteraccess-controller-providers requires --enable-clusteraccess-controller")
+		}
+		if err := validateProviderNames(options.ClusterAccessControllerProviders, "--clusteraccess-controller-providers"); err != nil {
+			return err
+		}
+	}
 
 	gvr, gv := schema.ParseResourceArg(options.ResourceGVR)
 	if gvr == nil && gv.Empty() {
@@ -170,5 +221,19 @@ func (options *CompletedOptions) Validate() error {
 		}
 	}
 
+	return nil
+}
+
+// validateProviderNames checks that a comma-separated string contains only valid provider names.
+func validateProviderNames(names string, flagName string) error {
+	for _, name := range strings.Split(names, ",") {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			return fmt.Errorf("empty provider name in %s", flagName)
+		}
+		if !validControllerProviderNames.Has(name) {
+			return fmt.Errorf("invalid provider name %q in %s, must be one of %v", name, flagName, sets.List(validControllerProviderNames))
+		}
+	}
 	return nil
 }
