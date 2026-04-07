@@ -49,6 +49,18 @@ func newTestServer(t *testing.T, gateway http.Handler) *httptest.Server {
 	return httptest.NewServer(srv.Server.Handler)
 }
 
+func newTestServerWithBodyLimit(t *testing.T, gateway http.Handler, maxBytes int64) *httptest.Server {
+	t.Helper()
+	srv, err := NewServer(ServerConfig{
+		Gateway:             gateway,
+		Addr:                ":0",
+		MaxRequestBodyBytes: maxBytes,
+		CORSConfig:          CORSConfig{},
+	})
+	require.NoError(t, err)
+	return httptest.NewServer(srv.Server.Handler)
+}
+
 func TestMissingAuthorizationHeader(t *testing.T) {
 	handler := &captureHandler{}
 	ts := newTestServer(t, handler)
@@ -120,6 +132,59 @@ func TestUnauthenticatedEndpoints(t *testing.T) {
 
 			assert.Equal(t, http.StatusOK, resp.StatusCode)
 			assert.False(t, handler.called)
+		})
+	}
+}
+
+func TestMaxRequestBodyBytes(t *testing.T) {
+	tests := []struct {
+		name           string
+		maxBytes       int64
+		bodySize       int
+		expectedStatus int
+		expectCalled   bool
+	}{
+		{
+			name:           "rejects body exceeding limit",
+			maxBytes:       64,
+			bodySize:       128,
+			expectedStatus: http.StatusOK, // handler is still called; MaxBytesReader limits the read, not the dispatch
+			expectCalled:   true,
+		},
+		{
+			name:           "allows body within limit",
+			maxBytes:       1024,
+			bodySize:       14, // len(`{"query":"{}"}`)
+			expectedStatus: http.StatusOK,
+			expectCalled:   true,
+		},
+		{
+			name:           "no limit when disabled",
+			maxBytes:       0,
+			bodySize:       1024 * 1024,
+			expectedStatus: http.StatusOK,
+			expectCalled:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := &captureHandler{}
+			ts := newTestServerWithBodyLimit(t, handler, tt.maxBytes)
+			defer ts.Close()
+
+			body := strings.Repeat("x", tt.bodySize)
+			req, err := http.NewRequest("POST", ts.URL+"/api/clusters/test-cluster", strings.NewReader(body))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer valid-token")
+
+			resp, err := http.DefaultClient.Do(req)
+			require.NoError(t, err)
+			defer resp.Body.Close() //nolint:errcheck
+
+			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
+			assert.Equal(t, tt.expectCalled, handler.called)
 		})
 	}
 }

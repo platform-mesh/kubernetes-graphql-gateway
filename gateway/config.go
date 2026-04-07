@@ -30,6 +30,11 @@ func NewConfig(opts *options.CompletedOptions) (*Config, error) {
 			Playground: cfg.Options.PlaygroundEnabled,
 			GraphiQL:   cfg.Options.PlaygroundEnabled,
 		},
+		Limits: gatewayconfig.Limits{
+			MaxQueryDepth:      cfg.Options.MaxQueryDepth,
+			MaxQueryComplexity: cfg.Options.MaxQueryComplexity,
+			MaxQueryBatchSize:  cfg.Options.MaxQueryBatchSize,
+		},
 		TokenReviewCacheTTL: cfg.Options.TokenReviewCacheTTL,
 	})
 	if err != nil {
@@ -38,9 +43,16 @@ func NewConfig(opts *options.CompletedOptions) (*Config, error) {
 	cfg.Gateway = gatewayServer
 
 	httpServer, err := http.NewServer(http.ServerConfig{
-		Gateway:        gatewayServer,
-		Addr:           fmt.Sprintf("%s:%d", cfg.Options.ServerBindAddress, cfg.Options.ServerBindPort),
-		EndpointSuffix: cfg.Options.EndpointSuffix,
+		Gateway:                  gatewayServer,
+		Addr:                     fmt.Sprintf("%s:%d", cfg.Options.ServerBindAddress, cfg.Options.ServerBindPort),
+		MaxRequestBodyBytes:      cfg.Options.MaxRequestBodyBytes,
+		MaxInFlightRequests:      cfg.Options.MaxInFlightRequests,
+		MaxInFlightSubscriptions: cfg.Options.MaxInFlightSubscriptions,
+		RequestTimeout:           cfg.Options.RequestTimeout,
+		SubscriptionTimeout:      cfg.Options.SubscriptionTimeout,
+		ReadHeaderTimeout:        cfg.Options.ReadHeaderTimeout,
+		IdleTimeout:              cfg.Options.IdleTimeout,
+		EndpointSuffix:           cfg.Options.EndpointSuffix,
 		CORSConfig: http.CORSConfig{
 			AllowedOrigins:   cfg.Options.CORSAllowedOrigins,
 			AllowedHeaders:   cfg.Options.CORSAllowedHeaders,

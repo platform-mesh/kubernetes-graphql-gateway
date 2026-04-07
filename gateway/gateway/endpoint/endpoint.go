@@ -12,6 +12,7 @@ import (
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/gateway/cluster"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/gateway/config"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/gateway/graphql"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/gateway/queryvalidation"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/resolver"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/schema"
 	utilscontext "github.com/platform-mesh/kubernetes-graphql-gateway/gateway/utils/context"
@@ -24,7 +25,7 @@ type Endpoint struct {
 	name           string
 	cluster        *cluster.Cluster
 	graphqlServer  *graphql.GraphQLServer
-	handler        *graphql.GraphQLHandler
+	handler        http.Handler
 	tokenValidator authn.Validator
 	cancelFunc     context.CancelFunc
 }
@@ -34,6 +35,7 @@ func New(
 	name string,
 	schemaJSON []byte,
 	graphqlCfg config.GraphQL,
+	limits config.Limits,
 	tokenReviewCacheTTL time.Duration,
 ) (*Endpoint, error) {
 	schemaData, err := parseSchema(schemaJSON)
@@ -63,7 +65,20 @@ func New(
 	}
 
 	graphqlServer := graphql.NewGraphQLServer(graphqlCfg)
-	handler := graphqlServer.CreateHandler(schemaProvider.GetSchema())
+	gqlHandler := graphqlServer.CreateHandler(schemaProvider.GetSchema())
+
+	// The HTTP layer also checks Accept to route to separate timeout/concurrency pools.
+	handler := queryvalidation.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Accept") == "text/event-stream" {
+			graphqlServer.HandleSubscription(w, r, gqlHandler.Schema)
+			return
+		}
+		gqlHandler.Handler.ServeHTTP(w, r)
+	}), queryvalidation.Config{
+		MaxDepth:      limits.MaxQueryDepth,
+		MaxComplexity: limits.MaxQueryComplexity,
+		MaxBatchSize:  limits.MaxQueryBatchSize,
+	})
 
 	log.FromContext(ctx).Info("Registered endpoint", "cluster", name)
 
@@ -78,7 +93,7 @@ func New(
 }
 
 func (e *Endpoint) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if e.handler == nil || e.handler.Handler == nil {
+	if e.handler == nil {
 		http.Error(w, "Endpoint not ready", http.StatusServiceUnavailable)
 		return
 	}
@@ -99,13 +114,7 @@ func (e *Endpoint) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Handle subscription requests using Server-Sent Events
-	if r.Header.Get("Accept") == "text/event-stream" {
-		e.graphqlServer.HandleSubscription(w, r, e.handler.Schema)
-		return
-	}
-
-	e.handler.Handler.ServeHTTP(w, r)
+	e.handler.ServeHTTP(w, r)
 }
 
 func (e *Endpoint) Name() string {

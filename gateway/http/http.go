@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/gateway/middleware"
 	utilscontext "github.com/platform-mesh/kubernetes-graphql-gateway/gateway/utils/context"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/cors"
@@ -16,15 +17,19 @@ import (
 )
 
 type ServerConfig struct {
-	// Gateway is the main server interface to handle GraphQL requests. Its http server compliant component
 	Gateway http.Handler
 
 	CORSConfig CORSConfig
 
-	// Addr is the address the server listens on
-	Addr string
+	MaxRequestBodyBytes      int64
+	MaxInFlightRequests      int
+	MaxInFlightSubscriptions int
+	RequestTimeout           time.Duration
+	SubscriptionTimeout      time.Duration
+	ReadHeaderTimeout        time.Duration
+	IdleTimeout              time.Duration
 
-	// EndpointSuffix is the suffix appended to the cluster endpoint path (e.g. "/graphql").
+	Addr           string
 	EndpointSuffix string
 }
 
@@ -43,7 +48,14 @@ type Server struct {
 func NewServer(c ServerConfig) (*Server, error) {
 	s := http.NewServeMux()
 
+	queryHandler := middleware.WithMaxInFlightRequests(middleware.WithTimeout(c.Gateway, c.RequestTimeout), c.MaxInFlightRequests)
+	subscriptionHandler := middleware.WithMaxInFlightRequests(middleware.WithTimeout(c.Gateway, c.SubscriptionTimeout), c.MaxInFlightSubscriptions)
+
 	s.Handle(fmt.Sprintf("/api/clusters/{clusterName}%s", c.EndpointSuffix), http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if c.MaxRequestBodyBytes > 0 {
+			r.Body = http.MaxBytesReader(w, r.Body, c.MaxRequestBodyBytes)
+		}
+
 		clusterName := r.PathValue("clusterName")
 
 		authHeader := r.Header.Get("Authorization")
@@ -63,7 +75,14 @@ func NewServer(c ServerConfig) (*Server, error) {
 
 		ctx := utilscontext.SetToken(r.Context(), token)
 		ctx = utilscontext.SetCluster(ctx, clusterName)
-		c.Gateway.ServeHTTP(w, r.WithContext(ctx))
+
+		// Route to separate timeout/concurrency pools; the endpoint layer
+		// checks this header again to pick the GraphQL execution path.
+		if r.Header.Get("Accept") == "text/event-stream" {
+			subscriptionHandler.ServeHTTP(w, r.WithContext(ctx))
+		} else {
+			queryHandler.ServeHTTP(w, r.WithContext(ctx))
+		}
 	}))
 
 	// TODO: Add middleware for logging, metrics, tracing, etc.
@@ -85,8 +104,10 @@ func NewServer(c ServerConfig) (*Server, error) {
 
 	return &Server{
 		Server: &http.Server{
-			Handler: corsHandler.Handler(s),
-			Addr:    c.Addr,
+			Handler:           corsHandler.Handler(s),
+			Addr:              c.Addr,
+			ReadHeaderTimeout: c.ReadHeaderTimeout,
+			IdleTimeout:       c.IdleTimeout,
 		},
 	}, nil
 }

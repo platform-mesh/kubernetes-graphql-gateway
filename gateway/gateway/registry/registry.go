@@ -44,6 +44,7 @@ func (r *Registry) OnSchemaChanged(ctx context.Context, clusterName string, sche
 		clusterName,
 		schema,
 		r.config.GraphQL,
+		r.config.Limits,
 		r.config.TokenReviewCacheTTL,
 	)
 	if err != nil {

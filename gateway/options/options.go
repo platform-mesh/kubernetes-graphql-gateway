@@ -35,6 +35,26 @@ type ExtraOptions struct {
 	CORSAllowedHeaders []string
 	// TokenReviewCacheTTL is the duration to cache TokenReview results.
 	TokenReviewCacheTTL time.Duration
+	// RequestTimeout is the maximum duration for non-streaming GraphQL requests.
+	RequestTimeout time.Duration
+	// SubscriptionTimeout is the maximum duration for a single SSE subscription.
+	SubscriptionTimeout time.Duration
+	// MaxRequestBodyBytes is the maximum allowed request body size in bytes.
+	MaxRequestBodyBytes int64
+	// MaxInFlightRequests is the maximum number of concurrent in-flight requests.
+	MaxInFlightRequests int
+	// MaxInFlightSubscriptions is the maximum number of concurrent in-flight SSE subscriptions.
+	MaxInFlightSubscriptions int
+	// MaxQueryDepth is the maximum allowed nesting depth for GraphQL queries.
+	MaxQueryDepth int
+	// MaxQueryComplexity is the maximum allowed complexity score for GraphQL queries.
+	MaxQueryComplexity int
+	// MaxQueryBatchSize is the maximum number of queries allowed in a single batched request.
+	MaxQueryBatchSize int
+	// ReadHeaderTimeout is the maximum duration for reading request headers.
+	ReadHeaderTimeout time.Duration
+	// IdleTimeout is the maximum duration an idle keep-alive connection remains open.
+	IdleTimeout time.Duration
 	// EndpointSuffix is the suffix appended to the cluster endpoint path (e.g. "/graphql").
 	EndpointSuffix string
 }
@@ -58,16 +78,26 @@ func NewOptions() *Options {
 		Logs: logs,
 
 		ExtraOptions: ExtraOptions{
-			SchemasDir:          "_output/schemas",
-			SchemaHandler:       "file",
-			GRPCListenerAddress: "localhost:50051",
-			ServerBindAddress:   "0.0.0.0",
-			ServerBindPort:      8080,
-			PlaygroundEnabled:   false,
-			CORSAllowedOrigins:  []string{},
-			CORSAllowedHeaders:  []string{},
-			TokenReviewCacheTTL: 30 * time.Second,
-			EndpointSuffix:      "/graphql",
+			SchemasDir:               "_output/schemas",
+			SchemaHandler:            "file",
+			GRPCListenerAddress:      "localhost:50051",
+			ServerBindAddress:        "0.0.0.0",
+			ServerBindPort:           8080,
+			PlaygroundEnabled:        false,
+			CORSAllowedOrigins:       []string{},
+			CORSAllowedHeaders:       []string{},
+			TokenReviewCacheTTL:      30 * time.Second,
+			RequestTimeout:           60 * time.Second,
+			SubscriptionTimeout:      30 * time.Minute,
+			MaxRequestBodyBytes:      3 * 1024 * 1024,
+			MaxInFlightRequests:      400,
+			MaxInFlightSubscriptions: 50,
+			MaxQueryDepth:            10,
+			MaxQueryComplexity:       1000,
+			MaxQueryBatchSize:        10,
+			ReadHeaderTimeout:        32 * time.Second,
+			IdleTimeout:              90 * time.Second,
+			EndpointSuffix:           "/graphql",
 		},
 	}
 	return opts
@@ -85,6 +115,16 @@ func (options *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.StringSliceVar(&options.CORSAllowedOrigins, "cors-allowed-origins", options.CORSAllowedOrigins, "list of allowed origins for CORS")
 	fs.StringSliceVar(&options.CORSAllowedHeaders, "cors-allowed-headers", options.CORSAllowedHeaders, "list of allowed headers for CORS")
 	fs.DurationVar(&options.TokenReviewCacheTTL, "token-review-cache-ttl", options.TokenReviewCacheTTL, "TTL for cached TokenReview results (0 to disable caching)")
+	fs.DurationVar(&options.RequestTimeout, "request-timeout", options.RequestTimeout, "maximum duration for non-streaming GraphQL requests (0 to disable)")
+	fs.DurationVar(&options.SubscriptionTimeout, "subscription-timeout", options.SubscriptionTimeout, "maximum duration for SSE subscription connections (0 to disable)")
+	fs.Int64Var(&options.MaxRequestBodyBytes, "max-request-body-bytes", options.MaxRequestBodyBytes, "maximum allowed request body size in bytes (0 to disable)")
+	fs.IntVar(&options.MaxInFlightRequests, "max-inflight-requests", options.MaxInFlightRequests, "maximum number of concurrent in-flight requests (0 to disable)")
+	fs.IntVar(&options.MaxInFlightSubscriptions, "max-inflight-subscriptions", options.MaxInFlightSubscriptions, "maximum number of concurrent in-flight SSE subscriptions (0 to disable)")
+	fs.IntVar(&options.MaxQueryDepth, "max-query-depth", options.MaxQueryDepth, "maximum allowed nesting depth for GraphQL queries (0 to disable)")
+	fs.IntVar(&options.MaxQueryComplexity, "max-query-complexity", options.MaxQueryComplexity, "maximum allowed complexity score for GraphQL queries (0 to disable)")
+	fs.IntVar(&options.MaxQueryBatchSize, "max-query-batch-size", options.MaxQueryBatchSize, "maximum number of queries allowed in a single batched request (0 to disable)")
+	fs.DurationVar(&options.ReadHeaderTimeout, "read-header-timeout", options.ReadHeaderTimeout, "maximum duration for reading request headers (0 to disable)")
+	fs.DurationVar(&options.IdleTimeout, "idle-timeout", options.IdleTimeout, "maximum duration an idle keep-alive connection remains open (0 to disable)")
 	fs.StringVar(&options.EndpointSuffix, "endpoint-suffix", options.EndpointSuffix, "suffix appended to the cluster endpoint path (default \"/graphql\")")
 }
 
@@ -110,6 +150,46 @@ func (options *CompletedOptions) Validate() error {
 
 	if options.TokenReviewCacheTTL < 0 {
 		return errors.New("--token-review-cache-ttl must not be negative")
+	}
+
+	if options.RequestTimeout < 0 {
+		return errors.New("--request-timeout must not be negative")
+	}
+
+	if options.SubscriptionTimeout < 0 {
+		return errors.New("--subscription-timeout must not be negative")
+	}
+
+	if options.MaxRequestBodyBytes < 0 {
+		return errors.New("--max-request-body-bytes must not be negative")
+	}
+
+	if options.MaxInFlightRequests < 0 {
+		return errors.New("--max-inflight-requests must not be negative")
+	}
+
+	if options.MaxInFlightSubscriptions < 0 {
+		return errors.New("--max-inflight-subscriptions must not be negative")
+	}
+
+	if options.MaxQueryDepth < 0 {
+		return errors.New("--max-query-depth must not be negative")
+	}
+
+	if options.MaxQueryComplexity < 0 {
+		return errors.New("--max-query-complexity must not be negative")
+	}
+
+	if options.MaxQueryBatchSize < 0 {
+		return errors.New("--max-query-batch-size must not be negative")
+	}
+
+	if options.ReadHeaderTimeout < 0 {
+		return errors.New("--read-header-timeout must not be negative")
+	}
+
+	if options.IdleTimeout < 0 {
+		return errors.New("--idle-timeout must not be negative")
 	}
 
 	return nil

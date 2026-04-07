@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/schema/types"
+
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
