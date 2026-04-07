@@ -226,7 +226,7 @@ func (options *CompletedOptions) Validate() error {
 
 // validateProviderNames checks that a comma-separated string contains only valid provider names.
 func validateProviderNames(names string, flagName string) error {
-	for _, name := range strings.Split(names, ",") {
+	for name := range strings.SplitSeq(names, ",") {
 		name = strings.TrimSpace(name)
 		if name == "" {
 			return fmt.Errorf("empty provider name in %s", flagName)

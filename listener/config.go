@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net"
+	"slices"
 	"strings"
 
 	gatewayv1alpha1 "github.com/platform-mesh/kubernetes-graphql-gateway/apis/v1alpha1"
@@ -181,6 +182,9 @@ func NewConfig(options *options.CompletedOptions) (*Config, error) {
 		// Build per-controller provider filters
 		config.ResourceControllerForOptions = buildControllerForOptions(options.ResourceControllerProviders, "kcp")
 		config.ClusterAccessControllerForOptions = buildControllerForOptions(options.ClusterAccessControllerProviders, "single")
+
+	default:
+		return nil, fmt.Errorf("unknown provider %q", options.Provider)
 	}
 
 	var tlsOpts []func(*tls.Config)
@@ -296,12 +300,7 @@ func buildControllerForOptions(names string, defaultNames string) []mcbuilder.Fo
 			if !ok {
 				return false
 			}
-			for _, name := range allowed {
-				if prefix == name {
-					return true
-				}
-			}
-			return false
+			return slices.Contains(allowed, prefix)
 		}),
 	}
 }
