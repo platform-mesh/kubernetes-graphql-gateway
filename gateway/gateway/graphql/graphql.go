@@ -101,7 +101,12 @@ func (s *GraphQLServer) HandleSubscription(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	if _, err := fmt.Fprint(w, "event: complete\n\n"); err != nil {
-		logger.V(4).Error(err, "Failed to write SSE complete event")
+	// Only send the complete event if the client is still connected.
+	select {
+	case <-r.Context().Done():
+	default:
+		if _, err := fmt.Fprint(w, "event: complete\n\n"); err != nil {
+			logger.V(4).Error(err, "Failed to write SSE complete event")
+		}
 	}
 }
