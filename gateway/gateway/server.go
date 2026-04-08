@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"sync/atomic"
 
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/gateway/config"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/gateway/registry"
@@ -21,6 +22,7 @@ type Service struct {
 	started   bool
 	ready     chan struct{}
 	readyOnce sync.Once
+	connected atomic.Bool
 }
 
 // New creates a new Gateway service.
@@ -52,6 +54,7 @@ func (s *Service) Run(ctx context.Context) error {
 		gw, err := watcher.NewGRPCWatcher(
 			watcher.GRPCWatcherConfig{Address: s.config.GRPCAddress},
 			s.registry,
+			&s.connected,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to create gRPC watcher: %w", err)
@@ -114,4 +117,26 @@ func (s *Service) WaitForReady(ctx context.Context) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	}
+}
+
+// IsReady reports whether the gateway has completed initial setup.
+// Compatible with healthz.Checker signature.
+func (s *Service) IsReady(_ *http.Request) error {
+	select {
+	case <-s.ready:
+		return nil
+	default:
+		return fmt.Errorf("gateway not ready")
+	}
+}
+
+// IsHealthy reports whether the gateway is in a healthy state.
+// For file watcher mode this always returns nil.
+// For gRPC mode this returns an error when the stream is not active.
+// Compatible with healthz.Checker signature.
+func (s *Service) IsHealthy(_ *http.Request) error {
+	if s.config.SchemaHandler == "grpc" && !s.connected.Load() {
+		return fmt.Errorf("gRPC stream not connected")
+	}
+	return nil
 }

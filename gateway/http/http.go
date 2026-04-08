@@ -13,11 +13,18 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/cors"
 
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type ServerConfig struct {
 	Gateway http.Handler
+
+	// HealthzCheck and ReadyzCheck are optional controller-runtime healthz.Checker
+	// functions. When set, they are used by /healthz and /readyz respectively.
+	// When nil, the endpoints always return 200.
+	HealthzCheck healthz.Checker
+	ReadyzCheck  healthz.Checker
 
 	CORSConfig CORSConfig
 
@@ -88,12 +95,8 @@ func NewServer(c ServerConfig) (*Server, error) {
 	// TODO: Add middleware for logging, metrics, tracing, etc.
 
 	// Health and metrics endpoints
-	s.Handle("/healthz", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-	s.Handle("/readyz", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
+	s.Handle("/healthz", healthz.CheckHandler{Checker: checkerOrPing(c.HealthzCheck)})
+	s.Handle("/readyz", healthz.CheckHandler{Checker: checkerOrPing(c.ReadyzCheck)})
 	s.Handle("/metrics", promhttp.Handler())
 
 	corsHandler := cors.New(cors.Options{
@@ -110,6 +113,14 @@ func NewServer(c ServerConfig) (*Server, error) {
 			IdleTimeout:       c.IdleTimeout,
 		},
 	}, nil
+}
+
+// checkerOrPing returns the given checker if non-nil, otherwise healthz.Ping (always healthy).
+func checkerOrPing(c healthz.Checker) healthz.Checker {
+	if c != nil {
+		return c
+	}
+	return healthz.Ping
 }
 
 func (s *Server) Run(ctx context.Context) error {

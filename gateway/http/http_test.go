@@ -136,6 +136,28 @@ func TestUnauthenticatedEndpoints(t *testing.T) {
 	}
 }
 
+func TestHealthEndpointsReflectCheckerState(t *testing.T) {
+	failing := func(_ *http.Request) error { return fmt.Errorf("down") }
+
+	srv, err := NewServer(ServerConfig{
+		Gateway:        &captureHandler{},
+		HealthzCheck:   failing,
+		ReadyzCheck:    failing,
+		Addr:           ":0",
+		EndpointSuffix: testEndpointSuffix,
+	})
+	require.NoError(t, err)
+	ts := httptest.NewServer(srv.Server.Handler)
+	defer ts.Close()
+
+	for _, path := range []string{"/healthz", "/readyz"} {
+		resp, err := http.Get(ts.URL + path)
+		require.NoError(t, err)
+		resp.Body.Close() //nolint:errcheck
+		assert.NotEqual(t, http.StatusOK, resp.StatusCode, path)
+	}
+}
+
 func TestMaxRequestBodyBytes(t *testing.T) {
 	tests := []struct {
 		name           string
