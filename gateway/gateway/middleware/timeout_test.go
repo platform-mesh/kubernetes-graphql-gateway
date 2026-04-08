@@ -69,6 +69,32 @@ func TestWithTimeout(t *testing.T) {
 		assert.Equal(t, http.StatusOK, rec.Code)
 	})
 
+	t.Run("flush forwards buffered data to underlying writer", func(t *testing.T) {
+		inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			rc := http.NewResponseController(w)
+
+			w.Header().Set("Content-Type", "text/event-stream")
+			w.WriteHeader(http.StatusOK)
+
+			w.Write([]byte("event: next\ndata: {\"one\":1}\n\n")) //nolint:errcheck
+			require.NoError(t, rc.Flush())
+
+			w.Write([]byte("event: next\ndata: {\"two\":2}\n\n")) //nolint:errcheck
+			require.NoError(t, rc.Flush())
+		})
+
+		handler := WithTimeout(inner, 1*time.Second)
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/graphql", nil)
+
+		handler.ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.Equal(t, "text/event-stream", rec.Header().Get("Content-Type"))
+		assert.Contains(t, rec.Body.String(), "event: next\ndata: {\"one\":1}\n\n")
+		assert.Contains(t, rec.Body.String(), "event: next\ndata: {\"two\":2}\n\n")
+	})
+
 	t.Run("writes after timeout are discarded", func(t *testing.T) {
 		writeDone := make(chan struct{})
 		inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
