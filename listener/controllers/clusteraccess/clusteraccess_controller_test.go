@@ -270,10 +270,10 @@ func (suite *ClusterAccessControllerTestSuite) TestKubeconfigAuth() {
 	suite.Require().NoError(err, "failed to create ClusterAccess")
 
 	// Wait for schema file to be generated
-	suite.waitForSchemaFile("kubeconfig-test")
+	suite.waitForSchemaFile("single-kubeconfig-test")
 
 	// Verify schema metadata
-	suite.verifySchemaMetadata("kubeconfig-test", v1alpha1.AuthTypeKubeconfig)
+	suite.verifySchemaMetadata("single-kubeconfig-test", v1alpha1.AuthTypeKubeconfig)
 }
 
 // TestTokenAuth tests ClusterAccess with token authentication
@@ -348,10 +348,10 @@ func (suite *ClusterAccessControllerTestSuite) TestTokenAuth() {
 	suite.Require().NoError(err, "failed to create ClusterAccess")
 
 	// Wait for schema file to be generated
-	suite.waitForSchemaFile("token-test")
+	suite.waitForSchemaFile("single-token-test")
 
 	// Verify schema metadata
-	suite.verifySchemaMetadata("token-test", v1alpha1.AuthTypeToken)
+	suite.verifySchemaMetadata("single-token-test", v1alpha1.AuthTypeToken)
 }
 
 // TestClientCertAuth tests ClusterAccess with client certificate authentication
@@ -399,10 +399,10 @@ func (suite *ClusterAccessControllerTestSuite) TestClientCertAuth() {
 	suite.Require().NoError(err, "failed to create ClusterAccess")
 
 	// Wait for schema file to be generated
-	suite.waitForSchemaFile("clientcert-test")
+	suite.waitForSchemaFile("single-clientcert-test")
 
 	// Verify schema metadata
-	suite.verifySchemaMetadata("clientcert-test", v1alpha1.AuthTypeClientCert)
+	suite.verifySchemaMetadata("single-clientcert-test", v1alpha1.AuthTypeClientCert)
 }
 
 // TestServiceAccountAuth tests ClusterAccess with service account authentication
@@ -449,10 +449,10 @@ func (suite *ClusterAccessControllerTestSuite) TestServiceAccountAuth() {
 	suite.Require().NoError(err, "failed to create ClusterAccess")
 
 	// Wait for schema file to be generated
-	suite.waitForSchemaFile("serviceaccount-test")
+	suite.waitForSchemaFile("single-serviceaccount-test")
 
 	// Verify schema metadata has SA auth type and details
-	schemaFilePath := filepath.Join(suite.listenerCfg.Options.SchemasDir, "serviceaccount-test")
+	schemaFilePath := filepath.Join(suite.listenerCfg.Options.SchemasDir, "single-serviceaccount-test")
 	raw, err := os.ReadFile(schemaFilePath)
 	suite.Require().NoError(err, "failed to read schema file")
 

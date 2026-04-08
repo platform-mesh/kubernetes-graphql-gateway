@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/platform-mesh/kubernetes-graphql-gateway/apis/v1alpha1"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/controllers/reconciler"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/apischema/enricher"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/schemahandler"
@@ -76,6 +77,10 @@ func (r *ClusterAccessReconciler) Reconcile(ctx context.Context, req mcreconcile
 		return ctrl.Result{}, fmt.Errorf("failed to get client for cluster %q: %w", req.ClusterName, err)
 	}
 
+	// Strip multi-provider prefix (e.g. "single#single" → "single") for
+	// downstream use in schema paths.
+	clusterName := reconciler.ClusterName(req.ClusterName)
+
 	c := cl.GetClient()
 
 	ca := &v1alpha1.ClusterAccess{}
@@ -85,8 +90,8 @@ func (r *ClusterAccessReconciler) Reconcile(ctx context.Context, req mcreconcile
 			// Delete the schema file if ClusterAccess is deleted
 			// Try both possible paths (resource name and path field)
 			name := req.Name
-			if req.ClusterName != "" {
-				name = fmt.Sprintf("%s-%s", req.ClusterName, name)
+			if clusterName != "" {
+				name = fmt.Sprintf("%s-%s", clusterName, name)
 			}
 			if err := r.ioHandler.Delete(ctx, name); err != nil {
 				logger.Error(err, "Failed to cleanup schema")
@@ -96,7 +101,7 @@ func (r *ClusterAccessReconciler) Reconcile(ctx context.Context, req mcreconcile
 		return ctrl.Result{}, fmt.Errorf("failed to get ClusterAccess: %w", err)
 	}
 
-	result, reconcileErr := r.reconcileClusterAccess(ctx, ca, c, cl.GetConfig(), req.ClusterName)
+	result, reconcileErr := r.reconcileClusterAccess(ctx, ca, c, cl.GetConfig(), clusterName)
 
 	// Update the Ready status condition based on the reconciliation outcome
 	if err := r.setReadyCondition(ctx, ca, c, reconcileErr); err != nil {
@@ -211,9 +216,9 @@ func calculateTokenRefreshInterval(tokenExpiration *metav1.Duration) time.Durati
 }
 
 // SetupWithManager sets up the controller with the Manager
-func (r *ClusterAccessReconciler) SetupWithManager(mgr mcmanager.Manager) error {
+func (r *ClusterAccessReconciler) SetupWithManager(mgr mcmanager.Manager, forOpts ...mcbuilder.ForOption) error {
 	return mcbuilder.ControllerManagedBy(mgr).
-		For(&v1alpha1.ClusterAccess{}).
+		For(&v1alpha1.ClusterAccess{}, forOpts...).
 		WithOptions(r.opts).
 		Named(controllerName).
 		Complete(r)

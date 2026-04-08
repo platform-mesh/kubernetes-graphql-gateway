@@ -50,7 +50,7 @@ func NewServer(ctx context.Context, c *Config) (*Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error setting up Namespace Controller: %w", err)
 	}
-	if err := s.Resource.SetupWithManager(s.Config.Manager); err != nil {
+	if err := s.Resource.SetupWithManager(s.Config.Manager, c.ResourceControllerForOptions...); err != nil {
 		return nil, fmt.Errorf("error setting up Namespace controller with manager: %w", err)
 	}
 
@@ -65,7 +65,7 @@ func NewServer(ctx context.Context, c *Config) (*Server, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error setting up ClusterAccess controller: %w", err)
 		}
-		if err := s.ClusterAccess.SetupWithManager(s.Config.Manager); err != nil {
+		if err := s.ClusterAccess.SetupWithManager(s.Config.Manager, c.ClusterAccessControllerForOptions...); err != nil {
 			return nil, fmt.Errorf("error setting up ClusterAccess controller with manager: %w", err)
 		}
 	}

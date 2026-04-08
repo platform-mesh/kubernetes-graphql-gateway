@@ -96,7 +96,7 @@ func (suite *ResourceControllerTestSuite) SetupSuite() {
 }
 
 func (suite *ResourceControllerTestSuite) TestSchemaGeneration() {
-	schemaFilePath := filepath.Join(suite.listenerCfg.Options.SchemasDir, "default")
+	schemaFilePath := filepath.Join(suite.listenerCfg.Options.SchemasDir, "single")
 	suite.Eventually(func() bool {
 		_, err := os.Stat(schemaFilePath)
 		return err == nil
