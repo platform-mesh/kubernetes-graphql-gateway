@@ -133,13 +133,3 @@ func (s *Service) IsReady(_ *http.Request) error {
 	return nil
 }
 
-// IsHealthy reports whether the gateway is in a healthy state.
-// For file watcher mode this always returns nil.
-// For gRPC mode this returns an error when the stream is not active.
-// Compatible with healthz.Checker signature.
-func (s *Service) IsHealthy(_ *http.Request) error {
-	if s.config.SchemaHandler == "grpc" && !s.connected.Load() {
-		return fmt.Errorf("gRPC stream not connected")
-	}
-	return nil
-}

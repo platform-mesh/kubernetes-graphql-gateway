@@ -95,7 +95,7 @@ func NewServer(c ServerConfig) (*Server, error) {
 	// TODO: Add middleware for logging, metrics, tracing, etc.
 
 	// Health and metrics endpoints
-	s.Handle("/healthz", healthz.CheckHandler{Checker: checkerOrPing(c.HealthzCheck)})
+	s.Handle("/healthz", healthz.CheckHandler{Checker: healthz.Ping})
 	s.Handle("/readyz", healthz.CheckHandler{Checker: checkerOrPing(c.ReadyzCheck)})
 	s.Handle("/metrics", promhttp.Handler())
 

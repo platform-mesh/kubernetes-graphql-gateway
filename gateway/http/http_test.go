@@ -150,7 +150,7 @@ func TestHealthEndpointsReflectCheckerState(t *testing.T) {
 	ts := httptest.NewServer(srv.Server.Handler)
 	defer ts.Close()
 
-	for _, path := range []string{"/healthz", "/readyz"} {
+	for _, path := range []string{"/readyz"} {
 		resp, err := http.Get(ts.URL + path)
 		require.NoError(t, err)
 		resp.Body.Close() //nolint:errcheck

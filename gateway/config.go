@@ -44,7 +44,6 @@ func NewConfig(opts *options.CompletedOptions) (*Config, error) {
 
 	httpServer, err := http.NewServer(http.ServerConfig{
 		Gateway:                  gatewayServer,
-		HealthzCheck:             gatewayServer.IsHealthy,
 		ReadyzCheck:              gatewayServer.IsReady,
 		Addr:                     fmt.Sprintf("%s:%d", cfg.Options.ServerBindAddress, cfg.Options.ServerBindPort),
 		MaxRequestBodyBytes:      cfg.Options.MaxRequestBodyBytes,
