@@ -4,20 +4,25 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"sync/atomic"
+	"time"
 
 	"github.com/platform-mesh/kubernetes-graphql-gateway/sdk"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/utils/clock"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // GRPCWatcher watches for schema changes via gRPC streaming from a listener.
 // It implements the Watcher interface.
 type GRPCWatcher struct {
-	conn    *grpc.ClientConn
-	client  sdk.SchemaHandlerClient
-	handler SchemaEventHandler
+	conn      *grpc.ClientConn
+	client    sdk.SchemaHandlerClient
+	handler   SchemaEventHandler
+	connected *atomic.Bool
 }
 
 // GRPCWatcherConfig holds configuration for the gRPC watcher.
@@ -28,7 +33,7 @@ type GRPCWatcherConfig struct {
 
 // NewGRPCWatcher creates a new gRPC watcher that connects to the given address
 // and notifies the handler when schemas change.
-func NewGRPCWatcher(config GRPCWatcherConfig, handler SchemaEventHandler) (*GRPCWatcher, error) {
+func NewGRPCWatcher(config GRPCWatcherConfig, handler SchemaEventHandler, connected *atomic.Bool) (*GRPCWatcher, error) {
 	// TODO: Add proper TLS configuration for production
 	conn, err := grpc.NewClient(
 		config.Address,
@@ -41,9 +46,10 @@ func NewGRPCWatcher(config GRPCWatcherConfig, handler SchemaEventHandler) (*GRPC
 	client := sdk.NewSchemaHandlerClient(conn)
 
 	return &GRPCWatcher{
-		conn:    conn,
-		client:  client,
-		handler: handler,
+		conn:      conn,
+		client:    client,
+		handler:   handler,
+		connected: connected,
 	}, nil
 }
 
@@ -56,7 +62,8 @@ func (w *GRPCWatcher) Close() error {
 }
 
 // Run starts the gRPC watcher and blocks until the context is cancelled.
-// It subscribes to schema updates from the listener and processes them.
+// It subscribes to schema updates from the listener and automatically
+// reconnects on stream errors.
 func (w *GRPCWatcher) Run(ctx context.Context) error {
 	logger := log.FromContext(ctx)
 	defer func() {
@@ -65,21 +72,47 @@ func (w *GRPCWatcher) Run(ctx context.Context) error {
 		}
 	}()
 
-	stream, err := w.client.Subscribe(ctx, &sdk.SubscribeRequest{})
+	// Uses exponential backoff with jitter to retry subscribe whenever
+	// the stream breaks. Stops when ctx is cancelled.
+	backoff := wait.Backoff{
+		Duration: 800 * time.Millisecond,
+		Cap:      30 * time.Second,
+		Steps:    10,
+		Factor:   2.0,
+		Jitter:   1.0,
+	}
+	delay := backoff.DelayWithReset(&clock.RealClock{}, 2*time.Minute)
+
+	return delay.Until(ctx, true, true, func(ctx context.Context) (bool, error) {
+		if err := w.subscribe(ctx); err != nil {
+			logger.Error(err, "gRPC stream error, reconnecting")
+		}
+		return false, nil
+	})
+}
+
+// subscribe establishes a gRPC stream and processes messages until
+// the stream breaks or the context is cancelled.
+func (w *GRPCWatcher) subscribe(ctx context.Context) error {
+	logger := log.FromContext(ctx)
+
+	// WaitForReady makes Subscribe block until the connection is established
+	// instead of failing immediately when the server is not yet reachable.
+	stream, err := w.client.Subscribe(ctx, &sdk.SubscribeRequest{}, grpc.WaitForReady(true))
 	if err != nil {
 		return fmt.Errorf("failed to subscribe to schema updates: %w", err)
 	}
 
 	logger.Info("Connected to gRPC schema handler, waiting for updates")
+	w.connected.Store(true)
+	defer w.connected.Store(false)
 
 	for {
 		res, err := stream.Recv()
 		if err == io.EOF {
-			logger.Info("gRPC stream closed by server")
-			return nil
+			return fmt.Errorf("stream closed by server")
 		}
 		if err != nil {
-			// Check if context was cancelled
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
