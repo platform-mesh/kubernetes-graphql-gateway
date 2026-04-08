@@ -124,10 +124,13 @@ func (s *Service) WaitForReady(ctx context.Context) error {
 func (s *Service) IsReady(_ *http.Request) error {
 	select {
 	case <-s.ready:
-		return nil
 	default:
 		return fmt.Errorf("gateway not ready")
 	}
+	if s.config.SchemaHandler == "grpc" && !s.connected.Load() {
+		return fmt.Errorf("gRPC stream not connected")
+	}
+	return nil
 }
 
 // IsHealthy reports whether the gateway is in a healthy state.
