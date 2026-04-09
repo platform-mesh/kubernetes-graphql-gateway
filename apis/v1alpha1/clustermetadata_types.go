@@ -126,6 +126,18 @@ func buildClusterMetadataFromClusterAccess(ctx context.Context, ca ClusterAccess
 			Type:       AuthTypeKubeconfig,
 			Kubeconfig: base64.StdEncoding.EncodeToString(kubeconfigData),
 		}
+		// If host is not explicitly set, derive it from the kubeconfig
+		if metadata.Host == "" {
+			clientConfig, err := clientcmd.NewClientConfigFromBytes(kubeconfigData)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse kubeconfig for host extraction: %w", err)
+			}
+			cfg, err := clientConfig.ClientConfig()
+			if err != nil {
+				return nil, fmt.Errorf("failed to get client config from kubeconfig: %w", err)
+			}
+			metadata.Host = cfg.Host
+		}
 
 	case auth.ClientCertificateRef != nil:
 		secret := &corev1.Secret{}
@@ -236,10 +248,6 @@ func BuildRestConfigFromClusterAccess(ctx context.Context, ca ClusterAccess, c c
 
 // buildConfigFromMetadata creates a rest.Config from base64-encoded metadata (used by gateway)
 func buildConfigFromMetadata(metadata ClusterMetadata) (*rest.Config, error) {
-	if metadata.Host == "" {
-		return nil, errors.New("host is required")
-	}
-
 	config := &rest.Config{
 		Host: metadata.Host,
 		TLSClientConfig: rest.TLSClientConfig{
@@ -306,7 +314,13 @@ func buildConfigFromMetadata(metadata ClusterMetadata) (*rest.Config, error) {
 		}
 	}
 
-	config.Host = metadata.Host
+	if metadata.Host != "" {
+		config.Host = metadata.Host
+	}
+
+	if config.Host == "" {
+		return nil, errors.New("host must be set either in spec or derived from kubeconfig")
+	}
 
 	return config, nil
 }

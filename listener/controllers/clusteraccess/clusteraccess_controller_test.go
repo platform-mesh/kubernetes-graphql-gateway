@@ -276,6 +276,49 @@ func (suite *ClusterAccessControllerTestSuite) TestKubeconfigAuth() {
 	suite.verifySchemaMetadata("single-kubeconfig-test", v1alpha1.AuthTypeKubeconfig)
 }
 
+// TestKubeconfigAuthWithoutHost tests ClusterAccess with kubeconfig authentication and no explicit host.
+// The host should be derived from the kubeconfig's server URL.
+func (suite *ClusterAccessControllerTestSuite) TestKubeconfigAuthWithoutHost() {
+	// Create secret with kubeconfig
+	kubeconfigSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "kubeconfig-nohost-secret",
+			Namespace: testNamespace,
+		},
+		Data: map[string][]byte{
+			"kubeconfig": suite.envtestKubeconfig,
+		},
+	}
+	err := suite.client.Create(context.Background(), kubeconfigSecret)
+	suite.Require().NoError(err, "failed to create kubeconfig secret")
+
+	// Create ClusterAccess without host — should derive it from kubeconfig
+	clusterAccess := &v1alpha1.ClusterAccess{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "kubeconfig-nohost-test",
+		},
+		Spec: v1alpha1.ClusterAccessSpec{
+			Auth: &v1alpha1.AuthConfig{
+				KubeconfigSecretRef: &v1alpha1.SecretKeyRef{
+					SecretReference: corev1.SecretReference{
+						Name:      "kubeconfig-nohost-secret",
+						Namespace: testNamespace,
+					},
+					Key: "kubeconfig",
+				},
+			},
+		},
+	}
+	err = suite.client.Create(context.Background(), clusterAccess)
+	suite.Require().NoError(err, "failed to create ClusterAccess")
+
+	// Wait for schema file to be generated
+	suite.waitForSchemaFile("single-kubeconfig-nohost-test")
+
+	// Verify schema metadata — host should have been derived from kubeconfig
+	suite.verifySchemaMetadata("single-kubeconfig-nohost-test", v1alpha1.AuthTypeKubeconfig)
+}
+
 // TestTokenAuth tests ClusterAccess with token authentication
 func (suite *ClusterAccessControllerTestSuite) TestTokenAuth() {
 	// First create a ServiceAccount to generate a token

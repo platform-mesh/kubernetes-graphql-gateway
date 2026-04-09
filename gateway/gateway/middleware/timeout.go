@@ -53,11 +53,11 @@ func WithTimeout(handler http.Handler, timeout time.Duration) http.Handler {
 
 // timeoutWriter buffers the response so it can be discarded on timeout.
 type timeoutWriter struct {
-	wrapped http.ResponseWriter
-	header  http.Header
-	buf     bytes.Buffer
-	code    int
-	mu      sync.Mutex
+	wrapped  http.ResponseWriter
+	header   http.Header
+	buf      bytes.Buffer
+	code     int
+	mu       sync.Mutex
 	timedOut bool
 	flusher  http.Flusher // resolved once at construction; nil if unsupported
 }

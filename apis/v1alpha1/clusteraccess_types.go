@@ -24,8 +24,9 @@ type ClusterAccessSpec struct {
 	// +optional
 	Path string `json:"path,omitempty"`
 
-	// Host is the URL for the cluster
-	Host string `json:"host"`
+	// Host is the URL for the cluster. If not set and kubeconfig auth is used, the host from the kubeconfig is used.
+	// +optional
+	Host string `json:"host,omitempty"`
 
 	// CA configuration for the cluster
 	// +optional
