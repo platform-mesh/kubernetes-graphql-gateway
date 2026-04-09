@@ -227,11 +227,6 @@ func (r *ClusterAccessReconciler) SetupWithManager(mgr mcmanager.Manager, forOpt
 func buildTargetClusterConfig(ctx context.Context, clusterAccess v1alpha1.ClusterAccess, c client.Client, currentConfig *rest.Config) (*rest.Config, error) {
 	spec := clusterAccess.Spec
 
-	host := spec.Host
-	if host == "" {
-		return nil, errors.New("host field not found in ClusterAccess spec")
-	}
-
 	config, err := v1alpha1.BuildRestConfigFromClusterAccess(ctx, clusterAccess, c)
 	if err != nil {
 		return nil, err
@@ -242,7 +237,9 @@ func buildTargetClusterConfig(ctx context.Context, clusterAccess v1alpha1.Cluste
 		config.Insecure = false
 	}
 
-	config.Host = host
+	if spec.Host != "" {
+		config.Host = spec.Host
+	}
 
 	return config, nil
 }
