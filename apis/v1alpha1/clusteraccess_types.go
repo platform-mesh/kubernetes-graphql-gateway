@@ -19,6 +19,7 @@ type ClusterAccess struct {
 }
 
 // ClusterAccessSpec defines the desired state of ClusterAccess
+// +kubebuilder:validation:XValidation:rule="has(self.host) || (has(self.auth) && has(self.auth.kubeconfigSecretRef))",message="host is required unless kubeconfigSecretRef auth is used"
 type ClusterAccessSpec struct {
 	// Path is an optional field. If not set, the name of the resource is used
 	// +optional

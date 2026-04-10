@@ -149,6 +149,9 @@ spec:
                   resource is used
                 type: string
             type: object
+            x-kubernetes-validations:
+            - message: host is required unless kubeconfigSecretRef auth is used
+              rule: has(self.host) || (has(self.auth) && has(self.auth.kubeconfigSecretRef))
           status:
             description: ClusterAccessStatus defines the observed state of ClusterAccess.
             properties:
