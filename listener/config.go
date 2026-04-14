@@ -23,6 +23,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	ctrl "sigs.k8s.io/controller-runtime"
+	ctrlcache "sigs.k8s.io/controller-runtime/pkg/cache"
 	ctrlcluster "sigs.k8s.io/controller-runtime/pkg/cluster"
 	ctrlconfig "sigs.k8s.io/controller-runtime/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
@@ -110,10 +111,19 @@ func NewConfig(options *options.CompletedOptions) (*Config, error) {
 
 	config.Scheme = scheme
 
+	var cacheNamespaces map[string]ctrlcache.Config
+	for _, ns := range options.CacheNamespaces {
+		if cacheNamespaces == nil {
+			cacheNamespaces = make(map[string]ctrlcache.Config, len(options.CacheNamespaces))
+		}
+		cacheNamespaces[ns] = ctrlcache.Config{}
+	}
+
 	switch options.Provider {
 	case "single":
 		cl, err := ctrlcluster.New(config.ClientConfig, func(o *ctrlcluster.Options) {
 			o.Scheme = scheme
+			o.Cache.DefaultNamespaces = cacheNamespaces
 		})
 		if err != nil {
 			return nil, fmt.Errorf("error creating cluster for single provider: %w", err)
@@ -161,6 +171,7 @@ func NewConfig(options *options.CompletedOptions) (*Config, error) {
 
 		singleCluster, err := ctrlcluster.New(singleConfig, func(o *ctrlcluster.Options) {
 			o.Scheme = scheme
+			o.Cache.DefaultNamespaces = cacheNamespaces
 		})
 		if err != nil {
 			return nil, fmt.Errorf("error creating cluster for single provider: %w", err)
@@ -198,6 +209,9 @@ func NewConfig(options *options.CompletedOptions) (*Config, error) {
 
 	opts := ctrl.Options{
 		Controller: ctrlconfig.Controller{},
+		Cache: ctrlcache.Options{
+			DefaultNamespaces: cacheNamespaces,
+		},
 		Metrics: metricsserver.Options{
 			BindAddress:   options.MetricsBindAddress,
 			SecureServing: options.MetricsSecureServe,
