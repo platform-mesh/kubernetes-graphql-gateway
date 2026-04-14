@@ -61,8 +61,13 @@ type ExtraOptions struct {
 
 	AdditonalPathAnnotationKey string
 
-	// EnableClusterAccessController enables the ClusterAccess controller
-	// which watches ClusterAccess CRD resources and generates schemas for remote clusters
+	// CacheNamespaces restricts the cache to these namespaces for namespaced resources.
+	// Cluster-scoped resources are unaffected.
+	CacheNamespaces []string
+
+	// EnableResourceController enables the resource controller.
+	EnableResourceController bool
+	// EnableClusterAccessController enables the ClusterAccess controller.
 	EnableClusterAccessController bool
 }
 
@@ -89,16 +94,17 @@ func NewOptions() *Options {
 		ProviderKcp: providerkcp.NewOptions(),
 
 		ExtraOptions: ExtraOptions{
-			Provider:               "single",
-			SchemaHandler:          "file",
-			SchemasDir:             "_output/schemas",
-			GRPCListenAddr:         ":50051",
-			AnchorResource:         "object.metadata.name == 'default'",
-			ResourceGVR:            "namespaces.v1",
-			MetricsBindAddress:     "0",
-			EnableHTTP2:            false,
-			MetricsSecureServe:     false,
-			ClusterURLResolverFunc: v1alpha1.DefaultClusterURLResolverFunc,
+			Provider:                 "single",
+			SchemaHandler:            "file",
+			SchemasDir:               "_output/schemas",
+			GRPCListenAddr:           ":50051",
+			AnchorResource:           "object.metadata.name == 'default'",
+			ResourceGVR:              "namespaces.v1",
+			MetricsBindAddress:       "0",
+			EnableHTTP2:              false,
+			MetricsSecureServe:       false,
+			ClusterURLResolverFunc:   v1alpha1.DefaultClusterURLResolverFunc,
+			EnableResourceController: true,
 		},
 	}
 	return opts
@@ -133,10 +139,13 @@ func (options *Options) AddFlags(fs *pflag.FlagSet) {
 
 	fs.StringVar(&options.AdditonalPathAnnotationKey, "additional-path-annotation-key", options.AdditonalPathAnnotationKey, "additional path annotation key for workspace schema generation")
 
+	fs.StringSliceVar(&options.CacheNamespaces, "cache-namespaces", options.CacheNamespaces, "Namespaces to restrict the cache to for namespaced resources (e.g. secrets, configmaps). Cluster-scoped resources are unaffected. When empty, all namespaces are cached")
+
 	fs.BoolVar(&options.EnableHTTP2, "enable-http2", options.EnableHTTP2, "Enable HTTP/2 for controller-manager server")
 	fs.StringVar(&options.MetricsBindAddress, "metrics-bind-address", options.MetricsBindAddress, "The address the metric endpoint binds to.")
 	fs.BoolVar(&options.MetricsSecureServe, "metrics-secure-serve", options.MetricsSecureServe, "Serve metrics over HTTPS.")
 
+	fs.BoolVar(&options.EnableResourceController, "enable-resource-controller", options.EnableResourceController, "Enable the resource controller for watching the configured anchor resource and generating schemas")
 	fs.BoolVar(&options.EnableClusterAccessController, "enable-clusteraccess-controller", options.EnableClusterAccessController, "Enable the ClusterAccess controller for managing remote cluster schemas")
 }
 
@@ -191,6 +200,9 @@ func (options *CompletedOptions) Validate() error {
 
 	// Validate per-controller provider names
 	if options.ResourceControllerProviders != "" {
+		if !options.EnableResourceController {
+			return fmt.Errorf("--resource-controller-providers requires --enable-resource-controller")
+		}
 		if err := validateProviderNames(options.ResourceControllerProviders, "--resource-controller-providers"); err != nil {
 			return err
 		}
@@ -218,6 +230,12 @@ func (options *CompletedOptions) Validate() error {
 	if options.SchemaHandler == "file" {
 		if options.SchemasDir == "" {
 			return fmt.Errorf("schemas-dir must be specified when schema-handler is 'file'")
+		}
+	}
+
+	for _, ns := range options.CacheNamespaces {
+		if strings.TrimSpace(ns) == "" {
+			return fmt.Errorf("empty namespace in --cache-namespaces")
 		}
 	}
 
