@@ -3,6 +3,7 @@
 
 # kubernetes-graphql-gateway
 
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/platform-mesh/kubernetes-graphql-gateway/badge)](https://scorecard.dev/viewer/?uri=github.com/platform-mesh/kubernetes-graphql-gateway)
 ![Build Status](https://github.com/platform-mesh/kubernetes-graphql-gateway/actions/workflows/pipeline.yml/badge.svg)
 [![REUSE status](
 https://api.reuse.software/badge/github.com/platform-mesh/kubernetes-graphql-gateway)](https://api.reuse.software/info/github.com/platform-mesh/kubernetes-graphql-gateway)
