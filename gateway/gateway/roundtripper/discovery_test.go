@@ -40,6 +40,11 @@ func TestIsDiscoveryRequest(t *testing.T) {
 		{name: "openapi v3", method: http.MethodGet, path: "/openapi/v3", expected: true},
 		{name: "openapi with prefix", method: http.MethodGet, path: "/services/ws/clusters/cl/openapi/v2", expected: true},
 
+		// Prefix contains literal "api" segment — must not shadow the real K8s root
+		{name: "prefix api segment discovery", method: http.MethodGet, path: "/services/api/clusters/cl/api/v1", expected: true},
+		{name: "prefix api segment resource", method: http.MethodGet, path: "/services/api/clusters/cl/api/v1/pods", expected: false},
+		{name: "prefix apis segment discovery", method: http.MethodGet, path: "/prefix/apis/proxy/apis/apps", expected: true},
+
 		// Non-discovery requests
 		{name: "resource path", method: http.MethodGet, path: "/api/v1/namespaces", expected: false},
 		{name: "resource list", method: http.MethodGet, path: "/api/v1/pods", expected: false},

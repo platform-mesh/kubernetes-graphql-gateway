@@ -43,10 +43,10 @@ func isDiscoveryRequest(req *http.Request) bool {
 	parts := strings.Split(path, "/")
 
 	// Strip any path prefix before the Kubernetes API segments.
-	// This handles KCP paths (/services/ws/clusters/cl/..., /clusters/cl/...),
-	// custom virtual workspace paths, or any other prefix-based multiplexing.
-	for i, part := range parts {
-		if part == "api" || part == "apis" || part == "openapi" {
+	// Scan from the end so that a prefix segment literally named "api" or "apis"
+	// (e.g. /services/api/clusters/cl/api/v1) doesn't shadow the real K8s root.
+	for i := len(parts) - 1; i >= 0; i-- {
+		if parts[i] == "api" || parts[i] == "apis" || parts[i] == "openapi" {
 			parts = parts[i:]
 			break
 		}
