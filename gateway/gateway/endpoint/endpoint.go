@@ -13,6 +13,7 @@ import (
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/gateway/config"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/gateway/graphql"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/gateway/queryvalidation"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/gateway/requestparser"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/resolver"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/schema"
 	utilscontext "github.com/platform-mesh/kubernetes-graphql-gateway/gateway/utils/context"
@@ -22,12 +23,11 @@ import (
 
 // Endpoint combines a cluster connection with its GraphQL handler.
 type Endpoint struct {
-	name           string
-	cluster        *cluster.Cluster
-	graphqlServer  *graphql.GraphQLServer
-	handler        http.Handler
-	tokenValidator authn.Validator
-	cancelFunc     context.CancelFunc
+	name          string
+	cluster       *cluster.Cluster
+	graphqlServer *graphql.GraphQLServer
+	handler       http.Handler
+	cancelFunc    context.CancelFunc
 }
 
 func New(
@@ -64,11 +64,12 @@ func New(
 		return nil, fmt.Errorf("failed to create GraphQL schema: %w", err)
 	}
 
+	hasPathTemplate := schemaData.ClusterMetadata != nil && schemaData.ClusterMetadata.RequestPathTemplate != ""
+
 	graphqlServer := graphql.NewGraphQLServer(graphqlCfg)
 	gqlHandler := graphqlServer.CreateHandler(schemaProvider.GetSchema())
 
-	// The HTTP layer also checks Accept to route to separate timeout/concurrency pools.
-	handler := queryvalidation.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	gqlHTTPHandler := queryvalidation.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Accept") == "text/event-stream" {
 			graphqlServer.HandleSubscription(w, r, gqlHandler.Schema)
 			return
@@ -80,15 +81,43 @@ func New(
 		MaxBatchSize:  limits.MaxQueryBatchSize,
 	})
 
+	// Middleware chain (outermost runs first):
+	//   requestparser → clusterTarget extraction → auth → queryvalidation → graphql handler
+	handler := requestparser.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if hasPathTemplate {
+			if reqs, ok := utilscontext.GetParsedRequestsFromCtx(r.Context()); ok {
+				if target := utilscontext.FindClusterTarget(reqs); target != "" {
+					r = r.WithContext(utilscontext.SetClusterTarget(r.Context(), target))
+				}
+			}
+		}
+
+		token, ok := utilscontext.GetTokenFromCtx(r.Context())
+		if !ok || token == "" {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		authenticated, err := validator.Validate(r.Context(), token)
+		if err != nil {
+			http.Error(w, "Service Unavailable", http.StatusServiceUnavailable)
+			return
+		}
+		if !authenticated {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		gqlHTTPHandler.ServeHTTP(w, r)
+	}))
 	log.FromContext(ctx).Info("Registered endpoint", "cluster", name)
 
 	return &Endpoint{
-		name:           name,
-		cluster:        cl,
-		graphqlServer:  graphqlServer,
-		handler:        handler,
-		tokenValidator: validator,
-		cancelFunc:     validatorCancel,
+		name:          name,
+		cluster:       cl,
+		graphqlServer: graphqlServer,
+		handler:       handler,
+		cancelFunc:    validatorCancel,
 	}, nil
 }
 
@@ -97,23 +126,6 @@ func (e *Endpoint) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Endpoint not ready", http.StatusServiceUnavailable)
 		return
 	}
-
-	token, ok := utilscontext.GetTokenFromCtx(r.Context())
-	if !ok || token == "" {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	authenticated, err := e.tokenValidator.Validate(r.Context(), token)
-	if err != nil {
-		http.Error(w, "Service Unavailable", http.StatusServiceUnavailable)
-		return
-	}
-	if !authenticated {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
-
 	e.handler.ServeHTTP(w, r)
 }
 

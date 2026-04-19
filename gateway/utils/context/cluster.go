@@ -2,6 +2,7 @@ package context
 
 import (
 	"context"
+	"regexp"
 )
 
 // contextKey is a custom type for context keys to avoid collisions
@@ -12,6 +13,14 @@ const clusterKey contextKey = "cluster-key"
 
 // tokenKey is the context key for storing authentication token
 const tokenKey contextKey = "token-key"
+
+// clusterTargetKey is the context key for storing the logical cluster target
+// extracted from GraphQL extensions.
+const clusterTargetKey contextKey = "cluster-target-key"
+
+// parsedRequestsKey is the context key for the pre-parsed GraphQL request body.
+// Set once by the request parser middleware; consumed by downstream middlewares.
+const parsedRequestsKey contextKey = "parsed-requests-key"
 
 // SetCluster sets cluster to the request context
 func SetCluster(ctx context.Context, cluster string) context.Context {
@@ -35,4 +44,48 @@ func GetClusterFromCtx(ctx context.Context) (string, bool) {
 func GetTokenFromCtx(ctx context.Context) (string, bool) {
 	v, ok := ctx.Value(tokenKey).(string)
 	return v, ok
+}
+
+// SetClusterTarget sets the logical cluster target in the request context.
+func SetClusterTarget(ctx context.Context, target string) context.Context {
+	return context.WithValue(ctx, clusterTargetKey, target)
+}
+
+// GetClusterTargetFromCtx retrieves the logical cluster target from the request context.
+// Returns the target and true if found, or empty string and false otherwise.
+func GetClusterTargetFromCtx(ctx context.Context) (string, bool) {
+	v, ok := ctx.Value(clusterTargetKey).(string)
+	return v, ok
+}
+
+// GraphQLRequest holds a single parsed GraphQL request from the body.
+// Shared across middlewares so the body is only parsed once.
+type GraphQLRequest struct {
+	Query      string         `json:"query"`
+	Extensions map[string]any `json:"extensions,omitempty"`
+}
+
+// SetParsedRequests stores the pre-parsed GraphQL requests in the context.
+func SetParsedRequests(ctx context.Context, reqs []GraphQLRequest) context.Context {
+	return context.WithValue(ctx, parsedRequestsKey, reqs)
+}
+
+// GetParsedRequestsFromCtx retrieves the pre-parsed GraphQL requests from the context.
+func GetParsedRequestsFromCtx(ctx context.Context) ([]GraphQLRequest, bool) {
+	v, ok := ctx.Value(parsedRequestsKey).([]GraphQLRequest)
+	return v, ok
+}
+
+var validClusterTarget = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9:_-]*$`)
+
+func FindClusterTarget(reqs []GraphQLRequest) string {
+	for _, req := range reqs {
+		if req.Extensions == nil {
+			continue
+		}
+		if v, ok := req.Extensions["clusterTarget"].(string); ok && validClusterTarget.MatchString(v) {
+			return v
+		}
+	}
+	return ""
 }

@@ -241,6 +241,10 @@ func buildTargetClusterConfig(ctx context.Context, clusterAccess v1alpha1.Cluste
 		config.Host = spec.Host
 	}
 
+	if spec.IntrospectionPath != "" {
+		config.Host += spec.IntrospectionPath
+	}
+
 	return config, nil
 }
 

@@ -42,10 +42,14 @@ func isDiscoveryRequest(req *http.Request) bool {
 	}
 	parts := strings.Split(path, "/")
 
-	if len(parts) >= 5 && parts[0] == "services" && parts[2] == "clusters" {
-		parts = parts[4:]
-	} else if len(parts) >= 3 && parts[0] == "clusters" {
-		parts = parts[2:]
+	// Strip any path prefix before the Kubernetes API segments.
+	// This handles KCP paths (/services/ws/clusters/cl/..., /clusters/cl/...),
+	// custom virtual workspace paths, or any other prefix-based multiplexing.
+	for i, part := range parts {
+		if part == "api" || part == "apis" || part == "openapi" {
+			parts = parts[i:]
+			break
+		}
 	}
 
 	switch {
@@ -56,6 +60,8 @@ func isDiscoveryRequest(req *http.Request) bool {
 	case len(parts) == 2 && parts[0] == "api":
 		return true
 	case len(parts) == 3 && parts[0] == "apis":
+		return true
+	case len(parts) >= 1 && parts[0] == "openapi":
 		return true
 	default:
 		return false

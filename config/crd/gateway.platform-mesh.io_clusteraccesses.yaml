@@ -144,9 +144,20 @@ spec:
                 description: Host is the URL for the cluster. If not set and kubeconfig
                   auth is used, the host from the kubeconfig is used.
                 type: string
+              introspectionPath:
+                description: |-
+                  IntrospectionPath is an optional path suffix appended to Host when the listener
+                  performs API discovery/introspection (e.g. "/clusters/*").
+                type: string
               path:
                 description: Path is an optional field. If not set, the name of the
                   resource is used
+                type: string
+              requestPathTemplate:
+                description: |-
+                  RequestPathTemplate defines a URL path template prepended to upstream API requests
+                  at gateway time. The {clusterTarget} variable is resolved from the GraphQL extensions
+                  field at request time. Example: "/clusters/{clusterTarget}"
                 type: string
             type: object
             x-kubernetes-validations:
