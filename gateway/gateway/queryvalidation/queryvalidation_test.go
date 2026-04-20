@@ -7,57 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestExtractQueries(t *testing.T) {
-	tests := []struct {
-		name      string
-		body      string
-		wantCount int
-	}{
-		{
-			name:      "single request",
-			body:      `{"query":"{ pods { name } }"}`,
-			wantCount: 1,
-		},
-		{
-			name:      "batched request",
-			body:      `[{"query":"{ a }"},{"query":"{ b }"}]`,
-			wantCount: 2,
-		},
-		{
-			name:      "batched request with empty queries filtered",
-			body:      `[{"query":"{ a }"},{"query":""},{"query":"{ b }"}]`,
-			wantCount: 2,
-		},
-		{
-			name: "empty single query",
-			body: `{"query":""}`,
-		},
-		{
-			name: "empty array",
-			body: `[]`,
-		},
-		{
-			name: "array with only empty queries",
-			body: `[{"query":""},{"query":""}]`,
-		},
-		{
-			name: "invalid JSON",
-			body: `not json`,
-		},
-		{
-			name: "empty body",
-			body: ``,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			queries := extractQueries([]byte(tt.body))
-			assert.Len(t, queries, tt.wantCount)
-		})
-	}
-}
-
 func TestValidate(t *testing.T) {
 	tests := []struct {
 		name    string

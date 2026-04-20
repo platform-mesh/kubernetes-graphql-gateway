@@ -29,6 +29,17 @@ type ClusterAccessSpec struct {
 	// +optional
 	Host string `json:"host,omitempty"`
 
+	// IntrospectionPath is an optional path suffix appended to Host when the listener
+	// performs API discovery/introspection (e.g. "/clusters/*").
+	// +optional
+	IntrospectionPath string `json:"introspectionPath,omitempty"`
+
+	// RequestPathTemplate defines a URL path template prepended to upstream API requests
+	// at gateway time. The {clusterTarget} variable is resolved from the GraphQL extensions
+	// field at request time. Example: "/clusters/{clusterTarget}"
+	// +optional
+	RequestPathTemplate string `json:"requestPathTemplate,omitempty"`
+
 	// CA configuration for the cluster
 	// +optional
 	CA *CAConfig `json:"ca,omitempty"`

@@ -42,10 +42,14 @@ func isDiscoveryRequest(req *http.Request) bool {
 	}
 	parts := strings.Split(path, "/")
 
-	if len(parts) >= 5 && parts[0] == "services" && parts[2] == "clusters" {
-		parts = parts[4:]
-	} else if len(parts) >= 3 && parts[0] == "clusters" {
-		parts = parts[2:]
+	// Strip any path prefix before the Kubernetes API segments.
+	// Scan from the end so that a prefix segment literally named "api" or "apis"
+	// (e.g. /services/api/clusters/cl/api/v1) doesn't shadow the real K8s root.
+	for i := len(parts) - 1; i >= 0; i-- {
+		if parts[i] == "api" || parts[i] == "apis" || parts[i] == "openapi" {
+			parts = parts[i:]
+			break
+		}
 	}
 
 	switch {
@@ -56,6 +60,8 @@ func isDiscoveryRequest(req *http.Request) bool {
 	case len(parts) == 2 && parts[0] == "api":
 		return true
 	case len(parts) == 3 && parts[0] == "apis":
+		return true
+	case len(parts) >= 1 && parts[0] == "openapi":
 		return true
 	default:
 		return false

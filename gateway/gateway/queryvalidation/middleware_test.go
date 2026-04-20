@@ -10,6 +10,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	utilscontext "github.com/platform-mesh/kubernetes-graphql-gateway/gateway/utils/context"
 )
 
 func TestMiddleware(t *testing.T) {
@@ -76,7 +78,7 @@ func TestMiddleware(t *testing.T) {
 			wantPass:   true,
 		},
 		{
-			name:       "non-JSON body passes through to graphql handler",
+			name:       "no parsed requests passes through",
 			cfg:        Config{MaxDepth: 1},
 			body:       `not json`,
 			method:     http.MethodPost,
@@ -164,6 +166,13 @@ func TestMiddleware(t *testing.T) {
 			if tt.method == http.MethodPost {
 				req.Header.Set("Content-Type", "application/json")
 			}
+
+			// Simulate the request parser middleware by setting parsed requests in context.
+			if reqs := parseBodies(tt.body); len(reqs) > 0 {
+				ctx := utilscontext.SetParsedRequests(req.Context(), reqs)
+				req = req.WithContext(ctx)
+			}
+
 			rec := httptest.NewRecorder()
 
 			handler.ServeHTTP(rec, req)
@@ -190,4 +199,20 @@ func TestMiddleware(t *testing.T) {
 			}
 		})
 	}
+}
+
+// parseBodies simulates what the request parser middleware does: parse JSON into GraphQLRequests.
+func parseBodies(body string) []utilscontext.GraphQLRequest {
+	if body == "" {
+		return nil
+	}
+	var reqs []utilscontext.GraphQLRequest
+	if err := json.Unmarshal([]byte(body), &reqs); err == nil {
+		return reqs
+	}
+	var req utilscontext.GraphQLRequest
+	if err := json.Unmarshal([]byte(body), &req); err != nil {
+		return nil
+	}
+	return []utilscontext.GraphQLRequest{req}
 }
