@@ -78,12 +78,14 @@ func GetParsedRequestsFromCtx(ctx context.Context) ([]GraphQLRequest, bool) {
 
 var validClusterTarget = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9:_-]*$`)
 
+const maxClusterTargetLen = 2048
+
 func FindClusterTarget(reqs []GraphQLRequest) string {
 	for _, req := range reqs {
 		if req.Extensions == nil {
 			continue
 		}
-		if v, ok := req.Extensions["clusterTarget"].(string); ok && validClusterTarget.MatchString(v) {
+		if v, ok := req.Extensions["clusterTarget"].(string); ok && len(v) <= maxClusterTargetLen && validClusterTarget.MatchString(v) {
 			return v
 		}
 	}
