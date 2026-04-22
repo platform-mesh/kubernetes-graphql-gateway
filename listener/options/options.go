@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/platform-mesh/kubernetes-graphql-gateway/apis/v1alpha1"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/defaults"
 	providerkcp "github.com/platform-mesh/kubernetes-graphql-gateway/providers/kcp/options"
 	"github.com/spf13/pflag"
 
@@ -100,7 +101,7 @@ func NewOptions() *Options {
 			SchemaHandler:            "file",
 			SchemasDir:               "_output/schemas",
 			GRPCListenAddr:           ":50051",
-			GRPCMaxSendMsgSize:       4 * 1024 * 1024,
+			GRPCMaxSendMsgSize:       defaults.DefaultGRPCMaxMsgSize,
 			AnchorResource:           "object.metadata.name == 'default'",
 			ResourceGVR:              "namespaces.v1",
 			MetricsBindAddress:       "0",

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/platform-mesh/kubernetes-graphql-gateway/defaults"
 	"github.com/spf13/pflag"
 
 	"k8s.io/component-base/logs"
@@ -83,7 +84,7 @@ func NewOptions() *Options {
 			SchemasDir:               "_output/schemas",
 			SchemaHandler:            "file",
 			GRPCListenerAddress:      "localhost:50051",
-			GRPCMaxRecvMsgSize:       4 * 1024 * 1024,
+			GRPCMaxRecvMsgSize:       defaults.DefaultGRPCMaxMsgSize,
 			ServerBindAddress:        "0.0.0.0",
 			ServerBindPort:           8080,
 			PlaygroundEnabled:        false,
