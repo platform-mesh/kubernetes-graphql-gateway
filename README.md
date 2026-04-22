@@ -51,7 +51,7 @@ The listener and gateway communicate via `--schema-handler`, which both componen
 **Terminal 1** — Start the listener:
 
 ```sh
-go run ./cmd/listener/listener.go --schema-handler grpc
+go run main.go listener --schema-handler grpc
 ```
 
 This starts the listener in `single` mode with a gRPC server on `:50051`. It watches namespaces on your local cluster and when it finds the `default` namespace (the anchor resource), generates and streams the GraphQL schema to connected gateways.
@@ -59,7 +59,7 @@ This starts the listener in `single` mode with a gRPC server on `:50051`. It wat
 **Terminal 2** — Start the gateway:
 
 ```sh
-go run ./cmd/gateway/gateway.go --schema-handler grpc --enable-playground
+go run main.go gateway --schema-handler grpc --enable-playground
 ```
 
 This starts the gateway on port `8080` with the GraphQL playground enabled. It connects to the listener's gRPC server and receives schemas, creating an endpoint at `/api/clusters/single/graphql`.
@@ -107,13 +107,13 @@ spec:
 3. Start the listener with the ClusterAccess controller enabled:
 
 ```sh
-go run ./cmd/listener/listener.go --schema-handler grpc --enable-clusteraccess-controller
+go run main.go listener --schema-handler grpc --enable-clusteraccess-controller
 ```
 
 4. Start the gateway:
 
 ```sh
-go run ./cmd/gateway/gateway.go --schema-handler grpc --enable-playground
+go run main.go gateway --schema-handler grpc --enable-playground
 ```
 
 5. Query at: `http://localhost:8080/api/clusters/my-cluster/graphql`
