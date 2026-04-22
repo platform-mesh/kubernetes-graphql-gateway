@@ -22,9 +22,10 @@ func NewConfig(opts *options.CompletedOptions) (*Config, error) {
 	}
 
 	gatewayServer, err := gateway.New(gatewayconfig.Gateway{
-		SchemaHandler:   cfg.Options.SchemaHandler,
-		SchemaDirectory: cfg.Options.SchemasDir,
-		GRPCAddress:     cfg.Options.GRPCListenerAddress,
+		SchemaHandler:      cfg.Options.SchemaHandler,
+		SchemaDirectory:    cfg.Options.SchemasDir,
+		GRPCAddress:        cfg.Options.GRPCListenerAddress,
+		GRPCMaxRecvMsgSize: cfg.Options.GRPCMaxRecvMsgSize,
 		GraphQL: gatewayconfig.GraphQL{
 			Pretty:     true,
 			Playground: cfg.Options.PlaygroundEnabled,

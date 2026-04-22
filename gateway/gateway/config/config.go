@@ -13,6 +13,9 @@ type Gateway struct {
 	// GRPCAddress is the gRPC server address when SchemaHandler is "grpc"
 	GRPCAddress string
 
+	// GRPCMaxRecvMsgSize is the maximum gRPC message size in bytes the gateway will accept.
+	GRPCMaxRecvMsgSize int
+
 	// GraphQL contains GraphQL-specific configuration
 	GraphQL GraphQL
 

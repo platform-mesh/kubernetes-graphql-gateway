@@ -29,6 +29,8 @@ type GRPCWatcher struct {
 type GRPCWatcherConfig struct {
 	// Address is the gRPC server address (e.g., "localhost:50051")
 	Address string
+	// MaxRecvMsgSize is the maximum message size in bytes the client can receive.
+	MaxRecvMsgSize int
 }
 
 // NewGRPCWatcher creates a new gRPC watcher that connects to the given address
@@ -38,6 +40,7 @@ func NewGRPCWatcher(config GRPCWatcherConfig, handler SchemaEventHandler, connec
 	conn, err := grpc.NewClient(
 		config.Address,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(config.MaxRecvMsgSize)),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to gRPC server: %w", err)
