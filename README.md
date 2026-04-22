@@ -188,6 +188,7 @@ Optionally set `ca.secretRef` for custom CA certificates.
 | `--schemas-dir` | `_output/schemas` | Directory to watch for schema files |
 | `--schema-handler` | `file` | How to receive schema updates: `file` or `grpc` |
 | `--grpc-listener-address` | `localhost:50051` | gRPC listener address (when `--schema-handler=grpc`) |
+| `--grpc-max-recv-msg-size` | `4194304` (4 MB) | Max gRPC receive message size in bytes (when `--schema-handler=grpc`) |
 | `--gateway-port` | `8080` | Port for the GraphQL server |
 | `--gateway-address` | `0.0.0.0` | Bind address for the GraphQL server |
 | `--enable-playground` | `false` | Enable the GraphQL playground UI |
@@ -217,6 +218,7 @@ Set any limit flag to `0` to disable that limit.
 | `--schemas-dir` | `_output/schemas` | Directory to store generated schema files |
 | `--schema-handler` | `file` | Schema transport: `file` or `grpc` |
 | `--grpc-listen-addr` | `:50051` | gRPC server address (when `--schema-handler=grpc`) |
+| `--grpc-max-send-msg-size` | `4194304` (4 MB) | Max gRPC send message size in bytes (when `--schema-handler=grpc`) |
 | `--reconciler-gvr` | `namespaces.v1` | GroupVersionResource the reconciler watches |
 | `--anchor-resource` | `object.metadata.name == 'default'` | CEL expression to match the anchor resource |
 | `--enable-clusteraccess-controller` | `false` | Enable the ClusterAccess CRD controller |
