@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/platform-mesh/kubernetes-graphql-gateway/defaults"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/gateway/watcher"
 	proto "github.com/platform-mesh/kubernetes-graphql-gateway/sdk"
 	"github.com/stretchr/testify/assert"
@@ -55,7 +56,10 @@ func TestGRPCWatcher_ConnectsAndReceives(t *testing.T) {
 	handler := newFakeHandler()
 	var connected atomic.Bool
 
-	gw, err := watcher.NewGRPCWatcher(watcher.GRPCWatcherConfig{Address: lis.Addr().String()}, handler, &connected)
+	gw, err := watcher.NewGRPCWatcher(watcher.GRPCWatcherConfig{
+		Address:        lis.Addr().String(),
+		MaxRecvMsgSize: defaults.DefaultGRPCMaxMsgSize,
+	}, handler, &connected)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(t.Context())

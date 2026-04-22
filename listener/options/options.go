@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/platform-mesh/kubernetes-graphql-gateway/apis/v1alpha1"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/defaults"
 	providerkcp "github.com/platform-mesh/kubernetes-graphql-gateway/providers/kcp/options"
 	"github.com/spf13/pflag"
 
@@ -58,6 +59,8 @@ type ExtraOptions struct {
 	SchemaHandler string
 	// GRPCListenAddr is the gRPC server listener address (only used if SchemaHandler is "grpc")
 	GRPCListenAddr string
+	// GRPCMaxSendMsgSize is the maximum gRPC message size in bytes the server will send.
+	GRPCMaxSendMsgSize int
 
 	AdditonalPathAnnotationKey string
 
@@ -98,6 +101,7 @@ func NewOptions() *Options {
 			SchemaHandler:            "file",
 			SchemasDir:               "_output/schemas",
 			GRPCListenAddr:           ":50051",
+			GRPCMaxSendMsgSize:       defaults.DefaultGRPCMaxMsgSize,
 			AnchorResource:           "object.metadata.name == 'default'",
 			ResourceGVR:              "namespaces.v1",
 			MetricsBindAddress:       "0",
@@ -133,6 +137,7 @@ func (options *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&options.SchemaHandler, "schema-handler", options.SchemaHandler, "The type of schema handler to use (e.g., 'file', 'grpc')")
 	fs.StringVar(&options.SchemasDir, "schemas-dir", options.SchemasDir, "SchemasDir is the directory to store schema files. Only required if using file schema handler")
 	fs.StringVar(&options.GRPCListenAddr, "grpc-listen-addr", options.GRPCListenAddr, "The gRPC server listener address (only used if SchemaHandler is 'grpc')")
+	fs.IntVar(&options.GRPCMaxSendMsgSize, "grpc-max-send-msg-size", options.GRPCMaxSendMsgSize, "maximum gRPC send message size in bytes (used with --schema-handler=grpc)")
 
 	fs.StringVar(&options.AnchorResource, "anchor-resource", options.AnchorResource, "Resource to watch as anchor for kubernetes provider (default: default)")
 	fs.StringVar(&options.ResourceGVR, "reconciler-gvr", options.ResourceGVR, "The GroupVersionResource which the reconciler will be watching (default: namespaces.v1)")
@@ -224,6 +229,9 @@ func (options *CompletedOptions) Validate() error {
 	if options.SchemaHandler == "grpc" {
 		if options.GRPCListenAddr == "" {
 			return fmt.Errorf("grpc-listen-addr must be specified when schema-handler is 'grpc'")
+		}
+		if options.GRPCMaxSendMsgSize <= 0 {
+			return fmt.Errorf("--grpc-max-send-msg-size must be a positive value")
 		}
 	}
 
