@@ -52,7 +52,10 @@ func (s *Service) Run(ctx context.Context) error {
 	case "grpc":
 		logger.Info("Starting gRPC watcher", "address", s.config.GRPCAddress)
 		gw, err := watcher.NewGRPCWatcher(
-			watcher.GRPCWatcherConfig{Address: s.config.GRPCAddress},
+			watcher.GRPCWatcherConfig{
+				Address:        s.config.GRPCAddress,
+				MaxRecvMsgSize: s.config.GRPCMaxRecvMsgSize,
+			},
 			s.registry,
 			&s.connected,
 		)
@@ -132,4 +135,3 @@ func (s *Service) IsReady(_ *http.Request) error {
 	}
 	return nil
 }
-

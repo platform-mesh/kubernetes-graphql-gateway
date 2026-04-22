@@ -23,6 +23,8 @@ type ExtraOptions struct {
 	SchemaHandler string
 	// GRPCListenerAddress is the address of the gRPC listener (used with grpc watcher).
 	GRPCListenerAddress string
+	// GRPCMaxRecvMsgSize is the maximum gRPC message size in bytes the gateway will accept.
+	GRPCMaxRecvMsgSize int
 	// ServerBindAddress is the address for the GraphQL gateway server.
 	ServerBindAddress string
 	// ServerBindPort is the port for the GraphQL gateway server.
@@ -81,6 +83,7 @@ func NewOptions() *Options {
 			SchemasDir:               "_output/schemas",
 			SchemaHandler:            "file",
 			GRPCListenerAddress:      "localhost:50051",
+			GRPCMaxRecvMsgSize:       4 * 1024 * 1024,
 			ServerBindAddress:        "0.0.0.0",
 			ServerBindPort:           8080,
 			PlaygroundEnabled:        false,
@@ -109,6 +112,7 @@ func (options *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&options.SchemasDir, "schemas-dir", options.SchemasDir, "directory to watch for schema files (used with --schema-handler=file)")
 	fs.StringVar(&options.SchemaHandler, "schema-handler", options.SchemaHandler, "how to receive schema updates: 'file' or 'grpc'")
 	fs.StringVar(&options.GRPCListenerAddress, "grpc-listener-address", options.GRPCListenerAddress, "address of the gRPC listener (used with --schema-handler=grpc)")
+	fs.IntVar(&options.GRPCMaxRecvMsgSize, "grpc-max-recv-msg-size", options.GRPCMaxRecvMsgSize, "maximum gRPC receive message size in bytes (used with --schema-handler=grpc)")
 	fs.IntVar(&options.ServerBindPort, "gateway-port", options.ServerBindPort, "port for the GraphQL gateway server")
 	fs.StringVar(&options.ServerBindAddress, "gateway-address", options.ServerBindAddress, "address for the GraphQL gateway server")
 	fs.BoolVar(&options.PlaygroundEnabled, "enable-playground", options.PlaygroundEnabled, "enable the GraphQL playground")
@@ -142,6 +146,10 @@ func (options *Options) Complete() (*CompletedOptions, error) {
 func (options *CompletedOptions) Validate() error {
 	if options.SchemaHandler == "grpc" && options.GRPCListenerAddress == "" {
 		return errors.New("--grpc-listener-address must be set when --schema-handler=grpc")
+	}
+
+	if options.SchemaHandler == "grpc" && options.GRPCMaxRecvMsgSize <= 0 {
+		return errors.New("--grpc-max-recv-msg-size must be a positive value")
 	}
 
 	if options.SchemaHandler == "file" && options.SchemasDir == "" {

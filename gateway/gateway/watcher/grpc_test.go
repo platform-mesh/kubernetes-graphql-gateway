@@ -55,7 +55,10 @@ func TestGRPCWatcher_ConnectsAndReceives(t *testing.T) {
 	handler := newFakeHandler()
 	var connected atomic.Bool
 
-	gw, err := watcher.NewGRPCWatcher(watcher.GRPCWatcherConfig{Address: lis.Addr().String()}, handler, &connected)
+	gw, err := watcher.NewGRPCWatcher(watcher.GRPCWatcherConfig{
+		Address:        lis.Addr().String(),
+		MaxRecvMsgSize: 4 * 1024 * 1024,
+	}, handler, &connected)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(t.Context())
