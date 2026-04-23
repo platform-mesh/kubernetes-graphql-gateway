@@ -15,7 +15,7 @@ require (
 	github.com/graphql-go/graphql v0.8.1
 	github.com/graphql-go/handler v0.2.4
 	github.com/jellydator/ttlcache/v3 v3.4.0
-	github.com/kcp-dev/multicluster-provider v0.5.1
+	github.com/kcp-dev/multicluster-provider v0.6.0
 	github.com/kcp-dev/sdk v0.31.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/rs/cors v1.11.1
@@ -39,7 +39,7 @@ require (
 	k8s.io/kube-openapi v0.0.0-20260414162039-ec9c827d403f
 	k8s.io/utils v0.0.0-20260319190234-28399d86e0b5
 	sigs.k8s.io/controller-runtime v0.23.3
-	sigs.k8s.io/multicluster-runtime v0.23.1
+	sigs.k8s.io/multicluster-runtime v0.23.3
 )
 
 require (
