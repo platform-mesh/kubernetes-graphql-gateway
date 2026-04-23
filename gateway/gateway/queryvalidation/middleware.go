@@ -1,38 +1,39 @@
 package queryvalidation
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
+
+	utilscontext "github.com/platform-mesh/kubernetes-graphql-gateway/gateway/utils/context"
 )
 
 // Middleware returns an http.Handler that validates incoming GraphQL queries
 // against depth and complexity limits before forwarding to the next handler.
 // Supports both single requests and batched query arrays.
 // If all limits are zero, the middleware is a no-op passthrough.
+//
+// Expects the request parser middleware to have stored parsed requests in context.
 func Middleware(next http.Handler, cfg Config) http.Handler {
 	if cfg.MaxDepth <= 0 && cfg.MaxComplexity <= 0 && cfg.MaxBatchSize <= 0 {
 		return next
 	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Body == nil || r.Method == http.MethodGet {
+		reqs, ok := utilscontext.GetParsedRequestsFromCtx(r.Context())
+		if !ok {
 			next.ServeHTTP(w, r)
 			return
 		}
 
-		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			writeGraphQLError(w, "failed to read request body", http.StatusBadRequest)
-			return
+		var queries []string
+		for _, req := range reqs {
+			if req.Query != "" {
+				queries = append(queries, req.Query)
+			}
 		}
-		r.Body = io.NopCloser(bytes.NewReader(body))
 
-		queries := extractQueries(body)
 		if len(queries) == 0 {
-			// Not valid JSON or no query field — let the GraphQL handler deal with it
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -51,33 +52,6 @@ func Middleware(next http.Handler, cfg Config) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
-}
-
-type graphqlRequest struct {
-	Query string `json:"query"`
-}
-
-// extractQueries extracts query strings from a GraphQL request body.
-// Supports both single requests {"query":"..."} and batched requests [{"query":"..."}, ...].
-// Returns the queries and true if extraction succeeded, or nil and false if the body
-// is not valid JSON or contains no queries.
-func extractQueries(body []byte) []string {
-	var reqs []graphqlRequest
-	if err := json.Unmarshal(body, &reqs); err != nil {
-		var req graphqlRequest
-		if err := json.Unmarshal(body, &req); err != nil {
-			return nil
-		}
-		reqs = []graphqlRequest{req}
-	}
-
-	queries := make([]string, 0, len(reqs))
-	for _, req := range reqs {
-		if req.Query != "" {
-			queries = append(queries, req.Query)
-		}
-	}
-	return queries
 }
 
 func writeGraphQLError(w http.ResponseWriter, message string, statusCode int) {

@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/platform-mesh/kubernetes-graphql-gateway/apis/v1alpha1"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/defaults"
 	providerkcp "github.com/platform-mesh/kubernetes-graphql-gateway/providers/kcp/options"
 	"github.com/spf13/pflag"
 
@@ -58,11 +59,18 @@ type ExtraOptions struct {
 	SchemaHandler string
 	// GRPCListenAddr is the gRPC server listener address (only used if SchemaHandler is "grpc")
 	GRPCListenAddr string
+	// GRPCMaxSendMsgSize is the maximum gRPC message size in bytes the server will send.
+	GRPCMaxSendMsgSize int
 
 	AdditonalPathAnnotationKey string
 
-	// EnableClusterAccessController enables the ClusterAccess controller
-	// which watches ClusterAccess CRD resources and generates schemas for remote clusters
+	// CacheNamespaces restricts the cache to these namespaces for namespaced resources.
+	// Cluster-scoped resources are unaffected.
+	CacheNamespaces []string
+
+	// EnableResourceController enables the resource controller.
+	EnableResourceController bool
+	// EnableClusterAccessController enables the ClusterAccess controller.
 	EnableClusterAccessController bool
 }
 
@@ -89,16 +97,18 @@ func NewOptions() *Options {
 		ProviderKcp: providerkcp.NewOptions(),
 
 		ExtraOptions: ExtraOptions{
-			Provider:               "single",
-			SchemaHandler:          "file",
-			SchemasDir:             "_output/schemas",
-			GRPCListenAddr:         ":50051",
-			AnchorResource:         "object.metadata.name == 'default'",
-			ResourceGVR:            "namespaces.v1",
-			MetricsBindAddress:     "0",
-			EnableHTTP2:            false,
-			MetricsSecureServe:     false,
-			ClusterURLResolverFunc: v1alpha1.DefaultClusterURLResolverFunc,
+			Provider:                 "single",
+			SchemaHandler:            "file",
+			SchemasDir:               "_output/schemas",
+			GRPCListenAddr:           ":50051",
+			GRPCMaxSendMsgSize:       defaults.DefaultGRPCMaxMsgSize,
+			AnchorResource:           "object.metadata.name == 'default'",
+			ResourceGVR:              "namespaces.v1",
+			MetricsBindAddress:       "0",
+			EnableHTTP2:              false,
+			MetricsSecureServe:       false,
+			ClusterURLResolverFunc:   v1alpha1.DefaultClusterURLResolverFunc,
+			EnableResourceController: true,
 		},
 	}
 	return opts
@@ -127,16 +137,20 @@ func (options *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&options.SchemaHandler, "schema-handler", options.SchemaHandler, "The type of schema handler to use (e.g., 'file', 'grpc')")
 	fs.StringVar(&options.SchemasDir, "schemas-dir", options.SchemasDir, "SchemasDir is the directory to store schema files. Only required if using file schema handler")
 	fs.StringVar(&options.GRPCListenAddr, "grpc-listen-addr", options.GRPCListenAddr, "The gRPC server listener address (only used if SchemaHandler is 'grpc')")
+	fs.IntVar(&options.GRPCMaxSendMsgSize, "grpc-max-send-msg-size", options.GRPCMaxSendMsgSize, "maximum gRPC send message size in bytes (used with --schema-handler=grpc)")
 
 	fs.StringVar(&options.AnchorResource, "anchor-resource", options.AnchorResource, "Resource to watch as anchor for kubernetes provider (default: default)")
 	fs.StringVar(&options.ResourceGVR, "reconciler-gvr", options.ResourceGVR, "The GroupVersionResource which the reconciler will be watching (default: namespaces.v1)")
 
 	fs.StringVar(&options.AdditonalPathAnnotationKey, "additional-path-annotation-key", options.AdditonalPathAnnotationKey, "additional path annotation key for workspace schema generation")
 
+	fs.StringSliceVar(&options.CacheNamespaces, "cache-namespaces", options.CacheNamespaces, "Namespaces to restrict the cache to for namespaced resources (e.g. secrets, configmaps). Cluster-scoped resources are unaffected. When empty, all namespaces are cached")
+
 	fs.BoolVar(&options.EnableHTTP2, "enable-http2", options.EnableHTTP2, "Enable HTTP/2 for controller-manager server")
 	fs.StringVar(&options.MetricsBindAddress, "metrics-bind-address", options.MetricsBindAddress, "The address the metric endpoint binds to.")
 	fs.BoolVar(&options.MetricsSecureServe, "metrics-secure-serve", options.MetricsSecureServe, "Serve metrics over HTTPS.")
 
+	fs.BoolVar(&options.EnableResourceController, "enable-resource-controller", options.EnableResourceController, "Enable the resource controller for watching the configured anchor resource and generating schemas")
 	fs.BoolVar(&options.EnableClusterAccessController, "enable-clusteraccess-controller", options.EnableClusterAccessController, "Enable the ClusterAccess controller for managing remote cluster schemas")
 }
 
@@ -191,6 +205,9 @@ func (options *CompletedOptions) Validate() error {
 
 	// Validate per-controller provider names
 	if options.ResourceControllerProviders != "" {
+		if !options.EnableResourceController {
+			return fmt.Errorf("--resource-controller-providers requires --enable-resource-controller")
+		}
 		if err := validateProviderNames(options.ResourceControllerProviders, "--resource-controller-providers"); err != nil {
 			return err
 		}
@@ -213,11 +230,20 @@ func (options *CompletedOptions) Validate() error {
 		if options.GRPCListenAddr == "" {
 			return fmt.Errorf("grpc-listen-addr must be specified when schema-handler is 'grpc'")
 		}
+		if options.GRPCMaxSendMsgSize <= 0 {
+			return fmt.Errorf("--grpc-max-send-msg-size must be a positive value")
+		}
 	}
 
 	if options.SchemaHandler == "file" {
 		if options.SchemasDir == "" {
 			return fmt.Errorf("schemas-dir must be specified when schema-handler is 'file'")
+		}
+	}
+
+	for _, ns := range options.CacheNamespaces {
+		if strings.TrimSpace(ns) == "" {
+			return fmt.Errorf("empty namespace in --cache-namespaces")
 		}
 	}
 

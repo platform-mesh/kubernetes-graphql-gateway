@@ -36,22 +36,26 @@ func NewServer(ctx context.Context, c *Config) (*Server, error) {
 
 	opts := controller.TypedOptions[mcreconcile.Request]{}
 	var err error
-	s.Resource, err = resource.New(
-		ctx,
-		s.Config.Manager,
-		opts,
-		s.Config.SchemaHandler,
-		c.Options.AnchorResource,
-		c.Options.ResourceGVR,
-		c.Options.AdditonalPathAnnotationKey,
-		c.Options.ClusterMetadataFunc,
-		c.Options.ClusterURLResolverFunc,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("error setting up Namespace Controller: %w", err)
-	}
-	if err := s.Resource.SetupWithManager(s.Config.Manager, c.ResourceControllerForOptions...); err != nil {
-		return nil, fmt.Errorf("error setting up Namespace controller with manager: %w", err)
+
+	if c.Options.EnableResourceController {
+		logger.Info("Setting up Resource controller")
+		s.Resource, err = resource.New(
+			ctx,
+			s.Config.Manager,
+			opts,
+			s.Config.SchemaHandler,
+			c.Options.AnchorResource,
+			c.Options.ResourceGVR,
+			c.Options.AdditonalPathAnnotationKey,
+			c.Options.ClusterMetadataFunc,
+			c.Options.ClusterURLResolverFunc,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("error setting up Namespace Controller: %w", err)
+		}
+		if err := s.Resource.SetupWithManager(s.Config.Manager, c.ResourceControllerForOptions...); err != nil {
+			return nil, fmt.Errorf("error setting up Namespace controller with manager: %w", err)
+		}
 	}
 
 	if c.Options.EnableClusterAccessController {

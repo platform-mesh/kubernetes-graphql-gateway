@@ -3,6 +3,7 @@
 
 # kubernetes-graphql-gateway
 
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/platform-mesh/kubernetes-graphql-gateway/badge)](https://scorecard.dev/viewer/?uri=github.com/platform-mesh/kubernetes-graphql-gateway)
 ![Build Status](https://github.com/platform-mesh/kubernetes-graphql-gateway/actions/workflows/pipeline.yml/badge.svg)
 [![REUSE status](
 https://api.reuse.software/badge/github.com/platform-mesh/kubernetes-graphql-gateway)](https://api.reuse.software/info/github.com/platform-mesh/kubernetes-graphql-gateway)
@@ -50,7 +51,7 @@ The listener and gateway communicate via `--schema-handler`, which both componen
 **Terminal 1** — Start the listener:
 
 ```sh
-go run ./cmd/listener/listener.go --schema-handler grpc
+go run main.go listener --schema-handler grpc
 ```
 
 This starts the listener in `single` mode with a gRPC server on `:50051`. It watches namespaces on your local cluster and when it finds the `default` namespace (the anchor resource), generates and streams the GraphQL schema to connected gateways.
@@ -58,7 +59,7 @@ This starts the listener in `single` mode with a gRPC server on `:50051`. It wat
 **Terminal 2** — Start the gateway:
 
 ```sh
-go run ./cmd/gateway/gateway.go --schema-handler grpc --enable-playground
+go run main.go gateway --schema-handler grpc --enable-playground
 ```
 
 This starts the gateway on port `8080` with the GraphQL playground enabled. It connects to the listener's gRPC server and receives schemas, creating an endpoint at `/api/clusters/single/graphql`.
@@ -106,13 +107,13 @@ spec:
 3. Start the listener with the ClusterAccess controller enabled:
 
 ```sh
-go run ./cmd/listener/listener.go --schema-handler grpc --enable-clusteraccess-controller
+go run main.go listener --schema-handler grpc --enable-clusteraccess-controller
 ```
 
 4. Start the gateway:
 
 ```sh
-go run ./cmd/gateway/gateway.go --schema-handler grpc --enable-playground
+go run main.go gateway --schema-handler grpc --enable-playground
 ```
 
 5. Query at: `http://localhost:8080/api/clusters/my-cluster/graphql`
@@ -187,6 +188,7 @@ Optionally set `ca.secretRef` for custom CA certificates.
 | `--schemas-dir` | `_output/schemas` | Directory to watch for schema files |
 | `--schema-handler` | `file` | How to receive schema updates: `file` or `grpc` |
 | `--grpc-listener-address` | `localhost:50051` | gRPC listener address (when `--schema-handler=grpc`) |
+| `--grpc-max-recv-msg-size` | `4194304` (4 MB) | Max gRPC receive message size in bytes (when `--schema-handler=grpc`) |
 | `--gateway-port` | `8080` | Port for the GraphQL server |
 | `--gateway-address` | `0.0.0.0` | Bind address for the GraphQL server |
 | `--enable-playground` | `false` | Enable the GraphQL playground UI |
@@ -216,6 +218,7 @@ Set any limit flag to `0` to disable that limit.
 | `--schemas-dir` | `_output/schemas` | Directory to store generated schema files |
 | `--schema-handler` | `file` | Schema transport: `file` or `grpc` |
 | `--grpc-listen-addr` | `:50051` | gRPC server address (when `--schema-handler=grpc`) |
+| `--grpc-max-send-msg-size` | `4194304` (4 MB) | Max gRPC send message size in bytes (when `--schema-handler=grpc`) |
 | `--reconciler-gvr` | `namespaces.v1` | GroupVersionResource the reconciler watches |
 | `--anchor-resource` | `object.metadata.name == 'default'` | CEL expression to match the anchor resource |
 | `--enable-clusteraccess-controller` | `false` | Enable the ClusterAccess CRD controller |
