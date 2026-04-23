@@ -30,15 +30,13 @@ type TypeEntry struct {
 }
 
 type Registry struct {
-	mu               sync.RWMutex
-	types            map[string]*TypeEntry
-	typeNameRegistry map[string]string
+	mu    sync.RWMutex
+	types map[string]*TypeEntry
 }
 
 func NewRegistry() *Registry {
 	return &Registry{
-		types:            make(map[string]*TypeEntry),
-		typeNameRegistry: make(map[string]string),
+		types: make(map[string]*TypeEntry),
 	}
 }
 
@@ -90,28 +88,16 @@ func (r *Registry) UnmarkProcessing(key string) {
 	}
 }
 
-// GetUniqueTypeName returns a unique type name for a GVK, handling conflicts
-// when the same Kind exists in different API groups.
+// GetUniqueTypeName returns a fully-qualified type name for a GVK by always
+// prefixing with group+version. This prevents collisions between nested type
+// names (e.g., Component + status → ComponentStatus) and resource type names
+// (e.g., the built-in ComponentStatus Kind).
 func (r *Registry) GetUniqueTypeName(gvk *schema.GroupVersionKind) string {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	kind := gvk.Kind
-	groupVersion := gvk.GroupVersion().String()
-
-	if existingGroupVersion, exists := r.typeNameRegistry[kind]; exists {
-		if existingGroupVersion != groupVersion {
-			sanitizedGroup := ""
-			if gvk.Group != "" {
-				sanitizedGroup = SanitizeGroupName(gvk.Group)
-			}
-			return flect.Pascalize(sanitizedGroup+"_"+gvk.Version) + kind
-		}
-	} else {
-		r.typeNameRegistry[kind] = groupVersion
+	sanitizedGroup := ""
+	if gvk.Group != "" {
+		sanitizedGroup = SanitizeGroupName(gvk.Group)
 	}
-
-	return kind
+	return flect.Pascalize(sanitizedGroup+"_"+gvk.Version) + gvk.Kind
 }
 
 // SanitizeGroupName converts a Kubernetes API group name to a valid GraphQL identifier.
