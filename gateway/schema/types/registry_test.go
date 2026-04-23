@@ -139,6 +139,37 @@ func TestRegistry_GetUniqueTypeName_GroupWithDots(t *testing.T) {
 	assert.Equal(t, "ExtensionsV1beta1Ingress", registry.GetUniqueTypeName(&gvk2))
 }
 
+func TestRegistry_GetUniqueTypeName_ReservedNames(t *testing.T) {
+	tests := []struct {
+		name     string
+		gvk      schema.GroupVersionKind
+		expected string
+	}{
+		{
+			name:     "Subscription kind is always prefixed",
+			gvk:      schema.GroupVersionKind{Group: "messaging.knative.dev", Version: "v1", Kind: "Subscription"},
+			expected: "MessagingKnativeDevV1Subscription",
+		},
+		{
+			name:     "Query kind is always prefixed",
+			gvk:      schema.GroupVersionKind{Group: "example.com", Version: "v1", Kind: "Query"},
+			expected: "ExampleComV1Query",
+		},
+		{
+			name:     "Mutation kind is always prefixed",
+			gvk:      schema.GroupVersionKind{Group: "example.com", Version: "v1beta1", Kind: "Mutation"},
+			expected: "ExampleComV1beta1Mutation",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			registry := types.NewRegistry()
+			assert.Equal(t, tt.expected, registry.GetUniqueTypeName(&tt.gvk))
+		})
+	}
+}
+
 func TestRegistry_IsProcessing_AfterMark(t *testing.T) {
 	registry := types.NewRegistry()
 

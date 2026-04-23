@@ -90,8 +90,17 @@ func (r *Registry) UnmarkProcessing(key string) {
 	}
 }
 
+// reservedTypeNames are names used by the GraphQL schema infrastructure
+// that resource types must not collide with.
+var reservedTypeNames = map[string]bool{
+	"Query":        true,
+	"Mutation":     true,
+	"Subscription": true,
+}
+
 // GetUniqueTypeName returns a unique type name for a GVK, handling conflicts
-// when the same Kind exists in different API groups.
+// when the same Kind exists in different API groups or collides with reserved
+// GraphQL root type names (Query, Mutation, Subscription).
 func (r *Registry) GetUniqueTypeName(gvk *schema.GroupVersionKind) string {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -99,19 +108,27 @@ func (r *Registry) GetUniqueTypeName(gvk *schema.GroupVersionKind) string {
 	kind := gvk.Kind
 	groupVersion := gvk.GroupVersion().String()
 
+	if reservedTypeNames[kind] {
+		return prefixedTypeName(gvk)
+	}
+
 	if existingGroupVersion, exists := r.typeNameRegistry[kind]; exists {
 		if existingGroupVersion != groupVersion {
-			sanitizedGroup := ""
-			if gvk.Group != "" {
-				sanitizedGroup = SanitizeGroupName(gvk.Group)
-			}
-			return flect.Pascalize(sanitizedGroup+"_"+gvk.Version) + kind
+			return prefixedTypeName(gvk)
 		}
 	} else {
 		r.typeNameRegistry[kind] = groupVersion
 	}
 
 	return kind
+}
+
+func prefixedTypeName(gvk *schema.GroupVersionKind) string {
+	sanitizedGroup := ""
+	if gvk.Group != "" {
+		sanitizedGroup = SanitizeGroupName(gvk.Group)
+	}
+	return flect.Pascalize(sanitizedGroup+"_"+gvk.Version) + gvk.Kind
 }
 
 // SanitizeGroupName converts a Kubernetes API group name to a valid GraphQL identifier.
