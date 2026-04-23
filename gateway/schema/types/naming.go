@@ -28,11 +28,13 @@ func SanitizeFieldName(name string) string {
 
 // GenerateTypeName creates a type name from a prefix and field path.
 // This is used to generate unique names for nested types.
-// Each path element is capitalized for readability (e.g., "PodSpecContainers").
+// Underscore separation ensures nested type names never collide with
+// top-level resource type names (which are PascalCase without underscores).
 func GenerateTypeName(typePrefix string, fieldPath []string) string {
 	var b strings.Builder
 	b.WriteString(typePrefix)
 	for _, field := range fieldPath {
+		b.WriteByte('_')
 		b.WriteString(capitalize(field))
 	}
 	return b.String()
