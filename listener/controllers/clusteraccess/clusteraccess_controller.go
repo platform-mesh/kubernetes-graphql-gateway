@@ -23,6 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	mcbuilder "sigs.k8s.io/multicluster-runtime/pkg/builder"
@@ -31,7 +32,8 @@ import (
 )
 
 const (
-	controllerName = "clusteraccess-schema-controller"
+	controllerName         = "clusteraccess-schema-controller"
+	schemaCleanupFinalizer = "gateway.platform-mesh.io/schema-cleanup"
 
 	// ConditionTypeReady indicates whether the ClusterAccess schema was
 	// successfully generated and written.
@@ -86,9 +88,10 @@ func (r *ClusterAccessReconciler) Reconcile(ctx context.Context, req mcreconcile
 	ca := &v1alpha1.ClusterAccess{}
 	if err := c.Get(ctx, client.ObjectKey{Name: req.Name}, ca); err != nil {
 		if k8serrors.IsNotFound(err) {
+			// Fallback for resources that predate the finalizer: schema path equals the
+			// resource name (the case when spec.path was not set). Resources with a custom
+			// spec.path are cleaned up via the finalizer before the object disappears.
 			logger.Info("ClusterAccess resource not found, cleaning up schema", "name", req.Name)
-			// Delete the schema file if ClusterAccess is deleted
-			// Try both possible paths (resource name and path field)
 			name := req.Name
 			if clusterName != "" {
 				name = fmt.Sprintf("%s-%s", clusterName, name)
@@ -99,6 +102,31 @@ func (r *ClusterAccessReconciler) Reconcile(ctx context.Context, req mcreconcile
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, fmt.Errorf("failed to get ClusterAccess: %w", err)
+	}
+
+	// Handle deletion: the finalizer keeps the object alive so we can read spec.path.
+	if !ca.DeletionTimestamp.IsZero() {
+		if controllerutil.ContainsFinalizer(ca, schemaCleanupFinalizer) {
+			schemaPath := resolveSchemaPath(ca, clusterName)
+			if err := r.ioHandler.Delete(ctx, schemaPath); err != nil {
+				logger.Error(err, "Failed to cleanup schema during deletion", "path", schemaPath)
+			}
+			patch := client.MergeFrom(ca.DeepCopy())
+			controllerutil.RemoveFinalizer(ca, schemaCleanupFinalizer)
+			if err := c.Patch(ctx, ca, patch); err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to remove finalizer: %w", err)
+			}
+		}
+		return ctrl.Result{}, nil
+	}
+
+	// Ensure the cleanup finalizer is registered before doing any work.
+	if !controllerutil.ContainsFinalizer(ca, schemaCleanupFinalizer) {
+		patch := client.MergeFrom(ca.DeepCopy())
+		controllerutil.AddFinalizer(ca, schemaCleanupFinalizer)
+		if err := c.Patch(ctx, ca, patch); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to add finalizer: %w", err)
+		}
 	}
 
 	result, reconcileErr := r.reconcileClusterAccess(ctx, ca, c, cl.GetConfig(), clusterName)
@@ -122,13 +150,7 @@ func (r *ClusterAccessReconciler) reconcileClusterAccess(
 	logger := log.FromContext(ctx)
 
 	// Determine cluster name/path for the schema file
-	clusterName := ca.GetName()
-	if ca.Spec.Path != "" {
-		clusterName = ca.Spec.Path
-	}
-	if reqClusterName != "" {
-		clusterName = fmt.Sprintf("%s-%s", reqClusterName, clusterName)
-	}
+	clusterName := resolveSchemaPath(ca, reqClusterName)
 
 	// Build target cluster config from ClusterAccess spec
 	targetConfig, err := buildTargetClusterConfig(ctx, *ca, c, currentConfig)
@@ -222,6 +244,19 @@ func (r *ClusterAccessReconciler) SetupWithManager(mgr mcmanager.Manager, forOpt
 		WithOptions(r.opts).
 		Named(controllerName).
 		Complete(r)
+}
+
+// resolveSchemaPath returns the schema file path for a ClusterAccess, derived from
+// spec.path (if set) or the resource name, optionally prefixed with the cluster name.
+func resolveSchemaPath(ca *v1alpha1.ClusterAccess, clusterName string) string {
+	name := ca.GetName()
+	if ca.Spec.Path != "" {
+		name = ca.Spec.Path
+	}
+	if clusterName != "" {
+		return fmt.Sprintf("%s-%s", clusterName, name)
+	}
+	return name
 }
 
 func buildTargetClusterConfig(ctx context.Context, clusterAccess v1alpha1.ClusterAccess, c client.Client, currentConfig *rest.Config) (*rest.Config, error) {

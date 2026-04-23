@@ -197,6 +197,16 @@ func (suite *ClusterAccessControllerTestSuite) waitForSchemaFile(name string) {
 		"expected schema file to be generated for %s", name)
 }
 
+// waitForSchemaFileDeleted waits for a schema file to be removed
+func (suite *ClusterAccessControllerTestSuite) waitForSchemaFileDeleted(name string) {
+	schemaFilePath := filepath.Join(suite.listenerCfg.Options.SchemasDir, name)
+	suite.Eventually(func() bool {
+		_, err := os.Stat(schemaFilePath)
+		return os.IsNotExist(err)
+	}, 10*time.Second, 500*time.Millisecond,
+		"expected schema file to be deleted for %s", name)
+}
+
 // verifySchemaMetadata reads and validates the schema file
 func (suite *ClusterAccessControllerTestSuite) verifySchemaMetadata(
 	name string,
@@ -524,4 +534,47 @@ func (suite *ClusterAccessControllerTestSuite) TestServiceAccountAuth() {
 	suite.Equal("test-sa", metadata.Auth.SAName, "SA name should match")
 	suite.Equal(testNamespace, metadata.Auth.SANamespace, "SA namespace should match")
 	suite.NotEmpty(metadata.Auth.Token, "SA auth should have generated token")
+}
+
+// TestPathFieldCleanup verifies that deleting a ClusterAccess with a custom spec.path
+// removes the schema file at the path-derived location and not the resource-name location.
+func (suite *ClusterAccessControllerTestSuite) TestPathFieldCleanup() {
+	kubeconfigSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "path-cleanup-secret",
+			Namespace: testNamespace,
+		},
+		Data: map[string][]byte{
+			"kubeconfig": suite.envtestKubeconfig,
+		},
+	}
+	err := suite.client.Create(context.Background(), kubeconfigSecret)
+	suite.Require().NoError(err, "failed to create kubeconfig secret")
+
+	clusterAccess := &v1alpha1.ClusterAccess{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "path-cleanup-test",
+		},
+		Spec: v1alpha1.ClusterAccessSpec{
+			Path: "custom-path",
+			Auth: &v1alpha1.AuthConfig{
+				KubeconfigSecretRef: &v1alpha1.SecretKeyRef{
+					SecretReference: corev1.SecretReference{
+						Name:      "path-cleanup-secret",
+						Namespace: testNamespace,
+					},
+					Key: "kubeconfig",
+				},
+			},
+		},
+	}
+	err = suite.client.Create(context.Background(), clusterAccess)
+	suite.Require().NoError(err, "failed to create ClusterAccess")
+
+	suite.waitForSchemaFile("single-custom-path")
+
+	err = suite.client.Delete(context.Background(), clusterAccess)
+	suite.Require().NoError(err, "failed to delete ClusterAccess")
+
+	suite.waitForSchemaFileDeleted("single-custom-path")
 }
