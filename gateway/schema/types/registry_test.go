@@ -84,32 +84,41 @@ func TestRegistry_ProcessingState(t *testing.T) {
 }
 
 func TestRegistry_GetUniqueTypeName(t *testing.T) {
-	registry := types.NewRegistry()
-
 	tests := []struct {
 		name     string
 		gvk      schema.GroupVersionKind
 		expected string
 	}{
 		{
-			name:     "first registration",
-			gvk:      schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"},
-			expected: "Deployment",
+			name:     "core resource always gets version prefix",
+			gvk:      schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Pod"},
+			expected: "V1Pod",
 		},
 		{
-			name:     "same kind same group",
+			name:     "apps group resource gets group+version prefix",
 			gvk:      schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"},
-			expected: "Deployment",
+			expected: "AppsV1Deployment",
 		},
 		{
-			name:     "same kind different group",
+			name:     "extensions group resource gets group+version prefix",
 			gvk:      schema.GroupVersionKind{Group: "extensions", Version: "v1beta1", Kind: "Deployment"},
 			expected: "ExtensionsV1beta1Deployment",
+		},
+		{
+			name:     "dotted group name is sanitized",
+			gvk:      schema.GroupVersionKind{Group: "networking.k8s.io", Version: "v1", Kind: "Ingress"},
+			expected: "NetworkingK8sIoV1Ingress",
+		},
+		{
+			name:     "CRD with custom group",
+			gvk:      schema.GroupVersionKind{Group: "custom.io", Version: "v1", Kind: "Component"},
+			expected: "CustomIoV1Component",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			registry := types.NewRegistry()
 			got := registry.GetUniqueTypeName(&tt.gvk)
 			assert.Equal(t, tt.expected, got)
 		})
@@ -119,22 +128,19 @@ func TestRegistry_GetUniqueTypeName(t *testing.T) {
 func TestRegistry_GetUniqueTypeName_EmptyGroup(t *testing.T) {
 	registry := types.NewRegistry()
 
-	// First: register Pod with empty group (core API)
 	gvk1 := schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Pod"}
-	assert.Equal(t, "Pod", registry.GetUniqueTypeName(&gvk1))
+	assert.Equal(t, "V1Pod", registry.GetUniqueTypeName(&gvk1))
 
-	// Second: same kind, same group should return same name
-	assert.Equal(t, "Pod", registry.GetUniqueTypeName(&gvk1))
+	// Same GVK returns the same name
+	assert.Equal(t, "V1Pod", registry.GetUniqueTypeName(&gvk1))
 }
 
 func TestRegistry_GetUniqueTypeName_GroupWithDots(t *testing.T) {
 	registry := types.NewRegistry()
 
-	// First: register Ingress with networking.k8s.io group
 	gvk1 := schema.GroupVersionKind{Group: "networking.k8s.io", Version: "v1", Kind: "Ingress"}
-	assert.Equal(t, "Ingress", registry.GetUniqueTypeName(&gvk1))
+	assert.Equal(t, "NetworkingK8sIoV1Ingress", registry.GetUniqueTypeName(&gvk1))
 
-	// Second: same kind from extensions group should get prefixed with sanitized group
 	gvk2 := schema.GroupVersionKind{Group: "extensions", Version: "v1beta1", Kind: "Ingress"}
 	assert.Equal(t, "ExtensionsV1beta1Ingress", registry.GetUniqueTypeName(&gvk2))
 }

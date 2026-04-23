@@ -614,7 +614,7 @@ func (suite *GatewayE2ETestSuite) TestCreateMutation() {
 	suite.waitForSchemaLoaded(clusterName)
 
 	resp := suite.executeGraphQLQuery(clusterName, `
-		mutation($ns: String!, $object: ConfigMapInput!) {
+		mutation($ns: String!, $object: V1ConfigMapInput!) {
 			v1 {
 				createConfigMap(namespace: $ns, object: $object) {
 					metadata { name namespace }
@@ -666,7 +666,7 @@ func (suite *GatewayE2ETestSuite) TestUpdateMutation() {
 	suite.Require().NoError(err)
 
 	resp := suite.executeGraphQLQuery(clusterName, `
-		mutation($name: String!, $ns: String!, $object: ConfigMapInput!) {
+		mutation($name: String!, $ns: String!, $object: V1ConfigMapInput!) {
 			v1 {
 				updateConfigMap(name: $name, namespace: $ns, object: $object) {
 					metadata { name }
