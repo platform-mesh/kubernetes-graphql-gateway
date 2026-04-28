@@ -93,7 +93,7 @@ func New(
 		}
 
 		// Allow unauthenticated GET requests through when playground is enabled.
-		if graphqlCfg.Playground && r.Method == http.MethodGet {
+		if graphqlCfg.PlaygroundEnabled && r.Method == http.MethodGet {
 			gqlHTTPHandler.ServeHTTP(w, r)
 			return
 		}

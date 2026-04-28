@@ -35,7 +35,7 @@ func (s *GraphQLServer) CreateHandler(schema *graphql.Schema) *GraphQLHandler {
 	graphqlHandler := handler.New(&handler.Config{
 		Schema:     schema,
 		Pretty:     s.config.Pretty,
-		Playground: s.config.Playground,
+		Playground: s.config.PlaygroundEnabled,
 		GraphiQL:   s.config.GraphiQL,
 	})
 	return &GraphQLHandler{
