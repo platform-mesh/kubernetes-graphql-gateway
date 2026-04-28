@@ -136,6 +136,48 @@ func TestUnauthenticatedEndpoints(t *testing.T) {
 	}
 }
 
+func TestPlaygroundEnabledAllowsUnauthenticatedGet(t *testing.T) {
+	handler := &captureHandler{}
+	srv, err := NewServer(ServerConfig{
+		Gateway:           handler,
+		Addr:              ":0",
+		EndpointSuffix:    testEndpointSuffix,
+		PlaygroundEnabled: true,
+		CORSConfig:        CORSConfig{},
+	})
+	require.NoError(t, err)
+	ts := httptest.NewServer(srv.Server.Handler)
+	defer ts.Close()
+
+	req, err := http.NewRequest("GET", clusterURL(ts.URL, "my-cluster"), nil)
+	require.NoError(t, err)
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close() //nolint:errcheck
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.True(t, handler.called)
+	assert.Equal(t, "my-cluster", handler.clusterName)
+	assert.Empty(t, handler.token)
+}
+
+func TestPlaygroundDisabledRejectsUnauthenticatedGet(t *testing.T) {
+	handler := &captureHandler{}
+	ts := newTestServer(t, handler)
+	defer ts.Close()
+
+	req, err := http.NewRequest("GET", clusterURL(ts.URL, "my-cluster"), nil)
+	require.NoError(t, err)
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close() //nolint:errcheck
+
+	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+	assert.False(t, handler.called)
+}
+
 func TestHealthEndpointsReflectCheckerState(t *testing.T) {
 	failing := func(_ *http.Request) error { return fmt.Errorf("down") }
 
