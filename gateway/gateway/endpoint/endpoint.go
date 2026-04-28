@@ -92,6 +92,12 @@ func New(
 			}
 		}
 
+		// Allow unauthenticated GET requests through when playground is enabled.
+		if graphqlCfg.PlaygroundEnabled && r.Method == http.MethodGet {
+			gqlHTTPHandler.ServeHTTP(w, r)
+			return
+		}
+
 		token, ok := utilscontext.GetTokenFromCtx(r.Context())
 		if !ok || token == "" {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)

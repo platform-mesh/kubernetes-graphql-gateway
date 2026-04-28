@@ -162,7 +162,7 @@ func (suite *GatewayE2ETestSuite) initGateway(ctx context.Context) {
 		SchemaDirectory: suite.schemasDir,
 		GraphQL: config.GraphQL{
 			Pretty:     true,
-			Playground: false,
+			PlaygroundEnabled: false,
 			GraphiQL:   false,
 		},
 		Limits:              config.Limits{},

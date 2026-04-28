@@ -28,7 +28,7 @@ func NewConfig(opts *options.CompletedOptions) (*Config, error) {
 		GRPCMaxRecvMsgSize: cfg.Options.GRPCMaxRecvMsgSize,
 		GraphQL: gatewayconfig.GraphQL{
 			Pretty:     true,
-			Playground: cfg.Options.PlaygroundEnabled,
+			PlaygroundEnabled: cfg.Options.PlaygroundEnabled,
 			GraphiQL:   cfg.Options.PlaygroundEnabled,
 		},
 		Limits: gatewayconfig.Limits{
@@ -47,6 +47,7 @@ func NewConfig(opts *options.CompletedOptions) (*Config, error) {
 		Gateway:                  gatewayServer,
 		ReadyzCheck:              gatewayServer.IsReady,
 		Addr:                     fmt.Sprintf("%s:%d", cfg.Options.ServerBindAddress, cfg.Options.ServerBindPort),
+		PlaygroundEnabled:        cfg.Options.PlaygroundEnabled,
 		MaxRequestBodyBytes:      cfg.Options.MaxRequestBodyBytes,
 		MaxInFlightRequests:      cfg.Options.MaxInFlightRequests,
 		MaxInFlightSubscriptions: cfg.Options.MaxInFlightSubscriptions,

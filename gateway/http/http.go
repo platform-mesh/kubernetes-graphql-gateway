@@ -28,6 +28,7 @@ type ServerConfig struct {
 
 	CORSConfig CORSConfig
 
+	PlaygroundEnabled        bool
 	MaxRequestBodyBytes      int64
 	MaxInFlightRequests      int
 	MaxInFlightSubscriptions int
@@ -64,6 +65,13 @@ func NewServer(c ServerConfig) (*Server, error) {
 		}
 
 		clusterName := r.PathValue("clusterName")
+
+		// Allow unauthenticated GET requests through to the playground handler.
+		if c.PlaygroundEnabled && r.Method == http.MethodGet {
+			ctx := utilscontext.SetCluster(r.Context(), clusterName)
+			queryHandler.ServeHTTP(w, r.WithContext(ctx))
+			return
+		}
 
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
