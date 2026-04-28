@@ -78,6 +78,11 @@ func (s *GraphQLServer) HandleSubscription(w http.ResponseWriter, r *http.Reques
 		Context:        r.Context(),
 	}
 
+	if err := flusher.Flush(); err != nil {
+		logger.V(4).Error(err, "Failed to flush initial SSE response")
+		return
+	}
+
 	subscriptionChannel := graphql.Subscribe(subscriptionParams)
 	for res := range subscriptionChannel {
 		if res == nil {
