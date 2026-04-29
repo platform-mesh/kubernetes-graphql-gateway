@@ -43,10 +43,11 @@ type SchemaGenerator struct {
 
 	categoryManager *extensions.CategoryManager
 	customQueryGen  *extensions.CustomQueryGenerator
+	customSubGen    *extensions.CustomSubscriptionGenerator
 }
 
 // New creates a new schema generator.
-func New(definitions map[string]*spec.Schema, resolverProvider *resolver.Service) *SchemaGenerator {
+func New(definitions map[string]*spec.Schema, resolverProvider *resolver.Service, customSubGen *extensions.CustomSubscriptionGenerator) *SchemaGenerator {
 	registry := types.NewRegistry()
 	categoryManager := extensions.NewCategoryManager(definitions)
 
@@ -60,6 +61,7 @@ func New(definitions map[string]*spec.Schema, resolverProvider *resolver.Service
 		subscriptionGen: fields.NewSubscriptionGenerator(resolverProvider),
 		categoryManager: categoryManager,
 		customQueryGen:  extensions.NewCustomQueryGenerator(resolverProvider, categoryManager),
+		customSubGen:    customSubGen,
 	}
 }
 
@@ -80,6 +82,10 @@ func (g *SchemaGenerator) Generate(ctx context.Context) (*graphql.Schema, error)
 
 	g.customQueryGen.AddTypeByCategoryQuery(rootQuery)
 	g.addApplyYamlMutation(rootMutation)
+
+	if g.customSubGen != nil {
+		g.customSubGen.AddPodLogsSubscription(rootSubscription, g.definitions)
+	}
 
 	schema, err := graphql.NewSchema(graphql.SchemaConfig{
 		Query:        rootQuery,
