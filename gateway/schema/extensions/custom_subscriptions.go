@@ -16,11 +16,11 @@ import (
 )
 
 const (
-	podLogsFieldName   = "podLogs"
-	containerArg       = "container"
-	tailLinesArg       = "tailLines"
-	sinceSecondsArg    = "sinceSeconds"
-	followArg          = "follow"
+	podLogsFieldName = "podLogs"
+	containerArg     = "container"
+	tailLinesArg     = "tailLines"
+	sinceSecondsArg  = "sinceSeconds"
+	followArg        = "follow"
 )
 
 type PodLogEntry struct {
@@ -148,7 +148,7 @@ func (g *CustomSubscriptionGenerator) subscribePodLogs() graphql.FieldResolveFn 
 
 		go func() {
 			defer close(resultChannel)
-			defer stream.Close()
+			defer func() { _ = stream.Close() }()
 
 			logger := log.FromContext(p.Context).WithValues(
 				"operation", "podLogs",
