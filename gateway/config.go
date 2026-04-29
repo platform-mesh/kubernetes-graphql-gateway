@@ -27,9 +27,9 @@ func NewConfig(opts *options.CompletedOptions) (*Config, error) {
 		GRPCAddress:        cfg.Options.GRPCListenerAddress,
 		GRPCMaxRecvMsgSize: cfg.Options.GRPCMaxRecvMsgSize,
 		GraphQL: gatewayconfig.GraphQL{
-			Pretty:     true,
+			Pretty:            true,
 			PlaygroundEnabled: cfg.Options.PlaygroundEnabled,
-			GraphiQL:   cfg.Options.PlaygroundEnabled,
+			GraphiQL:          cfg.Options.PlaygroundEnabled,
 		},
 		Limits: gatewayconfig.Limits{
 			MaxQueryDepth:      cfg.Options.MaxQueryDepth,

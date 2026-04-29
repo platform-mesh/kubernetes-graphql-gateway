@@ -161,9 +161,9 @@ func (suite *GatewayE2ETestSuite) initGateway(ctx context.Context) {
 		SchemaHandler:   "file",
 		SchemaDirectory: suite.schemasDir,
 		GraphQL: config.GraphQL{
-			Pretty:     true,
+			Pretty:            true,
 			PlaygroundEnabled: false,
-			GraphiQL:   false,
+			GraphiQL:          false,
 		},
 		Limits:              config.Limits{},
 		TokenReviewCacheTTL: 30 * time.Second,
