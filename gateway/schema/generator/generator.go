@@ -2,6 +2,7 @@ package generator
 
 import (
 	"context"
+	"sort"
 	"strings"
 
 	"github.com/gobuffalo/flect"
@@ -76,8 +77,14 @@ func (g *SchemaGenerator) Generate(ctx context.Context) (*graphql.Schema, error)
 	resources := g.parseResources()
 	groups := groupByAPIGroup(resources)
 
-	for group, versions := range groups {
-		g.processGroup(ctx, group, versions, rootQuery, rootMutation, rootSubscription)
+	sortedGroups := make([]string, 0, len(groups))
+	for group := range groups {
+		sortedGroups = append(sortedGroups, group)
+	}
+	sort.Strings(sortedGroups)
+
+	for _, group := range sortedGroups {
+		g.processGroup(ctx, group, groups[group], rootQuery, rootMutation, rootSubscription)
 	}
 
 	g.customQueryGen.AddTypeByCategoryQuery(rootQuery)
@@ -171,7 +178,14 @@ func (g *SchemaGenerator) processGroup(
 		mutationGroupType = createGroupType(group, "Mutation")
 	}
 
-	for version, resources := range versions {
+	sortedVersions := make([]string, 0, len(versions))
+	for v := range versions {
+		sortedVersions = append(sortedVersions, v)
+	}
+	sort.Strings(sortedVersions)
+
+	for _, version := range sortedVersions {
+		resources := versions[version]
 		queryVersionType := createVersionType(group, version, "Query")
 		mutationVersionType := createVersionType(group, version, "Mutation")
 

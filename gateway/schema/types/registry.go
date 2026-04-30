@@ -92,6 +92,7 @@ func (r *Registry) UnmarkProcessing(key string) {
 
 // GetUniqueTypeName returns a unique type name for a GVK, handling conflicts
 // when the same Kind exists in different API groups.
+// TODO: refactor to always qualify all versions when multi-version resources exist (symmetric naming, no first-wins).
 func (r *Registry) GetUniqueTypeName(gvk *schema.GroupVersionKind) string {
 	r.mu.Lock()
 	defer r.mu.Unlock()
