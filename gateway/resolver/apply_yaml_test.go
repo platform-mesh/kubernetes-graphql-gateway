@@ -64,13 +64,24 @@ kind: ConfigMap
 			wantErr: "metadata is required",
 		},
 		{
-			name: "missing metadata.name",
+			name: "missing metadata.name and metadata.generateName",
 			yaml: `apiVersion: v1
 kind: ConfigMap
 metadata:
   namespace: default
 `,
-			wantErr: "metadata.name is required",
+			wantErr: "metadata.name or metadata.generateName is required",
+		},
+		{
+			name: "valid with generateName instead of name",
+			yaml: `apiVersion: v1
+kind: ConfigMap
+metadata:
+  generateName: my-config-
+  namespace: default
+data:
+  key: value
+`,
 		},
 		{
 			name: "multi-document YAML",
@@ -161,7 +172,7 @@ metadata:
 				assert.NotEmpty(t, result["kind"])
 				metadata, ok := result["metadata"].(map[string]any)
 				require.True(t, ok)
-				assert.NotEmpty(t, metadata["name"])
+				assert.True(t, metadata["name"] != nil || metadata["generateName"] != nil)
 			}
 		})
 	}
