@@ -218,8 +218,8 @@ func (r *Service) CreateItem(gvk schema.GroupVersionKind, scope v1.ResourceScope
 			obj.SetNamespace(namespace)
 		}
 
-		if obj.GetName() == "" {
-			return nil, errors.New("object metadata.name is required")
+		if obj.GetName() == "" && obj.GetGenerateName() == "" {
+			return nil, errors.New("object metadata.name or metadata.generateName is required")
 		}
 
 		dryRunBool, err := GetArg[bool](p.Args, DryRunArg, false)
@@ -372,13 +372,20 @@ func (r *Service) ApplyYaml() graphql.FieldResolveFn {
 			"namespace", namespace,
 		)
 
+		if name == "" {
+			if err := r.runtimeClient.Create(ctx, obj); err != nil {
+				logger.Error(err, "Failed to create object with generateName")
+				return nil, fmt.Errorf("failed to create resource %s: %w", gvk.Kind, err)
+			}
+			return obj.Object, nil
+		}
+
 		target := &unstructured.Unstructured{}
 		target.SetGroupVersionKind(gvk)
 		target.SetName(name)
 		target.SetNamespace(namespace)
 
 		if _, err := controllerutil.CreateOrUpdate(ctx, r.runtimeClient, target, func() error {
-			// Preserve server-managed fields that CreateOrUpdate fetched
 			rv := target.GetResourceVersion()
 			uid := target.GetUID()
 			target.Object = parsed
@@ -432,7 +439,7 @@ func compareUnstructured(fieldPath string) func(a, b unstructured.Unstructured) 
 }
 
 // parseAndValidateYAML decodes a YAML string, rejects multi-document input,
-// and validates that apiVersion, kind, and metadata.name are present.
+// and validates that apiVersion, kind, and metadata.name or metadata.generateName are present.
 func parseAndValidateYAML(yamlStr string) (map[string]any, error) {
 	decoder := yaml.NewDecoder(bytes.NewReader([]byte(yamlStr)))
 
@@ -460,9 +467,10 @@ func parseAndValidateYAML(yamlStr string) (map[string]any, error) {
 	if !ok || metadata == nil {
 		return nil, errors.New("metadata is required")
 	}
-	name, ok := metadata["name"].(string)
-	if !ok || name == "" {
-		return nil, errors.New("metadata.name is required and must be a string")
+	name, _ := metadata["name"].(string)
+	generateName, _ := metadata["generateName"].(string)
+	if name == "" && generateName == "" {
+		return nil, errors.New("metadata.name or metadata.generateName is required")
 	}
 
 	return parsed, nil
