@@ -50,7 +50,6 @@ func (f *fakeWatcher) Stop() {
 // fakeClient implements client.WithWatch with controllable List and Watch behavior.
 type fakeClient struct {
 	client.WithWatch
-	mu         sync.Mutex
 	watchCalls int32
 	listCalls  int32
 	watchFn    func(ctx context.Context, list client.ObjectList, opts ...client.ListOption) (watch.Interface, error)
@@ -76,7 +75,7 @@ func (f *fakeClient) List(ctx context.Context, obj client.ObjectList, opts ...cl
 func makeResolveParams(ctx context.Context) graphql.ResolveParams {
 	return graphql.ResolveParams{
 		Context: ctx,
-		Args: map[string]interface{}{
+		Args: map[string]any{
 			SubscribeToAllArg: true,
 		},
 		Info: graphql.ResolveInfo{
