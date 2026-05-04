@@ -35,7 +35,7 @@ func (s *GraphQLServer) CreateHandler(schema *graphql.Schema) *GraphQLHandler {
 	graphqlHandler := handler.New(&handler.Config{
 		Schema:     schema,
 		Pretty:     s.config.Pretty,
-		Playground: s.config.Playground,
+		Playground: s.config.PlaygroundEnabled,
 		GraphiQL:   s.config.GraphiQL,
 	})
 	return &GraphQLHandler{
@@ -76,6 +76,11 @@ func (s *GraphQLServer) HandleSubscription(w http.ResponseWriter, r *http.Reques
 		VariableValues: params.Variables,
 		OperationName:  params.OperationName,
 		Context:        r.Context(),
+	}
+
+	if err := flusher.Flush(); err != nil {
+		logger.V(4).Error(err, "Failed to flush initial SSE response")
+		return
 	}
 
 	subscriptionChannel := graphql.Subscribe(subscriptionParams)

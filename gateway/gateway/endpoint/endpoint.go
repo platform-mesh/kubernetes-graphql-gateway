@@ -16,6 +16,7 @@ import (
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/gateway/requestparser"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/resolver"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/schema"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/schema/extensions"
 	utilscontext "github.com/platform-mesh/kubernetes-graphql-gateway/gateway/utils/context"
 
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -58,7 +59,14 @@ func New(
 	go validator.Start(validatorCtx)
 
 	resolverProvider := resolver.New(cl.Client())
-	schemaProvider, err := schema.New(ctx, schemaData.Components.Schemas, resolverProvider)
+
+	customSubGen, err := extensions.NewCustomSubscriptionGenerator(cl.RestConfig())
+	if err != nil {
+		validatorCancel()
+		return nil, fmt.Errorf("failed to create custom subscription generator: %w", err)
+	}
+
+	schemaProvider, err := schema.New(ctx, schemaData.Components.Schemas, resolverProvider, customSubGen)
 	if err != nil {
 		validatorCancel()
 		return nil, fmt.Errorf("failed to create GraphQL schema: %w", err)
@@ -90,6 +98,12 @@ func New(
 					r = r.WithContext(utilscontext.SetClusterTarget(r.Context(), target))
 				}
 			}
+		}
+
+		// Allow unauthenticated GET requests through when playground is enabled.
+		if graphqlCfg.PlaygroundEnabled && r.Method == http.MethodGet {
+			gqlHTTPHandler.ServeHTTP(w, r)
+			return
 		}
 
 		token, ok := utilscontext.GetTokenFromCtx(r.Context())

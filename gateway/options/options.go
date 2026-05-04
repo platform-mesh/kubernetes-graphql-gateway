@@ -116,7 +116,7 @@ func (options *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&options.GRPCMaxRecvMsgSize, "grpc-max-recv-msg-size", options.GRPCMaxRecvMsgSize, "maximum gRPC receive message size in bytes (used with --schema-handler=grpc)")
 	fs.IntVar(&options.ServerBindPort, "gateway-port", options.ServerBindPort, "port for the GraphQL gateway server")
 	fs.StringVar(&options.ServerBindAddress, "gateway-address", options.ServerBindAddress, "address for the GraphQL gateway server")
-	fs.BoolVar(&options.PlaygroundEnabled, "enable-playground", options.PlaygroundEnabled, "enable the GraphQL playground")
+	fs.BoolVar(&options.PlaygroundEnabled, "enable-playground", options.PlaygroundEnabled, "enable the GraphQL playground (allows unauthenticated GET requests to serve the playground UI)")
 	fs.StringSliceVar(&options.CORSAllowedOrigins, "cors-allowed-origins", options.CORSAllowedOrigins, "list of allowed origins for CORS")
 	fs.StringSliceVar(&options.CORSAllowedHeaders, "cors-allowed-headers", options.CORSAllowedHeaders, "list of allowed headers for CORS")
 	fs.DurationVar(&options.TokenReviewCacheTTL, "token-review-cache-ttl", options.TokenReviewCacheTTL, "TTL for cached TokenReview results (0 to disable caching)")

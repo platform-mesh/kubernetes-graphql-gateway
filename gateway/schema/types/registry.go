@@ -88,10 +88,9 @@ func (r *Registry) UnmarkProcessing(key string) {
 	}
 }
 
-// GetUniqueTypeName returns a fully-qualified type name for a GVK by always
-// prefixing with group+version. This prevents collisions between nested type
-// names (e.g., Component + status → ComponentStatus) and resource type names
-// (e.g., the built-in ComponentStatus Kind).
+// GetUniqueTypeName returns a unique type name for a GVK, handling conflicts
+// when the same Kind exists in different API groups.
+// TODO: refactor to always qualify all versions when multi-version resources exist (symmetric naming, no first-wins).
 func (r *Registry) GetUniqueTypeName(gvk *schema.GroupVersionKind) string {
 	sanitizedGroup := ""
 	if gvk.Group != "" {

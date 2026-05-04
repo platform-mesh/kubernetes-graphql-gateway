@@ -91,6 +91,12 @@ func (c *Cluster) Client() client.WithWatch {
 	return c.client
 }
 
+// RestConfig returns a copy of the cluster's rest.Config with the full
+// roundtripper chain preserved, suitable for building typed clientsets.
+func (c *Cluster) RestConfig() *rest.Config {
+	return rest.CopyConfig(c.restCfg)
+}
+
 // AdminConfig returns a rest.Config with the cluster's admin credentials,
 // suitable for privileged API calls like TokenReview.
 func (c *Cluster) AdminConfig() *rest.Config {

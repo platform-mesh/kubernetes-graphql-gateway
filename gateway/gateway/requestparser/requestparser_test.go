@@ -29,12 +29,12 @@ func TestMiddleware(t *testing.T) {
 			expectedQuery: "{ pods { name } }",
 		},
 		{
-			name:          "single request with extensions",
-			method:        http.MethodPost,
-			body:          `{"query":"{ pods }","extensions":{"clusterTarget":"abc"}}`,
-			expectParsed:  true,
-			expectedCount: 1,
-			expectedQuery: "{ pods }",
+			name:           "single request with extensions",
+			method:         http.MethodPost,
+			body:           `{"query":"{ pods }","extensions":{"clusterTarget":"abc"}}`,
+			expectParsed:   true,
+			expectedCount:  1,
+			expectedQuery:  "{ pods }",
 			expectedExtKey: "clusterTarget",
 		},
 		{

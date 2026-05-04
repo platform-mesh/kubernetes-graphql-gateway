@@ -5,6 +5,7 @@ import (
 
 	"github.com/graphql-go/graphql"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/resolver"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/schema/extensions"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/schema/generator"
 
 	"k8s.io/kube-openapi/pkg/validation/spec"
@@ -17,8 +18,8 @@ type Provider struct {
 }
 
 // New creates a new Provider with a GraphQL schema built from OpenAPI definitions.
-func New(ctx context.Context, definitions map[string]*spec.Schema, resolverProvider *resolver.Service) (*Provider, error) {
-	schema, err := generator.New(definitions, resolverProvider).Generate(ctx)
+func New(ctx context.Context, definitions map[string]*spec.Schema, resolverProvider *resolver.Service, customSubGen *extensions.CustomSubscriptionGenerator) (*Provider, error) {
+	schema, err := generator.New(definitions, resolverProvider, customSubGen).Generate(ctx)
 	if err != nil {
 		return nil, err
 	}
