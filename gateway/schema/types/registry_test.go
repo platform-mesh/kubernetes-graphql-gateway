@@ -41,7 +41,7 @@ func TestRegistry_RegisterAndGet(t *testing.T) {
 		Fields: graphql.Fields{"name": &graphql.Field{Type: graphql.String}},
 	})
 	inputType := graphql.NewInputObject(graphql.InputObjectConfig{
-		Name:   "TestTypeInput",
+		Name:   "TestType_Input",
 		Fields: graphql.InputObjectConfigFieldMap{"name": &graphql.InputObjectFieldConfig{Type: graphql.String}},
 	})
 
