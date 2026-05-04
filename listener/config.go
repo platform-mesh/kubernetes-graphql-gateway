@@ -309,8 +309,8 @@ func buildControllerForOptions(names string, defaultNames string) []mcbuilder.Fo
 	}
 
 	return []mcbuilder.ForOption{
-		mcbuilder.WithClusterFilter(func(clusterName string, _ ctrlcluster.Cluster) bool {
-			prefix, _, ok := strings.Cut(clusterName, "#")
+		mcbuilder.WithClusterFilter(func(clusterName multicluster.ClusterName, _ ctrlcluster.Cluster) bool {
+			prefix, _, ok := strings.Cut(string(clusterName), "#")
 			if !ok {
 				return false
 			}
