@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"k8s.io/client-go/rest"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/cluster"
 
 	"sigs.k8s.io/multicluster-runtime/pkg/multicluster"
@@ -37,16 +36,6 @@ func New(cfg *rest.Config, endpointSliceName string, options provider.Options) (
 	}, nil
 }
 
-// Get returns the cluster with the given name as a cluster.Cluster.
-func (p *Provider) Get(ctx context.Context, clusterName string) (cluster.Cluster, error) {
-	return p.Provider.Get(ctx, clusterName)
-}
-
-// IndexField adds an indexer to the clusters managed by this provider.
-func (p *Provider) IndexField(ctx context.Context, obj client.Object, field string, extractValue client.IndexerFunc) error {
-	return p.Provider.IndexField(ctx, obj, field, extractValue)
-}
-
 // Start starts the provider and blocks.
 func (p *Provider) Start(ctx context.Context, aware multicluster.Aware) error {
 	return p.Provider.Start(ctx, &awareWrapper{Aware: aware})
@@ -58,7 +47,6 @@ type awareWrapper struct {
 	multicluster.Aware
 }
 
-func (a *awareWrapper) Engage(ctx context.Context, name string, cluster cluster.Cluster) error {
+func (a *awareWrapper) Engage(ctx context.Context, name multicluster.ClusterName, cluster cluster.Cluster) error {
 	return a.Aware.Engage(ctx, name, cluster)
-
 }
