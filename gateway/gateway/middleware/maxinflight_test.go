@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -134,7 +135,7 @@ func TestWithMaxInFlightRequests(t *testing.T) {
 			started := make(chan struct{}, 10)
 			release := make(chan struct{})
 
-			handler := WithMaxInFlightRequests(tt.handler(started, release), tt.maxInFlight)
+			handler := WithMaxInFlightRequests(tt.handler(started, release), tt.maxInFlight, nil)
 			server := httptest.NewServer(handler)
 			defer server.Close()
 
@@ -142,3 +143,91 @@ func TestWithMaxInFlightRequests(t *testing.T) {
 		})
 	}
 }
+
+func TestWithMaxInFlightRequestsMetrics(t *testing.T) {
+	t.Run("metrics incremented on successful request", func(t *testing.T) {
+		m := &fakeMetrics{}
+		metrics := &InFlightMetrics{
+			Active:   m,
+			Total:    &fakeCounter{&m.totalInc},
+			Rejected: &fakeCounter{&m.rejectedInc},
+		}
+
+		handler := WithMaxInFlightRequests(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Inside handler: active should be 1
+			assert.Equal(t, int64(1), m.active.Load())
+			w.WriteHeader(http.StatusOK)
+		}), 10, metrics)
+
+		server := httptest.NewServer(handler)
+		defer server.Close()
+
+		resp, err := http.Get(server.URL)
+		require.NoError(t, err)
+		defer resp.Body.Close() //nolint:errcheck
+
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		assert.Equal(t, int64(0), m.active.Load())
+		assert.Equal(t, int64(1), m.totalInc.Load())
+		assert.Equal(t, int64(0), m.rejectedInc.Load())
+	})
+
+	t.Run("rejected metric incremented at capacity", func(t *testing.T) {
+		m := &fakeMetrics{}
+		metrics := &InFlightMetrics{
+			Active:   m,
+			Total:    &fakeCounter{&m.totalInc},
+			Rejected: &fakeCounter{&m.rejectedInc},
+		}
+
+		started := make(chan struct{})
+		release := make(chan struct{})
+
+		handler := WithMaxInFlightRequests(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			started <- struct{}{}
+			<-release
+			w.WriteHeader(http.StatusOK)
+		}), 1, metrics)
+
+		server := httptest.NewServer(handler)
+		defer server.Close()
+
+		// Fill the single slot
+		go func() {
+			resp, _ := http.Get(server.URL) //nolint:errcheck
+			if resp != nil {
+				resp.Body.Close() //nolint:errcheck
+			}
+		}()
+		<-started
+
+		// This request should be rejected
+		resp, err := http.Get(server.URL)
+		require.NoError(t, err)
+		defer resp.Body.Close() //nolint:errcheck
+
+		assert.Equal(t, http.StatusTooManyRequests, resp.StatusCode)
+		assert.Equal(t, int64(1), m.active.Load())
+		assert.Equal(t, int64(1), m.totalInc.Load())
+		assert.Equal(t, int64(1), m.rejectedInc.Load())
+
+		close(release)
+	})
+}
+
+// fakeMetrics implements the Active gauge interface (Inc/Dec) using atomics.
+type fakeMetrics struct {
+	active      atomic.Int64
+	totalInc    atomic.Int64
+	rejectedInc atomic.Int64
+}
+
+func (f *fakeMetrics) Inc() { f.active.Add(1) }
+func (f *fakeMetrics) Dec() { f.active.Add(-1) }
+
+// fakeCounter implements the counter interface (Inc) using an atomic.
+type fakeCounter struct {
+	val *atomic.Int64
+}
+
+func (f *fakeCounter) Inc() { f.val.Add(1) }
