@@ -115,6 +115,15 @@ tasks:
       - task: lint
       - task: test
 
+  fuzz:
+    desc: "Run fuzz tests with a configurable duration (default 30s per target)"
+    vars:
+      FUZZTIME: '{{.FUZZTIME | default "30s"}}'
+    cmds:
+      - go test ./apis/v1alpha1/ -run=^$ -fuzz=FuzzClusterAccessRoundTrip -fuzztime={{.FUZZTIME}} -count=1
+      - go test ./gateway/gateway/queryvalidation/ -run=^$ -fuzz=FuzzQueryValidation -fuzztime={{.FUZZTIME}} -count=1
+      - go test ./gateway/resolver/ -run=^$ -fuzz=FuzzParseAndValidateYAML -fuzztime={{.FUZZTIME}} -count=1
+
   proto:
     desc: "Generate protobuf files"
     cmds:
