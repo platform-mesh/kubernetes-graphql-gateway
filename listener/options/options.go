@@ -121,8 +121,8 @@ func (options *Options) AddFlags(fs *pflag.FlagSet) {
 	options.ProviderKcp.AddFlags(fs)
 
 	// Hide commons log flags — we use k8s.io/component-base/logs instead.
-	fs.MarkHidden("log-level")
-	fs.MarkHidden("no-json")
+	_ = fs.MarkHidden("log-level")
+	_ = fs.MarkHidden("no-json")
 
 	fs.StringVar(&options.Provider, "multicluster-runtime-provider", options.Provider,
 		fmt.Sprintf("The multicluster runtime provider. Possible values are: %v", sets.List(sets.Set[string](sets.StringKeySet(providerAliases)))),
