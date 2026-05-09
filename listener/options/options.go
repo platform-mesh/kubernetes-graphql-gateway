@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	commonsconfig "github.com/platform-mesh/golang-commons/config"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/apis/v1alpha1"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/defaults"
 	providerkcp "github.com/platform-mesh/kubernetes-graphql-gateway/providers/kcp/options"
@@ -18,14 +19,14 @@ import (
 type Options struct {
 	Logs *logs.Options
 
+	Common *commonsconfig.CommonServiceConfig
+
 	ProviderKcp *providerkcp.Options
 
 	ExtraOptions
 }
 
 type ExtraOptions struct {
-	// KubeConfig is the path to a kubeconfig. Only required if out-of-cluster
-	KubeConfig string
 	// Multicluster runtime provider
 	Provider string
 	// SingleKubeConfig is the path to a kubeconfig for the single provider cluster.
@@ -49,12 +50,6 @@ type ExtraOptions struct {
 	ClusterMetadataFunc v1alpha1.ClusterMetadataFunc
 	// ClusterURLResolverFunc allows to provide cluster URL for a given cluster name
 	ClusterURLResolverFunc v1alpha1.ClusterURLResolver
-	// EnableHTTP2 indicates whether to enable HTTP/2 for controller-manager server
-	EnableHTTP2 bool
-	// MetricsBindAddress is the bind address for metrics server
-	MetricsBindAddress string
-	// MetricsSecureServe indicates whether to serve metrics over HTTPS
-	MetricsSecureServe bool
 	// SchemaHandler is the type of schema handler to use (e.g., "file", "grpc")
 	SchemaHandler string
 	// GRPCListenAddr is the gRPC server listener address (only used if SchemaHandler is "grpc")
@@ -77,6 +72,8 @@ type ExtraOptions struct {
 type completedOptions struct {
 	Logs *logs.Options
 
+	Common *commonsconfig.CommonServiceConfig
+
 	// Provider specific options
 	ProviderKcp *providerkcp.CompletedOptions
 
@@ -94,6 +91,7 @@ func NewOptions() *Options {
 
 	opts := &Options{
 		Logs:        logs,
+		Common:      commonsconfig.NewDefaultConfig(),
 		ProviderKcp: providerkcp.NewOptions(),
 
 		ExtraOptions: ExtraOptions{
@@ -104,11 +102,8 @@ func NewOptions() *Options {
 			GRPCMaxSendMsgSize:       defaults.DefaultGRPCMaxMsgSize,
 			AnchorResource:           "object.metadata.name == 'default'",
 			ResourceGVR:              "namespaces.v1",
-			MetricsBindAddress:       "0",
-			EnableHTTP2:              false,
-			MetricsSecureServe:       false,
-			ClusterURLResolverFunc:   v1alpha1.DefaultClusterURLResolverFunc,
 			EnableResourceController: true,
+			ClusterURLResolverFunc:   v1alpha1.DefaultClusterURLResolverFunc,
 		},
 	}
 	return opts
@@ -122,9 +117,12 @@ var providerAliases = map[string]string{
 
 func (options *Options) AddFlags(fs *pflag.FlagSet) {
 	logsv1.AddFlags(options.Logs, fs)
+	options.Common.AddFlags(fs)
 	options.ProviderKcp.AddFlags(fs)
 
-	fs.StringVar(&options.KubeConfig, "kubeconfig", options.KubeConfig, "path to a kubeconfig. Only required if out-of-cluster")
+	// Hide commons log flags — we use k8s.io/component-base/logs instead.
+	_ = fs.MarkHidden("log-level")
+	_ = fs.MarkHidden("no-json")
 
 	fs.StringVar(&options.Provider, "multicluster-runtime-provider", options.Provider,
 		fmt.Sprintf("The multicluster runtime provider. Possible values are: %v", sets.List(sets.Set[string](sets.StringKeySet(providerAliases)))),
@@ -146,10 +144,6 @@ func (options *Options) AddFlags(fs *pflag.FlagSet) {
 
 	fs.StringSliceVar(&options.CacheNamespaces, "cache-namespaces", options.CacheNamespaces, "Namespaces to restrict the cache to for namespaced resources (e.g. secrets, configmaps). Cluster-scoped resources are unaffected. When empty, all namespaces are cached")
 
-	fs.BoolVar(&options.EnableHTTP2, "enable-http2", options.EnableHTTP2, "Enable HTTP/2 for controller-manager server")
-	fs.StringVar(&options.MetricsBindAddress, "metrics-bind-address", options.MetricsBindAddress, "The address the metric endpoint binds to.")
-	fs.BoolVar(&options.MetricsSecureServe, "metrics-secure-serve", options.MetricsSecureServe, "Serve metrics over HTTPS.")
-
 	fs.BoolVar(&options.EnableResourceController, "enable-resource-controller", options.EnableResourceController, "Enable the resource controller for watching the configured anchor resource and generating schemas")
 	fs.BoolVar(&options.EnableClusterAccessController, "enable-clusteraccess-controller", options.EnableClusterAccessController, "Enable the ClusterAccess controller for managing remote cluster schemas")
 }
@@ -158,6 +152,7 @@ func (options *Options) Complete() (*CompletedOptions, error) {
 	co := &CompletedOptions{
 		completedOptions: &completedOptions{
 			Logs:         options.Logs,
+			Common:       options.Common,
 			ExtraOptions: options.ExtraOptions,
 		},
 	}
@@ -185,7 +180,7 @@ func (options *CompletedOptions) Validate() error {
 
 	// Multi-mode specific validation
 	if provider == "multi" {
-		if options.KubeConfig == "" {
+		if options.Common.Kubeconfig == "" {
 			return fmt.Errorf("--kubeconfig is required when provider is 'multi' (used for kcp endpoint)")
 		}
 		if options.SingleKubeConfig == "" {

@@ -1,8 +1,11 @@
 package listener
 
 import (
+	"context"
 	"fmt"
+	"time"
 
+	"github.com/platform-mesh/golang-commons/traces"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/options"
 	"github.com/spf13/cobra"
@@ -50,6 +53,18 @@ func (c *command) run(cmd *cobra.Command, args []string) error {
 	}
 
 	ctx := genericapiserver.SetupSignalContext()
+
+	if completed.Common.Tracing.Enabled {
+		shutdown, err := traces.InitProvider(ctx, completed.Common.Tracing.Collector)
+		if err != nil {
+			return fmt.Errorf("error initializing tracing: %w", err)
+		}
+		defer func() {
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			_ = shutdown(shutdownCtx)
+		}()
+	}
 
 	config, err := listener.NewConfig(completed)
 	if err != nil {
