@@ -5,8 +5,11 @@ import (
 
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/gateway"
 	gatewayconfig "github.com/platform-mesh/kubernetes-graphql-gateway/gateway/gateway/config"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/gateway/metrics"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/gateway/middleware"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/http"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/options"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 type Config struct {
@@ -43,6 +46,8 @@ func NewConfig(opts *options.CompletedOptions) (*Config, error) {
 	}
 	cfg.Gateway = gatewayServer
 
+	subMetrics := metrics.NewSubscriptionMetrics(prometheus.DefaultRegisterer)
+
 	httpServer, err := http.NewServer(http.ServerConfig{
 		Gateway:                  gatewayServer,
 		ReadyzCheck:              gatewayServer.IsReady,
@@ -56,6 +61,11 @@ func NewConfig(opts *options.CompletedOptions) (*Config, error) {
 		ReadHeaderTimeout:        cfg.Options.ReadHeaderTimeout,
 		IdleTimeout:              cfg.Options.IdleTimeout,
 		EndpointSuffix:           cfg.Options.EndpointSuffix,
+		SubscriptionMetrics: &middleware.InFlightMetrics{
+			Active:   subMetrics.Active,
+			Total:    subMetrics.Total,
+			Rejected: subMetrics.Rejected,
+		},
 		CORSConfig: http.CORSConfig{
 			AllowedOrigins:   cfg.Options.CORSAllowedOrigins,
 			AllowedHeaders:   cfg.Options.CORSAllowedHeaders,

@@ -37,6 +37,10 @@ type ServerConfig struct {
 	ReadHeaderTimeout        time.Duration
 	IdleTimeout              time.Duration
 
+	// SubscriptionMetrics provides optional Prometheus instrumentation for
+	// the subscription concurrency limiter. When nil, no metrics are recorded.
+	SubscriptionMetrics *middleware.InFlightMetrics
+
 	Addr           string
 	EndpointSuffix string
 }
@@ -56,8 +60,8 @@ type Server struct {
 func NewServer(c ServerConfig) (*Server, error) {
 	s := http.NewServeMux()
 
-	queryHandler := middleware.WithMaxInFlightRequests(middleware.WithTimeout(c.Gateway, c.RequestTimeout), c.MaxInFlightRequests)
-	subscriptionHandler := middleware.WithMaxInFlightRequests(middleware.WithTimeout(c.Gateway, c.SubscriptionTimeout), c.MaxInFlightSubscriptions)
+	queryHandler := middleware.WithMaxInFlightRequests(middleware.WithTimeout(c.Gateway, c.RequestTimeout), c.MaxInFlightRequests, nil)
+	subscriptionHandler := middleware.WithMaxInFlightRequests(middleware.WithTimeout(c.Gateway, c.SubscriptionTimeout), c.MaxInFlightSubscriptions, c.SubscriptionMetrics)
 
 	s.Handle(fmt.Sprintf("/api/clusters/{clusterName}%s", c.EndpointSuffix), http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if c.MaxRequestBodyBytes > 0 {

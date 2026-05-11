@@ -372,7 +372,7 @@ func BuildClusterMetadataFromConfig(config *rest.Config) (*ClusterMetadata, erro
 	case config.BearerToken != "":
 		metadata.Auth = &AuthMetadata{
 			Type:  AuthTypeToken,
-			Token: config.BearerToken,
+			Token: base64.StdEncoding.EncodeToString([]byte(config.BearerToken)),
 		}
 	case len(config.CertData) > 0 && len(config.KeyData) > 0:
 		metadata.Auth = &AuthMetadata{
