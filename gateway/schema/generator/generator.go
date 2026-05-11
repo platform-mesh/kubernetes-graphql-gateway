@@ -272,7 +272,7 @@ func (g *SchemaGenerator) processResource(
 	})
 
 	inputType := graphql.NewInputObject(graphql.InputObjectConfig{
-		Name:   uniqueTypeName + "Input",
+		Name:   uniqueTypeName + "_Input",
 		Fields: inputFields,
 	})
 

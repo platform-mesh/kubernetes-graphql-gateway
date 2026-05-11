@@ -166,7 +166,7 @@ func (c *Converter) handleNestedObject(fieldSpec spec.Schema, definitions map[st
 	})
 
 	newInputType := graphql.NewInputObject(graphql.InputObjectConfig{
-		Name:        SanitizeFieldName(typeName) + "Input",
+		Name:        SanitizeFieldName(typeName) + "_Input",
 		Description: fieldSpec.Description,
 		Fields:      nestedInputFields,
 	})

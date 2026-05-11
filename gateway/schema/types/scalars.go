@@ -46,7 +46,7 @@ var JSONStringScalar = graphql.NewScalar(graphql.ScalarConfig{
 
 // StringMapScalar is a GraphQL scalar for map[string]string input types.
 var StringMapScalar = graphql.NewScalar(graphql.ScalarConfig{
-	Name:        "StringMapInput",
+	Name:        "StringMap_Input",
 	Description: "Input type for a map from strings to strings.",
 	Serialize: func(value any) any {
 		return value
