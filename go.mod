@@ -10,12 +10,12 @@ require (
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/gobuffalo/flect v1.0.3
 	github.com/golang-jwt/jwt/v5 v5.3.1
-	github.com/google/cel-go v0.28.0
+	github.com/google/cel-go v0.28.1
 	github.com/google/gnostic-models v0.7.1
 	github.com/graphql-go/graphql v0.8.1
 	github.com/graphql-go/handler v0.2.4
 	github.com/jellydator/ttlcache/v3 v3.4.0
-	github.com/kcp-dev/multicluster-provider v0.6.0
+	github.com/kcp-dev/multicluster-provider v0.7.0
 	github.com/kcp-dev/sdk v0.31.1
 	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/client_model v0.6.2
