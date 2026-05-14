@@ -1,4 +1,4 @@
-version: '3'
+version: "3"
 
 vars:
   LOCAL_BIN: bin
@@ -33,7 +33,7 @@ tasks:
   ## Code Generation
   generate:
     desc: "Generate all CRD-related files (manifests + deepcopy methods)"
-    deps: [setup:controller-gen, setup:kcp-apigen ]
+    deps: [setup:controller-gen, setup:kcp-apigen]
     cmds:
       - "{{.LOCAL_BIN}}/controller-gen object crd:crdVersions=v1 paths=./apis/v1alpha1 output:crd:artifacts:config=config/crd"
       - "{{.LOCAL_BIN}}/apigen --output-dir config/kcp --input-dir config/crd"
@@ -96,7 +96,7 @@ tasks:
         vars:
           ADDITIONAL_COMMAND_ARGS: -coverprofile=./cover.out -covermode=atomic -coverpkg=./...
   cover:
-    deps: [setup:envtest, setup:go-test-coverage ]
+    deps: [setup:envtest, setup:go-test-coverage]
     cmds:
       - task: envtest
         vars:
@@ -136,7 +136,7 @@ tasks:
   listener:
     desc: "Start the listener server (kills existing process on port 8090 if needed)"
     cmds:
-      - go run ./cmd/listener/listener.go 
+      - go run ./cmd/listener/listener.go
 
   listener-kcp:
     desc: "Start the listener server (kills existing process on port 8090 if needed)"

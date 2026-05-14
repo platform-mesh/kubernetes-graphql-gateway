@@ -1,9 +1,11 @@
 package resolver
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/graphql-go/graphql"
 	"github.com/graphql-go/graphql/language/ast"
@@ -12,11 +14,14 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/utils/clock"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -30,6 +35,15 @@ const (
 	EventTypeAdded    = "ADDED"
 	EventTypeModified = "MODIFIED"
 	EventTypeDeleted  = "DELETED"
+)
+
+const (
+	watchReconnectInitialDelay = 800 * time.Millisecond
+	watchReconnectMaxDelay     = 30 * time.Second
+	watchReconnectFactor       = 2.0
+	watchReconnectJitter       = 1.0
+	watchReconnectSteps        = 10
+	watchReconnectResetAfter   = 2 * time.Minute
 )
 
 // SubscriptionEnvelope represents the envelope for a subscription update
@@ -161,130 +175,182 @@ func (r *Service) runWatch(
 	// If no resourceVersion provided, perform an initial LIST to obtain current items and resourceVersion,
 	// If a resourceVersion is provided, start WATCH from that resourceVersion without initial listing.
 
-	var watchOpts []client.ListOption
-	watchOpts = append(watchOpts, opts...)
-
 	// Track last-seen objects for change detection on MODIFIED
 	previousObjects := make(map[string]*unstructured.Unstructured)
 
-	if resourceVersion == "" {
-		// Initial LIST without a resourceVersion to get current items and resourceVersion
-		if err := r.runtimeClient.List(ctx, list, opts...); err != nil {
-			logger.Error(err, "Failed to list resources for initial watch state")
-			sendErr(fmt.Errorf("failed to list resources for initial watch state: %w", err))
-			return
-		}
+	lastRV := resourceVersion
 
-		for i := range list.Items {
-			item := list.Items[i]
-			key := item.GetNamespace() + "/" + item.GetName()
-			previousObjects[key] = item.DeepCopy()
-
-			envelope := SubscriptionEnvelope{
-				Type:   EventTypeAdded,
-				Object: item.Object,
-			}
-			select {
-			case <-ctx.Done():
-				return
-			case resultChannel <- envelope:
-			}
-		}
-
-		// Start WATCH from the LIST's resourceVersion
-		rv := list.GetResourceVersion()
-		if rv != "" {
-			watchOpts = append(watchOpts, &client.ListOptions{Raw: &metav1.ListOptions{ResourceVersion: rv}})
-		}
-	} else {
-		// Start WATCH from provided resourceVersion
-		watchOpts = append(watchOpts, &client.ListOptions{Raw: &metav1.ListOptions{ResourceVersion: resourceVersion}})
+	backoff := wait.Backoff{
+		Duration: watchReconnectInitialDelay,
+		Cap:      watchReconnectMaxDelay,
+		Steps:    watchReconnectSteps,
+		Factor:   watchReconnectFactor,
+		Jitter:   watchReconnectJitter,
 	}
+	delay := backoff.DelayWithReset(&clock.RealClock{}, watchReconnectResetAfter)
 
-	watcher, err := r.runtimeClient.Watch(ctx, list, watchOpts...)
-	if err != nil {
-		logger.Error(err, "Failed to start watch")
-		sendErr(fmt.Errorf("failed to start watch: %w", err))
-		return
-	}
-	defer watcher.Stop()
-
-	for {
-		select {
-		case event, ok := <-watcher.ResultChan():
-			if !ok {
-				return
-			}
-			obj, ok := event.Object.(*unstructured.Unstructured)
-			if !ok {
-				err = ErrFailedToCastEventObjectToUnstructured
-				logger.Error(err, "Failed to cast event object to unstructured")
-				sendErr(fmt.Errorf("failed to cast event object to unstructured: %w", err))
-				return
-			}
-			key := obj.GetNamespace() + "/" + obj.GetName()
-
-			var sendUpdate bool
-			var eventType string
-			switch event.Type {
-			case watch.Added:
-				previousObjects[key] = obj.DeepCopy()
-				sendUpdate = true
-				eventType = EventTypeAdded
-			case watch.Modified:
-				oldObj := previousObjects[key]
-				if subscribeToAll {
-					sendUpdate = true
-				} else {
-					var changed bool
-					changed, err = determineFieldChanged(oldObj, obj, fieldsToWatch)
-					if err != nil {
-						logger.Error(err, "Failed to determine field changes")
-						sendErr(fmt.Errorf("failed to determine field changed: %w", err))
-						return
-					}
-					sendUpdate = changed
+	// NOTE: Currently retries indefinitely until ctx is cancelled.
+	// This may be a candidate for a configurable max retry count or timeout
+	// if users need bounded retry behavior.
+	_ = delay.Until(ctx, true, true, func(_ context.Context) (bool, error) {
+		// --- LIST phase (when no resourceVersion is available) ---
+		if lastRV == "" {
+			if err := r.runtimeClient.List(ctx, list, opts...); err != nil {
+				if apierrors.IsForbidden(err) || apierrors.IsUnauthorized(err) {
+					logger.Error(err, "Permission denied listing resources")
+					sendErr(err)
+					return true, nil
 				}
-				previousObjects[key] = obj.DeepCopy()
-				if sendUpdate {
-					eventType = EventTypeModified
-				}
-			case watch.Deleted:
-				delete(previousObjects, key)
-				sendUpdate = true
-				eventType = EventTypeDeleted
+				logger.Error(err, "Failed to list resources, will retry")
+				return false, nil
 			}
 
-			if sendUpdate {
-				var payload any = obj.Object
-
-				// Ensure payload is a non-nil map; if not, provide minimal metadata so
-				// clients can reconcile caches
-				if m, ok := payload.(map[string]any); !ok || m == nil {
-					payload = SubscriptionObject{
-						Metadata: SubscriptionMetadata{
-							Name:            obj.GetName(),
-							Namespace:       obj.GetNamespace(),
-							ResourceVersion: obj.GetResourceVersion(),
-						},
-					}
-				}
+			previousObjects = make(map[string]*unstructured.Unstructured)
+			for i := range list.Items {
+				item := list.Items[i]
+				key := item.GetNamespace() + "/" + item.GetName()
+				previousObjects[key] = item.DeepCopy()
 
 				envelope := SubscriptionEnvelope{
-					Type:   eventType,
-					Object: payload,
+					Type:   EventTypeAdded,
+					Object: item.Object,
 				}
-
 				select {
 				case <-ctx.Done():
-					return
+					return true, nil
 				case resultChannel <- envelope:
 				}
 			}
-		case <-ctx.Done():
-			return
+
+			lastRV = list.GetResourceVersion()
 		}
-	}
+
+		// --- WATCH phase ---
+		watchOpts := append([]client.ListOption{}, opts...)
+		if lastRV != "" {
+			watchOpts = append(watchOpts, &client.ListOptions{
+				Raw: &metav1.ListOptions{ResourceVersion: lastRV},
+			})
+		}
+
+		watcher, err := r.runtimeClient.Watch(ctx, list, watchOpts...)
+		if err != nil {
+			if apierrors.IsForbidden(err) || apierrors.IsUnauthorized(err) {
+				logger.Error(err, "Permission denied starting watch")
+				sendErr(err)
+				return true, nil
+			}
+			if apierrors.IsResourceExpired(err) || apierrors.IsGone(err) {
+				logger.V(1).Info("Resource version expired on watch creation, will re-list")
+				lastRV = ""
+				return false, nil
+			}
+			logger.Error(err, "Failed to start watch, will retry")
+			return false, nil
+		}
+		defer watcher.Stop()
+
+		// --- EVENT LOOP ---
+		for {
+			select {
+			case event, ok := <-watcher.ResultChan():
+				if !ok {
+					logger.V(1).Info("Watch channel closed, reconnecting")
+					return false, nil
+				}
+
+				if event.Type == watch.Error {
+					statusErr := apierrors.FromObject(event.Object)
+					if apierrors.IsForbidden(statusErr) || apierrors.IsUnauthorized(statusErr) {
+						logger.Error(statusErr, "Permission denied during watch")
+						sendErr(statusErr)
+						return true, nil
+					}
+					if apierrors.IsResourceExpired(statusErr) || apierrors.IsGone(statusErr) {
+						logger.V(1).Info("Resource version expired, restarting watch")
+						lastRV = ""
+						return false, nil
+					}
+					logger.Error(statusErr, "Watch error event, restarting",
+						"reason", string(apierrors.ReasonForError(statusErr)),
+					)
+					return false, nil
+				}
+
+				obj, ok := event.Object.(*unstructured.Unstructured)
+				if !ok {
+					err = ErrFailedToCastEventObjectToUnstructured
+					logger.Error(err, "Failed to cast event object to unstructured")
+					sendErr(fmt.Errorf("failed to cast event object to unstructured: %w", err))
+					return true, nil
+				}
+
+				if rv := obj.GetResourceVersion(); rv != "" {
+					lastRV = rv
+				}
+
+				key := obj.GetNamespace() + "/" + obj.GetName()
+
+				var sendUpdate bool
+				var eventType string
+				switch event.Type {
+				case watch.Added:
+					previousObjects[key] = obj.DeepCopy()
+					sendUpdate = true
+					eventType = EventTypeAdded
+				case watch.Modified:
+					oldObj := previousObjects[key]
+					if subscribeToAll {
+						sendUpdate = true
+					} else {
+						var changed bool
+						changed, err = determineFieldChanged(oldObj, obj, fieldsToWatch)
+						if err != nil {
+							logger.Error(err, "Failed to determine field changes")
+							sendErr(fmt.Errorf("failed to determine field changed: %w", err))
+							return true, nil
+						}
+						sendUpdate = changed
+					}
+					previousObjects[key] = obj.DeepCopy()
+					if sendUpdate {
+						eventType = EventTypeModified
+					}
+				case watch.Deleted:
+					delete(previousObjects, key)
+					sendUpdate = true
+					eventType = EventTypeDeleted
+				}
+
+				if sendUpdate {
+					var payload any = obj.Object
+
+					if m, ok := payload.(map[string]any); !ok || m == nil {
+						payload = SubscriptionObject{
+							Metadata: SubscriptionMetadata{
+								Name:            obj.GetName(),
+								Namespace:       obj.GetNamespace(),
+								ResourceVersion: obj.GetResourceVersion(),
+							},
+						}
+					}
+
+					envelope := SubscriptionEnvelope{
+						Type:   eventType,
+						Object: payload,
+					}
+
+					select {
+					case <-ctx.Done():
+						return true, nil
+					case resultChannel <- envelope:
+					}
+				}
+			case <-ctx.Done():
+				return true, nil
+			}
+		}
+	})
 }
 
 // extractRequestedFields uses p.Info to determine the fields requested by the client.
