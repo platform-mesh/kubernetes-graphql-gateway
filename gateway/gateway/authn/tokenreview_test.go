@@ -16,6 +16,15 @@ import (
 	k8stesting "k8s.io/client-go/testing"
 )
 
+func TestNoopValidatorAcceptsAnyToken(t *testing.T) {
+	var v Validator = NoopValidator{}
+	for _, tok := range []string{"", "bogus", "header.payload.sig"} {
+		ok, err := v.Validate(context.Background(), tok)
+		assert.NoError(t, err)
+		assert.True(t, ok, "NoopValidator must accept token %q", tok)
+	}
+}
+
 func fakeClientset(authenticated bool, calls *atomic.Int32, returnErr error) *fake.Clientset {
 	cs := fake.NewSimpleClientset()
 	cs.PrependReactor("create", "tokenreviews", func(action k8stesting.Action) (bool, runtime.Object, error) {

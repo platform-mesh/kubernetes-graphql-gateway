@@ -38,6 +38,7 @@ func New(
 	graphqlCfg config.GraphQL,
 	limits config.Limits,
 	tokenReviewCacheTTL time.Duration,
+	injectedValidator authn.Validator,
 ) (*Endpoint, error) {
 	schemaData, err := parseSchema(schemaJSON)
 	if err != nil {
@@ -49,14 +50,21 @@ func New(
 		return nil, fmt.Errorf("failed to create cluster: %w", err)
 	}
 
-	validatorCtx, validatorCancel := context.WithCancel(ctx)
-
-	validator, err := authn.NewTokenReviewValidator(cl.AdminConfig(), tokenReviewCacheTTL)
-	if err != nil {
-		validatorCancel()
-		return nil, fmt.Errorf("failed to create token validator: %w", err)
+	// When the caller injects a Validator, they own its lifecycle. Otherwise
+	// we build a per-endpoint TokenReviewValidator and own it ourselves.
+	validator := injectedValidator
+	validatorCancel := context.CancelFunc(func() {})
+	if validator == nil {
+		validatorCtx, trCancel := context.WithCancel(ctx)
+		tr, err := authn.NewTokenReviewValidator(cl.AdminConfig(), tokenReviewCacheTTL)
+		if err != nil {
+			trCancel()
+			return nil, fmt.Errorf("failed to create token validator: %w", err)
+		}
+		go tr.Start(validatorCtx)
+		validator = tr
+		validatorCancel = trCancel
 	}
-	go validator.Start(validatorCtx)
 
 	resolverProvider := resolver.New(cl.Client())
 
