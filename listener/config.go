@@ -138,7 +138,12 @@ func NewConfig(options *options.CompletedOptions) (*Config, error) {
 			return nil, err
 		}
 
-		provider, err := kcpprovider.New(config.ClientConfig, options.ProviderKcp.APIExportEndpointSliceName, apiexport.Options{
+		kcpClientCfg, err := options.ProviderKcp.ApplyLogicalClusterToConfig(config.ClientConfig)
+		if err != nil {
+			return nil, fmt.Errorf("error applying logical cluster to kcp client config: %w", err)
+		}
+
+		provider, err := kcpprovider.New(kcpClientCfg, options.ProviderKcp.APIExportEndpointSliceName, apiexport.Options{
 			Scheme: scheme,
 		})
 		if err != nil {
@@ -153,8 +158,13 @@ func NewConfig(options *options.CompletedOptions) (*Config, error) {
 			return nil, err
 		}
 
+		kcpClientCfg, err := options.ProviderKcp.ApplyLogicalClusterToConfig(config.ClientConfig)
+		if err != nil {
+			return nil, fmt.Errorf("error applying logical cluster to kcp client config: %w", err)
+		}
+
 		// Create kcp provider from main kubeconfig
-		kcpProv, err := kcpprovider.New(config.ClientConfig, options.ProviderKcp.APIExportEndpointSliceName, apiexport.Options{
+		kcpProv, err := kcpprovider.New(kcpClientCfg, options.ProviderKcp.APIExportEndpointSliceName, apiexport.Options{
 			Scheme: scheme,
 		})
 		if err != nil {
