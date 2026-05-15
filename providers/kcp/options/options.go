@@ -21,6 +21,13 @@ type Options struct {
 type ExtraOptions struct {
 	// APIExportEndpointSliceName is the name of the APIExport EndpointSlice to watch.
 	APIExportEndpointSliceName string
+	// APIExportEndpointSliceLogicalCluster is the logical cluster path where the
+	// APIExportEndpointSlice lives, e.g. "root:providers". When set, the listener
+	// rest config host is rewritten to point to that logical cluster so the
+	// EndpointSlice is fetched from the correct workspace regardless of what the
+	// kubeconfig's current context points to. Leave empty to use the kubeconfig
+	// current context.
+	APIExportEndpointSliceLogicalCluster string
 	// WorkspaceSchemaHostOverride is the host override for workspace schema generation.
 	WorkspaceSchemaHostOverride string
 	// WorkspaceSchemaKubeconfigOverride is the kubeconfig override for workspace schema generation.
@@ -48,6 +55,7 @@ func NewOptions() *Options {
 
 func (options *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&options.APIExportEndpointSliceName, "apiexport-endpoint-slice-name", options.APIExportEndpointSliceName, "name of the APIExport EndpointSlice to watch")
+	fs.StringVar(&options.APIExportEndpointSliceLogicalCluster, "apiexport-endpoint-slice-logicalcluster", options.APIExportEndpointSliceLogicalCluster, "logical cluster path where the APIExportEndpointSlice lives, e.g. root:providers. When set, overrides the kubeconfig current-context workspace.")
 	fs.StringVar(&options.WorkspaceSchemaHostOverride, "workspace-schema-host-override", options.WorkspaceSchemaHostOverride, "host override for workspace schema generation")
 	fs.StringVar(&options.WorkspaceSchemaKubeconfigOverride, "workspace-schema-kubeconfig-override", options.WorkspaceSchemaKubeconfigOverride, "kubeconfig override for workspace schema generation. If set together with --workspace-schema-host-override, the host override will take precedence.")
 }
@@ -82,6 +90,24 @@ func (options *CompletedOptions) Validate() error {
 	}
 
 	return nil
+}
+
+// ApplyLogicalClusterToConfig returns a copy of cfg with Host rewritten to
+// point at the logical cluster path configured via
+// APIExportEndpointSliceLogicalCluster. If the field is empty, cfg is returned
+// unchanged.
+func (options *CompletedOptions) ApplyLogicalClusterToConfig(cfg *rest.Config) (*rest.Config, error) {
+	if options.APIExportEndpointSliceLogicalCluster == "" {
+		return cfg, nil
+	}
+	parsed, err := url.Parse(cfg.Host)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse rest config host %q: %w", cfg.Host, err)
+	}
+	parsed.Path = path.Join("clusters", options.APIExportEndpointSliceLogicalCluster)
+	out := rest.CopyConfig(cfg)
+	out.Host = parsed.String()
+	return out, nil
 }
 
 func (options *CompletedOptions) GetClusterMetadataOverrideFunc() v1alpha1.ClusterMetadataFunc {
