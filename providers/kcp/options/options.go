@@ -30,10 +30,10 @@ type ExtraOptions struct {
 	APIExportEndpointSliceLogicalCluster string
 	// WorkspaceSchemaHostOverride is the host override for workspace schema generation.
 	WorkspaceSchemaHostOverride string
-	// workspaceSchemaKubeconfigOverride is the kubeconfig override for workspace schema generation.
+	// WorkspaceSchemaKubeconfigOverride is the kubeconfig override for workspace schema generation.
 	// If set together with WorkspaceSchemaHostOverride, WorkspaceSchemaHostOverride will take precedence.
-	workspaceSchemaKubeconfigOverride string
-	// WorkspaceSchemaKubeconfigRestConfig is the rest config built from workspaceSchemaKubeconfigOverride
+	WorkspaceSchemaKubeconfigOverride string
+	// WorkspaceSchemaKubeconfigRestConfig is the rest config built from WorkspaceSchemaKubeconfigOverride
 	WorkspaceSchemaKubeconfigRestConfig *rest.Config
 }
 
@@ -57,13 +57,13 @@ func (options *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&options.APIExportEndpointSliceName, "apiexport-endpoint-slice-name", options.APIExportEndpointSliceName, "name of the APIExport EndpointSlice to watch")
 	fs.StringVar(&options.APIExportEndpointSliceLogicalCluster, "apiexport-endpoint-slice-logicalcluster", options.APIExportEndpointSliceLogicalCluster, "logical cluster path where the APIExportEndpointSlice lives, e.g. root:providers. When set, overrides the kubeconfig current-context workspace.")
 	fs.StringVar(&options.WorkspaceSchemaHostOverride, "workspace-schema-host-override", options.WorkspaceSchemaHostOverride, "host override for workspace schema generation")
-	fs.StringVar(&options.workspaceSchemaKubeconfigOverride, "workspace-schema-kubeconfig-override", options.workspaceSchemaKubeconfigOverride, "kubeconfig override for workspace schema generation. If set together with --workspace-schema-host-override, the host override will take precedence.")
+	fs.StringVar(&options.WorkspaceSchemaKubeconfigOverride, "workspace-schema-kubeconfig-override", options.WorkspaceSchemaKubeconfigOverride, "kubeconfig override for workspace schema generation. If set together with --workspace-schema-host-override, the host override will take precedence.")
 }
 
 func (options *Options) Complete() (*CompletedOptions, error) {
-	if options.workspaceSchemaKubeconfigOverride != "" {
+	if options.WorkspaceSchemaKubeconfigOverride != "" {
 		// Load the kubeconfig and build rest config
-		config, err := clientcmd.BuildConfigFromFlags("", options.workspaceSchemaKubeconfigOverride)
+		config, err := clientcmd.BuildConfigFromFlags("", options.WorkspaceSchemaKubeconfigOverride)
 		if err != nil {
 			return nil, fmt.Errorf("failed to build rest config from kubeconfig: %w", err)
 		}
@@ -79,11 +79,11 @@ func (options *Options) Complete() (*CompletedOptions, error) {
 }
 
 func (options *CompletedOptions) Validate() error {
-	if options.workspaceSchemaKubeconfigOverride != "" {
+	if options.WorkspaceSchemaKubeconfigOverride != "" {
 		// Check if kubeconfig file exists
-		if _, err := os.Stat(options.workspaceSchemaKubeconfigOverride); err != nil {
+		if _, err := os.Stat(options.WorkspaceSchemaKubeconfigOverride); err != nil {
 			if os.IsNotExist(err) {
-				return fmt.Errorf("kubeconfig file does not exist: %s", options.workspaceSchemaKubeconfigOverride)
+				return fmt.Errorf("kubeconfig file does not exist: %s", options.WorkspaceSchemaKubeconfigOverride)
 			}
 			return fmt.Errorf("failed to access kubeconfig file: %w", err)
 		}
