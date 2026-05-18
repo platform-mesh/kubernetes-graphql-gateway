@@ -1,6 +1,10 @@
 package config
 
-import "time"
+import (
+	"time"
+
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/gateway/authn"
+)
 
 // Gateway holds the complete gateway service configuration.
 type Gateway struct {
@@ -23,7 +27,23 @@ type Gateway struct {
 	Limits Limits
 
 	// TokenReviewCacheTTL is the duration to cache TokenReview results.
+	// Ignored when Validator is non-nil — the supplied validator owns its
+	// own caching strategy.
 	TokenReviewCacheTTL time.Duration
+
+	// Validator authenticates incoming bearer tokens. When nil (the default),
+	// each endpoint builds a TokenReviewValidator against its cluster's admin
+	// config and owns the validator's lifecycle.
+	//
+	// Set this when the gateway is embedded behind a mux that has already
+	// authenticated the caller — pass authn.NoopValidator{} to skip the
+	// per-request TokenReview entirely, or inject a custom Validator for
+	// alternate auth strategies.
+	//
+	// When set, the caller owns the validator's lifecycle (e.g. calling
+	// Start on TokenReviewValidator). The same Validator instance is shared
+	// across all endpoints.
+	Validator authn.Validator
 }
 
 // GraphQL holds GraphQL handler configuration.

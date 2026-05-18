@@ -22,6 +22,18 @@ type Validator interface {
 	Validate(ctx context.Context, token string) (bool, error)
 }
 
+// NoopValidator accepts every token. Intended for embedded deployments where
+// the caller has already authenticated the request before reaching the gateway
+// (e.g. an outer mux that performs its own auth and injects the token via
+// utilscontext.SetToken purely for upstream proxying). Do not use as the
+// front-line validator on internet-facing deployments.
+type NoopValidator struct{}
+
+// Validate always reports the token as authenticated.
+func (NoopValidator) Validate(_ context.Context, _ string) (bool, error) {
+	return true, nil
+}
+
 const maxCacheSize = 10000
 
 // TokenReviewValidator validates tokens via the Kubernetes TokenReview API.

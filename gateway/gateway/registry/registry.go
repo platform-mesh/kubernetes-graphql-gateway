@@ -46,6 +46,7 @@ func (r *Registry) OnSchemaChanged(ctx context.Context, clusterName string, sche
 		r.config.GraphQL,
 		r.config.Limits,
 		r.config.TokenReviewCacheTTL,
+		r.config.Validator,
 	)
 	if err != nil {
 		logger.Error(err, "Failed to create endpoint", "cluster", clusterName)
