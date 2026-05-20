@@ -8,6 +8,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/jellydator/ttlcache/v3"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/metrics"
 	"golang.org/x/sync/singleflight"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
@@ -101,10 +102,17 @@ func (v *TokenReviewValidator) Validate(ctx context.Context, token string) (bool
 	key := hashToken(token)
 	if v.cache != nil {
 		if item := v.cache.Get(key); item != nil {
+			labelResult := "denied"
+			if item.Value() {
+				labelResult = "allowed"
+			}
+			metrics.AuthRequestsTotal.WithLabelValues(labelResult, "cache").Inc()
+			metrics.AuthRequestDuration.WithLabelValues("cache").Observe(0)
 			return item.Value(), nil
 		}
 	}
 
+	start := time.Now()
 	result, err, _ := v.inflight.Do(key, func() (any, error) {
 		tr, err := v.clientset.AuthenticationV1().TokenReviews().Create(ctx, &authenticationv1.TokenReview{
 			Spec: authenticationv1.TokenReviewSpec{Token: token},
@@ -125,6 +133,15 @@ func (v *TokenReviewValidator) Validate(ctx context.Context, token string) (bool
 		}
 		return tr.Status.Authenticated, nil
 	})
+
+	labelResult := "allowed"
+	if err != nil {
+		labelResult = "error"
+	} else if !result.(bool) {
+		labelResult = "denied"
+	}
+	metrics.AuthRequestsTotal.WithLabelValues(labelResult, "api").Inc()
+	metrics.AuthRequestDuration.WithLabelValues("api").Observe(time.Since(start).Seconds())
 
 	return result.(bool), err
 }
