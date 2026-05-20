@@ -14,6 +14,7 @@ import (
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/gateway/graphql"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/gateway/queryvalidation"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/gateway/requestparser"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/metrics"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/resolver"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/schema"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/schema/extensions"
@@ -148,7 +149,30 @@ func (e *Endpoint) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Endpoint not ready", http.StatusServiceUnavailable)
 		return
 	}
-	e.handler.ServeHTTP(w, r)
+	start := time.Now()
+	operation := "query"
+	if r.Header.Get("Accept") == "text/event-stream" {
+		operation = "subscription"
+	}
+	rw := &statusResponseWriter{ResponseWriter: w, statusCode: http.StatusOK}
+	e.handler.ServeHTTP(rw, r)
+	labelResult := "success"
+	if rw.statusCode >= 400 {
+		labelResult = "error"
+	}
+	metrics.GraphQLRequestsTotal.WithLabelValues(e.name, operation, labelResult).Inc()
+	metrics.GraphQLRequestDuration.WithLabelValues(e.name, operation).Observe(time.Since(start).Seconds())
+}
+
+// statusResponseWriter wraps http.ResponseWriter to capture the HTTP status code.
+type statusResponseWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func (rw *statusResponseWriter) WriteHeader(code int) {
+	rw.statusCode = code
+	rw.ResponseWriter.WriteHeader(code)
 }
 
 func (e *Endpoint) Name() string {
