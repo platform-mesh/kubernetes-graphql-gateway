@@ -87,7 +87,7 @@ func NewConfig(options *options.CompletedOptions) (*Config, error) {
 	}
 
 	rules := clientcmd.NewDefaultClientConfigLoadingRules()
-	rules.ExplicitPath = options.KubeConfig
+	rules.ExplicitPath = options.Common.Kubeconfig
 
 	var err error
 	config.ClientConfig, err = clientcmd.NewNonInteractiveDeferredLoadingClientConfig(rules, nil).ClientConfig()
@@ -209,7 +209,7 @@ func NewConfig(options *options.CompletedOptions) (*Config, error) {
 	}
 
 	var tlsOpts []func(*tls.Config)
-	if !options.EnableHTTP2 {
+	if !options.Common.EnableHTTP2 {
 		disableHTTP2 := func(c *tls.Config) {
 			log.Info().Msg("disabling http/2")
 			c.NextProtos = []string{"http/1.1"}
@@ -218,19 +218,24 @@ func NewConfig(options *options.CompletedOptions) (*Config, error) {
 	}
 
 	opts := ctrl.Options{
-		Controller: ctrlconfig.Controller{},
+		Controller: ctrlconfig.Controller{
+			MaxConcurrentReconciles: options.Common.MaxConcurrentReconciles,
+		},
 		Cache: ctrlcache.Options{
 			DefaultNamespaces: cacheNamespaces,
 		},
 		Metrics: metricsserver.Options{
-			BindAddress:   options.MetricsBindAddress,
-			SecureServing: options.MetricsSecureServe,
+			BindAddress:   options.Common.Metrics.BindAddress,
+			SecureServing: options.Common.Metrics.Secure,
 			TLSOpts:       tlsOpts,
 		},
-		Scheme:           scheme,
-		LeaderElectionID: "72231e1f.platform-mesh.io",
+		Scheme:                  scheme,
+		LeaderElection:          options.Common.LeaderElectionEnabled,
+		LeaderElectionID:        "72231e1f.platform-mesh.io",
+		HealthProbeBindAddress:  options.Common.HealthProbeBindAddress,
+		GracefulShutdownTimeout: &options.Common.ShutdownTimeout,
 	}
-	if options.MetricsSecureServe {
+	if options.Common.Metrics.Secure {
 		opts.Metrics.FilterProvider = filters.WithAuthenticationAndAuthorization
 	}
 
