@@ -84,7 +84,9 @@ func (suite *ClusterAccessControllerTestSuite) SetupSuite() {
 	suite.Require().NoError(err, "failed to write kubeconfig")
 
 	opts := options.NewOptions()
-	opts.KubeConfig = kubeconfigPath
+	opts.Common.Kubeconfig = kubeconfigPath
+	opts.Common.Metrics.BindAddress = "0"
+	opts.Common.HealthProbeBindAddress = "0"
 	opts.SchemasDir = filepath.Join(tmpDir, "schemas")
 
 	completedOpts, err := opts.Complete()
