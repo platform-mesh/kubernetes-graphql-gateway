@@ -62,7 +62,7 @@ func (c *command) run(cmd *cobra.Command, args []string) error {
 		defer func() {
 			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			shutdown(shutdownCtx)
+			_ = shutdown(shutdownCtx)
 		}()
 	}
 
