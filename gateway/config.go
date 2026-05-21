@@ -40,6 +40,7 @@ func NewConfig(opts *options.CompletedOptions) (*Config, error) {
 			MaxQueryBatchSize:  cfg.Options.MaxQueryBatchSize,
 		},
 		TokenReviewCacheTTL: cfg.Options.TokenReviewCacheTTL,
+		Metrics:             metrics.NewCollector(prometheus.DefaultRegisterer),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create gateway server: %w", err)

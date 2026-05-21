@@ -8,7 +8,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/jellydator/ttlcache/v3"
-	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/metrics"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/gateway/metrics"
 	"golang.org/x/sync/singleflight"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
@@ -43,6 +43,7 @@ type TokenReviewValidator struct {
 	cache     *ttlcache.Cache[string, bool]
 	cacheTTL  time.Duration
 	inflight  singleflight.Group
+	metrics   *metrics.AuthMetrics
 }
 
 func hashToken(token string) string {
@@ -76,7 +77,7 @@ func newCache(ttl time.Duration) *ttlcache.Cache[string, bool] {
 // NewTokenReviewValidator creates a validator that calls TokenReview on the
 // given cluster. If cacheTTL <= 0, caching is disabled and every request
 // triggers an API call.
-func NewTokenReviewValidator(cfg *rest.Config, cacheTTL time.Duration) (*TokenReviewValidator, error) {
+func NewTokenReviewValidator(cfg *rest.Config, cacheTTL time.Duration, m *metrics.AuthMetrics) (*TokenReviewValidator, error) {
 	cs, err := kubernetes.NewForConfig(cfg)
 	if err != nil {
 		return nil, err
@@ -85,6 +86,7 @@ func NewTokenReviewValidator(cfg *rest.Config, cacheTTL time.Duration) (*TokenRe
 		clientset: cs,
 		cache:     newCache(cacheTTL),
 		cacheTTL:  cacheTTL,
+		metrics:   m,
 	}, nil
 }
 
@@ -102,23 +104,27 @@ func (v *TokenReviewValidator) Validate(ctx context.Context, token string) (bool
 	key := hashToken(token)
 	if v.cache != nil {
 		if item := v.cache.Get(key); item != nil {
-			labelResult := "denied"
-			if item.Value() {
-				labelResult = "allowed"
+			if v.metrics != nil {
+				labelResult := metrics.ResultDenied
+				if item.Value() {
+					labelResult = metrics.ResultAllowed
+				}
+				v.metrics.RecordCacheHit(labelResult)
 			}
-			metrics.AuthRequestsTotal.WithLabelValues(labelResult, "cache").Inc()
-			metrics.AuthRequestDuration.WithLabelValues("cache").Observe(0)
 			return item.Value(), nil
 		}
 	}
 
-	start := time.Now()
 	result, err, _ := v.inflight.Do(key, func() (any, error) {
+		start := time.Now()
 		tr, err := v.clientset.AuthenticationV1().TokenReviews().Create(ctx, &authenticationv1.TokenReview{
 			Spec: authenticationv1.TokenReviewSpec{Token: token},
 		}, metav1.CreateOptions{})
 		if err != nil {
 			log.FromContext(ctx).Error(err, "TokenReview API call failed")
+			if v.metrics != nil {
+				v.metrics.RecordAPICall(metrics.ResultError, time.Since(start))
+			}
 			return false, err
 		}
 
@@ -131,17 +137,17 @@ func (v *TokenReviewValidator) Validate(ctx context.Context, token string) (bool
 			}
 			v.cache.Set(key, tr.Status.Authenticated, itemTTL)
 		}
+
+		if v.metrics != nil {
+			labelResult := metrics.ResultAllowed
+			if !tr.Status.Authenticated {
+				labelResult = metrics.ResultDenied
+			}
+			v.metrics.RecordAPICall(labelResult, time.Since(start))
+		}
+
 		return tr.Status.Authenticated, nil
 	})
-
-	labelResult := "allowed"
-	if err != nil {
-		labelResult = "error"
-	} else if !result.(bool) {
-		labelResult = "denied"
-	}
-	metrics.AuthRequestsTotal.WithLabelValues(labelResult, "api").Inc()
-	metrics.AuthRequestDuration.WithLabelValues("api").Observe(time.Since(start).Seconds())
 
 	return result.(bool), err
 }
