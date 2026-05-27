@@ -19,10 +19,11 @@ import (
 )
 
 type Cluster struct {
-	name     string
-	client   client.WithWatch
-	restCfg  *rest.Config
-	adminCfg *rest.Config
+	name           string
+	client         client.WithWatch
+	restCfg        *rest.Config
+	adminCfg       *rest.Config
+	tokenReviewCfg *rest.Config
 }
 
 // New creates a new Cluster connection from cluster metadata.
@@ -46,6 +47,13 @@ func New(
 	}
 
 	cluster.adminCfg = rest.CopyConfig(cluster.restCfg)
+	cluster.tokenReviewCfg = rest.CopyConfig(cluster.restCfg)
+	// When TokenReviewHost is set, all TokenReviews go to that fixed host (typically
+	// the gateway home workspace). Leave it empty so the request path template can
+	// target /clusters/<clusterName> and TokenReview runs in the workspace being queried.
+	if metadata.TokenReviewHost != "" {
+		cluster.tokenReviewCfg.Host = metadata.TokenReviewHost
+	}
 
 	basePath := hostPath(metadata.Host)
 	tpl := metadata.RequestPathTemplate
@@ -53,6 +61,11 @@ func New(
 	cluster.adminCfg.Wrap(func(rt http.RoundTripper) http.RoundTripper {
 		return roundtripper.NewPathTemplateHandler(rt, tpl, basePath)
 	})
+	if metadata.TokenReviewHost == "" {
+		cluster.tokenReviewCfg.Wrap(func(rt http.RoundTripper) http.RoundTripper {
+			return roundtripper.NewPathTemplateHandler(rt, tpl, basePath)
+		})
+	}
 
 	tlsConfig := cluster.restCfg.TLSClientConfig
 	baseRT, err := roundtripper.NewBaseRoundTripper(tlsConfig)
@@ -97,16 +110,17 @@ func (c *Cluster) RestConfig() *rest.Config {
 	return rest.CopyConfig(c.restCfg)
 }
 
-// AdminConfig returns a rest.Config with the cluster's admin credentials,
-// suitable for privileged API calls like TokenReview.
-func (c *Cluster) AdminConfig() *rest.Config {
-	return rest.CopyConfig(c.adminCfg)
+// TokenReviewConfig returns a rest.Config configured for validating bearer
+// tokens against the workspace targeted by this cluster.
+func (c *Cluster) TokenReviewConfig() *rest.Config {
+	return rest.CopyConfig(c.tokenReviewCfg)
 }
 
 func (c *Cluster) Close() {
 	c.client = nil
 	c.adminCfg = nil
 	c.restCfg = nil
+	c.tokenReviewCfg = nil
 }
 
 func hostPath(host string) string {

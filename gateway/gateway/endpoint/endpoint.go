@@ -56,7 +56,7 @@ func New(
 	validatorCancel := context.CancelFunc(func() {})
 	if validator == nil {
 		validatorCtx, trCancel := context.WithCancel(ctx)
-		tr, err := authn.NewTokenReviewValidator(cl.AdminConfig(), tokenReviewCacheTTL)
+		tr, err := authn.NewTokenReviewValidator(cl.TokenReviewConfig(), tokenReviewCacheTTL)
 		if err != nil {
 			trCancel()
 			return nil, fmt.Errorf("failed to create token validator: %w", err)

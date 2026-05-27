@@ -3,6 +3,8 @@ package options
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/client-go/rest"
 )
 
@@ -70,4 +72,23 @@ func TestApplyLogicalClusterToConfig(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGetClusterMetadataOverrideFunc_perClusterHostWithoutTokenReviewHost(t *testing.T) {
+	opts, err := (&Options{
+		ExtraOptions: ExtraOptions{
+			WorkspaceSchemaKubeconfigRestConfig: &rest.Config{
+				Host: "https://kcp.example/clusters/root:platform-mesh-system",
+			},
+		},
+	}).Complete()
+	require.NoError(t, err)
+
+	override := opts.GetClusterMetadataOverrideFunc()
+	metadata, err := override("root:orgs:org1:account1")
+	require.NoError(t, err)
+	require.NotNil(t, metadata)
+
+	assert.Equal(t, "https://kcp.example/clusters/root:orgs:org1:account1", metadata.Host)
+	assert.Empty(t, metadata.TokenReviewHost, "TokenReview must use per-cluster path injection, not a fixed home workspace host")
 }

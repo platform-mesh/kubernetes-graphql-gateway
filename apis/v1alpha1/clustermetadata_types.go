@@ -43,6 +43,7 @@ type ClusterMetadata struct {
 	Path                string        `json:"path,omitempty"`
 	RequestPathTemplate string        `json:"requestPathTemplate,omitempty"`
 	IntrospectionPath   string        `json:"introspectionPath,omitempty"`
+	TokenReviewHost     string        `json:"tokenReviewHost,omitempty"`
 	Auth                *AuthMetadata `json:"auth,omitempty"`
 	CA                  *CAMetadata   `json:"ca,omitempty"`
 }

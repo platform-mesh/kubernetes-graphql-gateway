@@ -124,6 +124,8 @@ func (options *CompletedOptions) GetClusterMetadataOverrideFunc() v1alpha1.Clust
 			}
 			parsed.Path = path.Join("clusters", clusterName)
 			metadata.Host = parsed.String()
+			// Do not set metadata.TokenReviewHost: TokenReview must hit the same
+			// per-cluster path as GraphQL (see gateway/gateway/cluster/cluster.go).
 
 			return metadata, nil
 		}
