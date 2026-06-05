@@ -108,6 +108,14 @@ tasks:
     cmds:
       - go tool cover -html=cover.out -o coverage.html
       - open coverage.html || xdg-open coverage.html || start coverage.html
+  fuzz:
+    desc: "Run fuzz tests with a configurable duration (default 30s per target)"
+    vars:
+      FUZZTIME: '{{.FUZZTIME | default "30s"}}'
+    cmds:
+      - go test ./gateway/schema/types/ -run=^$ -fuzz=FuzzSanitizeFieldName -fuzztime={{.FUZZTIME}} -count=1
+      - go test ./gateway/gateway/queryvalidation/ -run=^$ -fuzz=FuzzValidate -fuzztime={{.FUZZTIME}} -count=1
+      - go test ./gateway/utils/context/ -run=^$ -fuzz=FuzzFindClusterTarget -fuzztime={{.FUZZTIME}} -count=1
   validate:
     desc: "Run all validation checks including code generation, linting, and testing"
     cmds:
