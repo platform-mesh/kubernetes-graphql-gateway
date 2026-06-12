@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/gateway/authn"
+	"github.com/platform-mesh/kubernetes-graphql-gateway/gateway/gateway/metrics"
 )
 
 // Gateway holds the complete gateway service configuration.
@@ -44,6 +45,13 @@ type Gateway struct {
 	// Start on TokenReviewValidator). The same Validator instance is shared
 	// across all endpoints.
 	Validator authn.Validator
+
+	// EndpointMetrics, ResolverMetrics, and AuthMetrics are optional. When
+	// non-nil, each component records Prometheus metrics using the provided
+	// struct. Pass nil to disable instrumentation for that component.
+	EndpointMetrics *metrics.EndpointMetrics
+	ResolverMetrics *metrics.ResolverMetrics
+	AuthMetrics     *metrics.AuthMetrics
 }
 
 // GraphQL holds GraphQL handler configuration.

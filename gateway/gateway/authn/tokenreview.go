@@ -8,6 +8,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/jellydator/ttlcache/v3"
+	gatewaymetrics "github.com/platform-mesh/kubernetes-graphql-gateway/gateway/gateway/metrics"
 	"golang.org/x/sync/singleflight"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
@@ -42,6 +43,7 @@ type TokenReviewValidator struct {
 	cache     *ttlcache.Cache[string, bool]
 	cacheTTL  time.Duration
 	inflight  singleflight.Group
+	metrics   *gatewaymetrics.AuthMetrics
 }
 
 func hashToken(token string) string {
@@ -75,7 +77,7 @@ func newCache(ttl time.Duration) *ttlcache.Cache[string, bool] {
 // NewTokenReviewValidator creates a validator that calls TokenReview on the
 // given cluster. If cacheTTL <= 0, caching is disabled and every request
 // triggers an API call.
-func NewTokenReviewValidator(cfg *rest.Config, cacheTTL time.Duration) (*TokenReviewValidator, error) {
+func NewTokenReviewValidator(cfg *rest.Config, cacheTTL time.Duration, m *gatewaymetrics.AuthMetrics) (*TokenReviewValidator, error) {
 	cs, err := kubernetes.NewForConfig(cfg)
 	if err != nil {
 		return nil, err
@@ -84,6 +86,7 @@ func NewTokenReviewValidator(cfg *rest.Config, cacheTTL time.Duration) (*TokenRe
 		clientset: cs,
 		cache:     newCache(cacheTTL),
 		cacheTTL:  cacheTTL,
+		metrics:   m,
 	}, nil
 }
 
@@ -101,10 +104,19 @@ func (v *TokenReviewValidator) Validate(ctx context.Context, token string) (bool
 	key := hashToken(token)
 	if v.cache != nil {
 		if item := v.cache.Get(key); item != nil {
+			if v.metrics != nil {
+				labelResult := "denied"
+				if item.Value() {
+					labelResult = "allowed"
+				}
+				v.metrics.RequestsTotal.WithLabelValues(labelResult, "cache").Inc()
+				v.metrics.RequestDuration.WithLabelValues("cache").Observe(0)
+			}
 			return item.Value(), nil
 		}
 	}
 
+	start := time.Now()
 	result, err, _ := v.inflight.Do(key, func() (any, error) {
 		tr, err := v.clientset.AuthenticationV1().TokenReviews().Create(ctx, &authenticationv1.TokenReview{
 			Spec: authenticationv1.TokenReviewSpec{Token: token},
@@ -125,6 +137,17 @@ func (v *TokenReviewValidator) Validate(ctx context.Context, token string) (bool
 		}
 		return tr.Status.Authenticated, nil
 	})
+
+	if v.metrics != nil {
+		labelResult := "allowed"
+		if err != nil {
+			labelResult = "error"
+		} else if !result.(bool) {
+			labelResult = "denied"
+		}
+		v.metrics.RequestsTotal.WithLabelValues(labelResult, "api").Inc()
+		v.metrics.RequestDuration.WithLabelValues("api").Observe(time.Since(start).Seconds())
+	}
 
 	return result.(bool), err
 }

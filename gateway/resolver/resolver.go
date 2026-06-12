@@ -9,8 +9,10 @@ import (
 	"io"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/graphql-go/graphql"
+	gatewaymetrics "github.com/platform-mesh/kubernetes-graphql-gateway/gateway/gateway/metrics"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -28,16 +30,30 @@ import (
 
 type Service struct {
 	runtimeClient client.WithWatch
+	metrics       *gatewaymetrics.ResolverMetrics
 }
 
-func New(runtimeClient client.WithWatch) *Service {
+func New(runtimeClient client.WithWatch, m *gatewaymetrics.ResolverMetrics) *Service {
 	return &Service{
 		runtimeClient: runtimeClient,
+		metrics:       m,
 	}
 }
 
 func (r *Service) ListItems(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
-	return func(p graphql.ResolveParams) (any, error) {
+	return func(p graphql.ResolveParams) (result any, err error) {
+		start := time.Now()
+		defer func() {
+			if r.metrics == nil {
+				return
+			}
+			labelResult := "success"
+			if err != nil {
+				labelResult = "error"
+			}
+			r.metrics.RequestsTotal.WithLabelValues("list", gvk.Kind, labelResult).Inc()
+			r.metrics.RequestDuration.WithLabelValues("list", gvk.Kind).Observe(time.Since(start).Seconds())
+		}()
 		logger := log.FromContext(p.Context)
 		ctx, span := otel.Tracer("").Start(p.Context, "ListItems", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
@@ -127,7 +143,19 @@ func (r *Service) ListItems(gvk schema.GroupVersionKind, scope v1.ResourceScope)
 }
 
 func (r *Service) GetItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
-	return func(p graphql.ResolveParams) (any, error) {
+	return func(p graphql.ResolveParams) (result any, err error) {
+		start := time.Now()
+		defer func() {
+			if r.metrics == nil {
+				return
+			}
+			labelResult := "success"
+			if err != nil {
+				labelResult = "error"
+			}
+			r.metrics.RequestsTotal.WithLabelValues("get", gvk.Kind, labelResult).Inc()
+			r.metrics.RequestDuration.WithLabelValues("get", gvk.Kind).Observe(time.Since(start).Seconds())
+		}()
 		logger := log.FromContext(p.Context)
 		ctx, span := otel.Tracer("").Start(p.Context, "GetItem", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
@@ -173,7 +201,7 @@ func (r *Service) GetItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) g
 }
 
 func (r *Service) GetItemAsYAML(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
-	return func(p graphql.ResolveParams) (any, error) {
+	return func(p graphql.ResolveParams) (result any, err error) {
 		_, span := otel.Tracer("").Start(p.Context, "GetItemAsYAML", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
 
@@ -192,7 +220,19 @@ func (r *Service) GetItemAsYAML(gvk schema.GroupVersionKind, scope v1.ResourceSc
 }
 
 func (r *Service) CreateItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
-	return func(p graphql.ResolveParams) (any, error) {
+	return func(p graphql.ResolveParams) (result any, err error) {
+		start := time.Now()
+		defer func() {
+			if r.metrics == nil {
+				return
+			}
+			labelResult := "success"
+			if err != nil {
+				labelResult = "error"
+			}
+			r.metrics.RequestsTotal.WithLabelValues("create", gvk.Kind, labelResult).Inc()
+			r.metrics.RequestDuration.WithLabelValues("create", gvk.Kind).Observe(time.Since(start).Seconds())
+		}()
 		ctx, span := otel.Tracer("").Start(p.Context, "CreateItem", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
 
@@ -241,7 +281,19 @@ func (r *Service) CreateItem(gvk schema.GroupVersionKind, scope v1.ResourceScope
 }
 
 func (r *Service) UpdateItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
-	return func(p graphql.ResolveParams) (any, error) {
+	return func(p graphql.ResolveParams) (result any, err error) {
+		start := time.Now()
+		defer func() {
+			if r.metrics == nil {
+				return
+			}
+			labelResult := "success"
+			if err != nil {
+				labelResult = "error"
+			}
+			r.metrics.RequestsTotal.WithLabelValues("update", gvk.Kind, labelResult).Inc()
+			r.metrics.RequestDuration.WithLabelValues("update", gvk.Kind).Observe(time.Since(start).Seconds())
+		}()
 		logger := log.FromContext(p.Context)
 		ctx, span := otel.Tracer("").Start(p.Context, "UpdateItem", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
@@ -291,7 +343,19 @@ func (r *Service) UpdateItem(gvk schema.GroupVersionKind, scope v1.ResourceScope
 }
 
 func (r *Service) DeleteItem(gvk schema.GroupVersionKind, scope v1.ResourceScope) graphql.FieldResolveFn {
-	return func(p graphql.ResolveParams) (any, error) {
+	return func(p graphql.ResolveParams) (result any, err error) {
+		start := time.Now()
+		defer func() {
+			if r.metrics == nil {
+				return
+			}
+			labelResult := "success"
+			if err != nil {
+				labelResult = "error"
+			}
+			r.metrics.RequestsTotal.WithLabelValues("delete", gvk.Kind, labelResult).Inc()
+			r.metrics.RequestDuration.WithLabelValues("delete", gvk.Kind).Observe(time.Since(start).Seconds())
+		}()
 		logger := log.FromContext(p.Context)
 		ctx, span := otel.Tracer("").Start(p.Context, "DeleteItem", trace.WithAttributes(attribute.String("kind", gvk.Kind)))
 		defer span.End()
@@ -337,7 +401,19 @@ func (r *Service) DeleteItem(gvk schema.GroupVersionKind, scope v1.ResourceScope
 // Kubernetes API server with create-or-update semantics: if the resource
 // exists it is updated, otherwise it is created.
 func (r *Service) ApplyYaml() graphql.FieldResolveFn {
-	return func(p graphql.ResolveParams) (any, error) {
+	return func(p graphql.ResolveParams) (result any, err error) {
+		start := time.Now()
+		defer func() {
+			if r.metrics == nil {
+				return
+			}
+			labelResult := "success"
+			if err != nil {
+				labelResult = "error"
+			}
+			r.metrics.RequestsTotal.WithLabelValues("apply", "", labelResult).Inc()
+			r.metrics.RequestDuration.WithLabelValues("apply", "").Observe(time.Since(start).Seconds())
+		}()
 		ctx, span := otel.Tracer("").Start(p.Context, "ApplyYaml")
 		defer span.End()
 
