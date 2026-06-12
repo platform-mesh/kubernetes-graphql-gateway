@@ -9,17 +9,13 @@ import (
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/controllers/reconciler"
 	"github.com/platform-mesh/kubernetes-graphql-gateway/listener/pkg/schemahandler"
 
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	mcbuilder "sigs.k8s.io/multicluster-runtime/pkg/builder"
 	mcmanager "sigs.k8s.io/multicluster-runtime/pkg/manager"
@@ -36,6 +32,7 @@ type Reconciler struct {
 	opts                        controller.TypedOptions[mcreconcile.Request]
 	reconciler                  *reconciler.Reconciler
 	anchorResource              string
+	anchorProgram               cel.Program // compiled anchorResource, evaluated per listed object
 	resourceGVK                 schema.GroupVersionKind
 	additionalPathAnnotationKey string
 
@@ -114,24 +111,38 @@ func (r *Reconciler) Reconcile(ctx context.Context, req mcreconcile.Request) (ct
 		paths = []string{clusterName}
 	}
 
-	us := unstructured.Unstructured{}
-	us.SetGroupVersionKind(r.resourceGVK)
-
-	// Check if the anchor resource exists
-	if err := c.Get(ctx, req.NamespacedName, &us); err != nil {
-		if errors.IsNotFound(err) {
-			logger.Info("Anchor resource not found, cleaning up schema", "resource", r.anchorResource)
-			// Delete the schema file if namespace is deleted
-			if err := r.reconciler.Cleanup(ctx, paths); err != nil {
-				logger.Error(err, "Failed to cleanup schema")
-			}
-			return ctrl.Result{}, nil
-		}
-		return ctrl.Result{}, fmt.Errorf("failed to get resource: %w", err)
+	// Decide keep-vs-cleanup by LISTING anchor-GVK resources, not by Getting the
+	// single object that triggered this event. The watch fires on every resource
+	// of this GVK (e.g. every APIBinding in the workspace), so a sibling's
+	// create/delete must not be read as the anchor appearing/disappearing.
+	// Regenerate while ≥1 anchor match exists; clean up only when none remain
+	// (e.g. the consumer's own anchor binding is actually gone).
+	ul := &unstructured.UnstructuredList{}
+	ul.SetGroupVersionKind(r.resourceGVK.GroupVersion().WithKind(r.resourceGVK.Kind + "List"))
+	if err := c.List(ctx, ul); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to list %s: %w", r.resourceGVK.Kind, err)
 	}
 
-	if r.additionalPathAnnotationKey != "" && us.GetAnnotations() != nil {
-		if additionalPath, ok := us.GetAnnotations()[r.additionalPathAnnotationKey]; ok {
+	var anchor *unstructured.Unstructured
+	for i := range ul.Items {
+		if r.matchesAnchor(ul.Items[i].Object) {
+			anchor = &ul.Items[i]
+			break
+		}
+	}
+
+	if anchor == nil {
+		logger.Info("No anchor resource present, cleaning up schema", "anchor", r.anchorResource)
+		// Delete the schema file once no anchor-matching resource remains.
+		if err := r.reconciler.Cleanup(ctx, paths); err != nil {
+			logger.Error(err, "Failed to cleanup schema")
+		}
+		return ctrl.Result{}, nil
+	}
+
+	// Additional-path annotation is read from the matched anchor object.
+	if r.additionalPathAnnotationKey != "" && anchor.GetAnnotations() != nil {
+		if additionalPath, ok := anchor.GetAnnotations()[r.additionalPathAnnotationKey]; ok {
 			logger.V(4).Info("Found additional path annotation on anchor resource", "annotationKey", r.additionalPathAnnotationKey, "additionalPath", additionalPath)
 			paths = append(paths, additionalPath)
 		}
@@ -189,36 +200,29 @@ func (r *Reconciler) SetupWithManager(mgr mcmanager.Manager, forOpts ...mcbuilde
 	if err != nil {
 		return fmt.Errorf("failed to create CEL program for anchor resource: %w", err)
 	}
-
-	// Create a predicate to only watch the anchor resource
-	anchorResourcePredicate := predicate.NewPredicateFuncs(func(object client.Object) bool {
-		us, err := runtime.DefaultUnstructuredConverter.ToUnstructured(object)
-		if err != nil {
-			klog.Error("failure converting object to unstructured", "err", err.Error())
-			return false
-		}
-
-		// For now I decided to give it the whole object, so that more complex expressions can be built.
-		out, _, err := prg.Eval(map[string]any{
-			"object": us,
-		})
-		if err != nil {
-			klog.Error("failure evaluating expression", "err", err.Error())
-			return false
-		}
-
-		return out.Value().(bool)
-	})
+	r.anchorProgram = prg
 
 	us := unstructured.Unstructured{}
 	us.SetGroupVersionKind(r.resourceGVK)
 
-	opts := []mcbuilder.ForOption{mcbuilder.WithPredicates(anchorResourcePredicate)}
-	opts = append(opts, forOpts...)
-
+	// No anchor predicate here: we watch every resource of this GVK so a sibling
+	// (e.g. another APIBinding in the same workspace) create/delete also triggers
+	// a rebuild. Whether the anchor itself is present is decided in Reconcile by
+	// listing and evaluating the anchor expression — see matchesAnchor.
 	return mcbuilder.ControllerManagedBy(mgr).
-		For(&us, opts...).
+		For(&us, forOpts...).
 		WithOptions(r.opts).
 		Named(controllerName).
 		Complete(r)
+}
+
+// matchesAnchor reports whether obj satisfies the compiled anchor CEL expression.
+func (r *Reconciler) matchesAnchor(obj map[string]any) bool {
+	out, _, err := r.anchorProgram.Eval(map[string]any{"object": obj})
+	if err != nil {
+		klog.Error("failure evaluating anchor expression", "err", err.Error())
+		return false
+	}
+	b, ok := out.Value().(bool)
+	return ok && b
 }
