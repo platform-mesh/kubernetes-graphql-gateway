@@ -17,7 +17,7 @@ require (
 	github.com/jellydator/ttlcache/v3 v3.4.0
 	github.com/kcp-dev/multicluster-provider v0.7.1
 	github.com/kcp-dev/sdk v0.31.2
-	github.com/platform-mesh/golang-commons v0.17.8
+	github.com/platform-mesh/golang-commons v0.17.9
 	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/client_model v0.6.2
 	github.com/rs/cors v1.11.1
