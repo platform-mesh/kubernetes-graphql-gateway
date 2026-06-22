@@ -74,3 +74,13 @@ jobs:
       appVersion: ${{ needs.create-version.outputs.version }}
       repoName: kubernetes-graphql-gateway
       commit: ${{ github.sha }}
+
+  scan-sbom:
+    needs: [create-version, docker-build-push, sbom, image-ocm]
+    uses: platform-mesh/.github/.github/workflows/job-trivy-sbom.yml@05d96c3fb19e6283463369b857449f9440aba7dd # main
+    permissions:
+      contents: read
+      packages: read
+      security-events: write
+    with:
+      componentVersion: ${{ needs.create-version.outputs.version }}
