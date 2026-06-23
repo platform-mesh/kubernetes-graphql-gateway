@@ -14,26 +14,26 @@ concurrency:
 
 jobs:
   lint:
-    uses: platform-mesh/.github/.github/workflows/job-golang-lint.yml@9ddacafbe3260312cb1cc3f9974ad2fece8effe0
+    uses: platform-mesh/.github/.github/workflows/job-golang-lint.yml@75f52df7bff585bcb2d794a7bbeec132354933fb # main
     with:
       useTask: true
 
   test:
-    uses: platform-mesh/.github/.github/workflows/job-golang-test-source.yml@9ddacafbe3260312cb1cc3f9974ad2fece8effe0
+    uses: platform-mesh/.github/.github/workflows/job-golang-test-source.yml@75f52df7bff585bcb2d794a7bbeec132354933fb # main
     secrets: inherit
     with:
       useTask: true
       useLocalCoverageConfig: true
 
   create-version:
-    uses: platform-mesh/.github/.github/workflows/job-create-version.yml@9ddacafbe3260312cb1cc3f9974ad2fece8effe0
+    uses: platform-mesh/.github/.github/workflows/job-create-version.yml@75f52df7bff585bcb2d794a7bbeec132354933fb # main
     secrets: inherit
     permissions:
       contents: write
 
   docker-build-push:
     needs: [create-version, lint, test]
-    uses: platform-mesh/.github/.github/workflows/job-docker-build-push.yml@9ddacafbe3260312cb1cc3f9974ad2fece8effe0
+    uses: platform-mesh/.github/.github/workflows/job-docker-build-push.yml@75f52df7bff585bcb2d794a7bbeec132354933fb # main
     secrets: inherit
     permissions:
       contents: write
@@ -46,7 +46,7 @@ jobs:
 
   update-version:
     needs: [create-version, docker-build-push]
-    uses: platform-mesh/.github/.github/workflows/job-chart-version-update.yml@9ddacafbe3260312cb1cc3f9974ad2fece8effe0
+    uses: platform-mesh/.github/.github/workflows/job-chart-version-update.yml@75f52df7bff585bcb2d794a7bbeec132354933fb # main
     secrets: inherit
     with:
       appVersion: ${{ needs.create-version.outputs.version }}
@@ -55,7 +55,7 @@ jobs:
 
   sbom:
     needs: [create-version, docker-build-push]
-    uses: platform-mesh/.github/.github/workflows/job-sbom.yml@9ddacafbe3260312cb1cc3f9974ad2fece8effe0
+    uses: platform-mesh/.github/.github/workflows/job-sbom.yml@75f52df7bff585bcb2d794a7bbeec132354933fb # main
     permissions:
       contents: read
       packages: read
@@ -64,7 +64,7 @@ jobs:
 
   image-ocm:
     needs: [create-version, docker-build-push, sbom]
-    uses: platform-mesh/.github/.github/workflows/job-image-ocm.yml@9ddacafbe3260312cb1cc3f9974ad2fece8effe0
+    uses: platform-mesh/.github/.github/workflows/job-image-ocm.yml@75f52df7bff585bcb2d794a7bbeec132354933fb # main
     secrets: inherit
     permissions:
       contents: read
@@ -77,7 +77,7 @@ jobs:
 
   scan-sbom:
     needs: [create-version, docker-build-push, sbom, image-ocm]
-    uses: platform-mesh/.github/.github/workflows/job-trivy-sbom.yml@05d96c3fb19e6283463369b857449f9440aba7dd # main
+    uses: platform-mesh/.github/.github/workflows/job-trivy-sbom.yml@75f52df7bff585bcb2d794a7bbeec132354933fb # main
     permissions:
       contents: read
       packages: read
