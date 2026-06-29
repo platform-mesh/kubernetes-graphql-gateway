@@ -1,5 +1,7 @@
 > [!WARNING]
-> This Repository is under development and not ready for productive use. It is in an alpha stage. That means APIs and concepts may change on short notice including breaking changes or complete removal of apis.
+> Code of this repository has move to [Platform-Mesh/Platform-Mesh](https://github.com/platform-mesh/platform-mesh/tree/main/services/kubernetes-graphql-gateway)
+> New import path: `go.platform-mesh.io/kubernetes-graphql-gateway`
+> New image location: `ghcr.io/platform-mesh/platform-mesh/kubernetes-graphql-gateway`
 
 # kubernetes-graphql-gateway
 
